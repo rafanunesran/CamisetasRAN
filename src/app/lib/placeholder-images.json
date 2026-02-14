@@ -1,0 +1,41 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "uniform-polo",
+      "description": "School polo shirt",
+      "imageUrl": "https://picsum.photos/seed/polo/400/400",
+      "imageHint": "school polo"
+    },
+    {
+      "id": "uniform-skirt",
+      "description": "School pleated skirt",
+      "imageUrl": "https://picsum.photos/seed/skirt/400/400",
+      "imageHint": "school skirt"
+    },
+    {
+      "id": "uniform-pants",
+      "description": "School dress pants",
+      "imageUrl": "https://picsum.photos/seed/pants/400/400",
+      "imageHint": "school pants"
+    },
+    {
+      "id": "uniform-sweater",
+      "description": "V-neck school sweater",
+      "imageUrl": "https://picsum.photos/seed/sweater/400/400",
+      "imageHint": "school sweater"
+    },
+    {
+      "id": "uniform-jacket",
+      "description": "School track jacket",
+      "imageUrl": "https://picsum.photos/seed/jacket/400/400",
+      "imageHint": "track jacket"
+    },
+    {
+      "id": "uniform-shorts",
+      "description": "School gym shorts",
+      "imageUrl": "https://picsum.photos/seed/shorts/400/400",
+      "imageHint": "gym shorts"
+    }
+  ]
+}
