@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backstage - UniformeGestor</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { DEFAULT: '#2E3A87', foreground: '#ffffff' },
+                        secondary: { DEFAULT: '#E9ECEF', foreground: '#1f2937' },
+                        accent: { DEFAULT: '#9B5DE5', foreground: '#ffffff' },
+                        muted: { DEFAULT: '#f3f4f6', foreground: '#6b7280' },
+                        destructive: { DEFAULT: '#ef4444', foreground: '#ffffff' },
+                        background: '#ffffff',
+                        foreground: '#020817',
+                        border: '#e5e7eb',
+                    },
+                    fontFamily: {
+                        headline: ['"PT Sans"', 'sans-serif'],
+                        body: ['"PT Sans"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-btn.active { border-bottom-color: #2E3A87; color: #020817; }
+        /* Esconde a barra de rolagem mas mantém a funcionalidade */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+    <script>
+        // Proteção de rota simples
+        if (sessionStorage.getItem('auth') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+</head>
+<body class="font-body antialiased bg-background overflow-hidden flex h-screen">
+
+    <!-- Sidebar -->
+    <aside class="fixed left-0 top-0 h-full w-16 hover:w-64 transition-[width] duration-300 ease-in-out bg-primary text-primary-foreground hidden lg:flex flex-col z-50 shadow-2xl overflow-hidden group">
+        <div class="h-16 flex items-center border-b border-white/10 whitespace-nowrap relative">
+            <div class="w-16 flex justify-center items-center shrink-0">
+            <i data-lucide="graduation-cap" class="h-8 w-8 text-accent shrink-0"></i>
+            </div>
+            <span class="text-xl font-bold font-headline opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 absolute left-16">Backstage</span>
+        </div>
+        <nav class="flex-1 space-y-1 py-4 flex flex-col overflow-hidden">
+            <button onclick="switchTab('overview')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="layout-dashboard" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Dashboard</span>
+            </button>
+            <button onclick="switchTab('clients')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="users" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Clientes</span>
+            </button>
+            <button onclick="switchTab('schools')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="building-2" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Escolas/Rev</span>
+            </button>
+            <button onclick="switchTab('products')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="shirt" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Produtos</span>
+            </button>
+            <button onclick="switchTab('inventory')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="package" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Estoque</span>
+            </button>
+            <button onclick="switchTab('production')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="factory" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Produção</span>
+            </button>
+            <button onclick="switchTab('transfers')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="arrow-right-left" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Repasses</span>
+            </button>
+            <button onclick="switchTab('reports')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="file-bar-chart" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Relatórios</span>
+            </button>
+            
+            <div class="mt-auto pt-4 border-t border-white/10 px-0 pb-4">
+                <a href="index.html" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium text-accent transition-colors duration-200 relative">
+                    <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="arrow-left" class="h-5 w-5"></i></div>
+                    <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Voltar ao Site</span>
+                </a>
+                <button onclick="logout()" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium text-red-300 hover:text-red-100 transition-colors duration-200 relative">
+                    <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="log-out" class="h-5 w-5"></i></div>
+                    <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Sair</span>
+                </button>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto bg-gray-50 lg:ml-16">
+        <header class="h-16 bg-white border-b px-8 flex items-center justify-between sticky top-0 z-40">
+            <div class="flex items-center gap-4 flex-1 max-w-md">
+                <div class="relative w-full">
+                    <i data-lucide="search" class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"></i>
+                    <input placeholder="Buscar..." class="pl-9 bg-muted/50 border-none h-9 w-full rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="h-9 w-9 bg-accent rounded-full flex items-center justify-center text-accent-foreground font-bold">AD</div>
+            </div>
+        </header>
+
+        <div class="p-8 max-w-7xl mx-auto space-y-8">
+            <div class="flex justify-between items-end">
+                <div>
+                    <h1 class="text-3xl font-bold font-headline text-primary">Painel de Controle</h1>
+                    <p class="text-muted-foreground">Bem-vindo ao sistema de gestão UniformeGestor.</p>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="bg-white p-1 h-12 shadow-sm border rounded-md flex mb-6 overflow-x-auto no-scrollbar">
+                <button onclick="switchTab('overview')" id="btn-overview" class="tab-btn active h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="layout-dashboard" class="h-4 w-4"></i> Visão Geral
+                </button>
+                <button onclick="switchTab('clients')" id="btn-clients" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="users" class="h-4 w-4"></i> Clientes
+                </button>
+                <button onclick="switchTab('schools')" id="btn-schools" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="building-2" class="h-4 w-4"></i> Escolas/Rev
+                </button>
+                <button onclick="switchTab('products')" id="btn-products" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="shirt" class="h-4 w-4"></i> Produtos
+                </button>
+                <button onclick="switchTab('inventory')" id="btn-inventory" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="package" class="h-4 w-4"></i> Estoque
+                </button>
+                <button onclick="switchTab('production')" id="btn-production" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="factory" class="h-4 w-4"></i> Produção
+                </button>
+                <button onclick="switchTab('transfers')" id="btn-transfers" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="arrow-right-left" class="h-4 w-4"></i> Repasses
+                </button>
+                <button onclick="switchTab('reports')" id="btn-reports" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="file-bar-chart" class="h-4 w-4"></i> Relatórios
+                </button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="rounded-lg border bg-white shadow-sm p-6">
+                        <h3 class="text-sm font-medium text-muted-foreground">Vendas do Mês</h3>
+                        <div class="text-2xl font-bold text-primary mt-2">R$ 24.500,00</div>
+                        <p class="text-xs text-green-600 flex items-center gap-1 mt-1"><i data-lucide="trending-up" class="h-3 w-3"></i> +12%</p>
+                    </div>
+                    <div class="rounded-lg border bg-white shadow-sm p-6">
+                        <h3 class="text-sm font-medium text-muted-foreground">Ordens em Produção</h3>
+                        <div class="text-2xl font-bold text-primary mt-2">12</div>
+                    </div>
+                </div>
+                
+                <!-- Recent Orders -->
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b">
+                        <h3 class="font-semibold">Pedidos Recentes</h3>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-muted-foreground font-medium border-b">
+                                <tr><th class="pb-3">Escola</th><th class="pb-3">Itens</th><th class="pb-3 text-right">Valor</th></tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr><td class="py-3">Sta. Maria</td><td>45 polos</td><td class="text-right">R$ 2.065,50</td></tr>
+                                <tr><td class="py-3">Anglo</td><td>12 jaquetas</td><td class="text-right">R$ 1.320,00</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clients Tab -->
+            <div id="clients" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b flex justify-between items-center">
+                        <h3 class="font-semibold">Base de Clientes</h3>
+                        <button onclick="openClientModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors">Novo Cliente</button>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-muted-foreground font-medium border-b">
+                                <tr><th class="pb-3">Nome</th><th class="pb-3">Telefone</th><th class="pb-3">Parceiro</th><th class="pb-3">Estudante</th><th class="pb-3 text-right">Ações</th></tr>
+                            </thead>
+                            <tbody id="clients-table-body" class="divide-y">
+                                <tr><td colspan="5" class="py-4 text-center text-muted-foreground">Carregando clientes...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schools/Resellers Tab -->
+            <div id="schools" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b flex justify-between items-center">
+                        <h3 class="font-semibold">Escolas e Revendedores</h3>
+                        <button onclick="openPartnerModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors">Novo Parceiro</button>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-muted-foreground font-medium border-b">
+                                <tr><th class="pb-3">Nome Oficial</th><th class="pb-3">Nick name</th><th class="pb-3">Chave Pix</th><th class="pb-3">Status</th><th class="pb-3 text-right">Ações</th></tr>
+                            </thead>
+                            <tbody id="partners-table-body" class="divide-y">
+                                <!-- Dados carregados via Firebase -->
+                                <tr><td colspan="5" class="py-4 text-center text-muted-foreground">Carregando parceiros...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Tab -->
+            <div id="products" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b flex justify-between items-center">
+                        <h3 class="font-semibold">Catálogo de Produtos</h3>
+                        <button class="text-xs bg-primary text-white px-3 py-1 rounded">Novo Produto</button>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-muted-foreground font-medium border-b">
+                                <tr><th class="pb-3">Produto</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3 text-right">Ações</th></tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr><td class="py-3">Polo Tradicional</td><td>Camisetas</td><td>R$ 45,90</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
+                                <tr><td class="py-3">Saia Pregueada</td><td>Inferior</td><td>R$ 65,00</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
+                                <tr><td class="py-3">Calça Social</td><td>Inferior</td><td>R$ 72,50</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
+                                <tr><td class="py-3">Jaqueta Tactel</td><td>Inverno</td><td>R$ 110,00</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Tab -->
+            <div id="inventory" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b flex justify-between items-center">
+                        <h3 class="font-semibold">Gestão de Estoque</h3>
+                        <button class="text-xs bg-primary text-white px-3 py-1 rounded">Novo Item</button>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-muted-foreground font-medium border-b">
+                                <tr><th class="pb-3">Produto</th><th class="pb-3">Estoque</th><th class="pb-3">Status</th></tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr>
+                                    <td class="py-3">Polo Tradicional P</td>
+                                    <td>150</td>
+                                    <td><span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Ok</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3">Polo Tradicional M</td>
+                                    <td>24</td>
+                                    <td><span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">Crítico</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Production Tab -->
+            <div id="production" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b">
+                        <h3 class="font-semibold">Controle de Produção</h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="border rounded-lg p-4">
+                            <div class="flex justify-between mb-2">
+                                <h4 class="font-bold text-sm">Polo Tradicional M <span class="font-normal text-muted-foreground">- Sta. Maria</span></h4>
+                                <span class="text-xs bg-primary text-white px-2 py-0.5 rounded">Corte</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-accent h-2 rounded-full" style="width: 25%"></div>
+                            </div>
+                            <p class="text-xs text-right mt-1 text-muted-foreground">25%</p>
+                        </div>
+                        <div class="border rounded-lg p-4">
+                            <div class="flex justify-between mb-2">
+                                <h4 class="font-bold text-sm">Suéter de Lã <span class="font-normal text-muted-foreground">- Britânico</span></h4>
+                                <span class="text-xs bg-primary text-white px-2 py-0.5 rounded">Costura</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-accent h-2 rounded-full" style="width: 60%"></div>
+                            </div>
+                            <p class="text-xs text-right mt-1 text-muted-foreground">60%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transfers Tab (Repasses) -->
+            <div id="transfers" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b">
+                        <h3 class="font-semibold">Repasses e Comissões</h3>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-muted-foreground font-medium border-b">
+                                <tr><th class="pb-3">Beneficiário</th><th class="pb-3">Tipo</th><th class="pb-3">Valor</th><th class="pb-3 text-right">Status</th></tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr><td class="py-3">Colégio Santa Maria</td><td>Comissão</td><td>R$ 1.250,00</td><td class="text-right"><span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Aberto</span></td></tr>
+                                <tr><td class="py-3">Ricardo Santos</td><td>Representante</td><td>R$ 850,00</td><td class="text-right"><span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Pago</span></td></tr>
+                                <tr><td class="py-3">Maria Oliveira</td><td>Produção</td><td>R$ 2.100,00</td><td class="text-right"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Processando</span></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div id="reports" class="tab-content space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="rounded-lg border bg-white shadow-sm p-6 flex flex-col items-center text-center">
+                        <i data-lucide="file-text" class="h-10 w-10 text-primary mb-4"></i>
+                        <h3 class="font-semibold mb-2">Relatório de Vendas</h3>
+                        <p class="text-sm text-muted-foreground mb-4">Exportar dados de vendas por período.</p>
+                        <button class="text-sm bg-secondary hover:bg-secondary/80 px-4 py-2 rounded w-full">Baixar PDF</button>
+                    </div>
+                    <div class="rounded-lg border bg-white shadow-sm p-6 flex flex-col items-center text-center">
+                        <i data-lucide="package-check" class="h-10 w-10 text-primary mb-4"></i>
+                        <h3 class="font-semibold mb-2">Relatório de Estoque</h3>
+                        <p class="text-sm text-muted-foreground mb-4">Posição atual e previsão de demanda.</p>
+                        <button class="text-sm bg-secondary hover:bg-secondary/80 px-4 py-2 rounded w-full">Baixar CSV</button>
+                    </div>
+                    <div class="rounded-lg border bg-white shadow-sm p-6 flex flex-col items-center text-center">
+                        <i data-lucide="banknote" class="h-10 w-10 text-primary mb-4"></i>
+                        <h3 class="font-semibold mb-2">Relatório Financeiro</h3>
+                        <p class="text-sm text-muted-foreground mb-4">Balanço de repasses e lucros.</p>
+                        <button class="text-sm bg-secondary hover:bg-secondary/80 px-4 py-2 rounded w-full">Baixar Excel</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal de Parceiro -->
+    <div id="partnerModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
+            <h2 id="modalTitle" class="text-xl font-bold text-primary">Novo Parceiro</h2>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Nome Oficial</label>
+                <input id="partnerName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Razão Social ou Nome Completo">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Nick name (Apelido)</label>
+                <input id="partnerNickname" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Nome Fantasia ou Apelido">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Chave Pix (Opcional)</label>
+                <input id="partnerPix" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="CPF, CNPJ, Email ou Aleatória">
+            </div>
+            <div class="flex justify-end gap-2 pt-4">
+                <button onclick="closePartnerModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
+                <button id="savePartnerBtn" onclick="savePartner()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Cliente -->
+    <div id="clientModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
+            <h2 id="clientModalTitle" class="text-xl font-bold text-primary">Novo Cliente</h2>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Nome do Cliente</label>
+                <input id="clientName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Nome completo">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Telefone</label>
+                <input id="clientPhone" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="(00) 00000-0000">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Parceiro (Escola/Revendedor)</label>
+                <select id="clientPartner" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="">Selecione um parceiro...</option>
+                </select>
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Nome do Estudante (se escola)</label>
+                <input id="clientStudent" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Nome do aluno">
+            </div>
+            <div class="flex justify-end gap-2 pt-4">
+                <button onclick="closeClientModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
+                <button id="saveClientBtn" onclick="saveClient()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWZEZskuEMIby9dr5iWfH2G3nsXj14gr4",
+            authDomain: "camisetasran.firebaseapp.com",
+            projectId: "camisetasran",
+            storageBucket: "camisetasran.firebasestorage.app",
+            messagingSenderId: "983902425471",
+            appId: "1:983902425471:web:c072c921574fd2415d8a4a",
+            measurementId: "G-6FJGXVCYV6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let partners = [];
+        let clients = [];
+        let currentPartnerId = null;
+        let currentClientId = null;
+
+        // Função para buscar parceiros
+        async function fetchPartners() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "partners"));
+                partners = [];
+                querySnapshot.forEach((doc) => {
+                    partners.push({ id: doc.id, ...doc.data() });
+                });
+                renderPartners();
+                fetchClients(); // Busca clientes depois de ter os parceiros para mapear nomes
+            } catch (error) {
+                console.error("Erro ao buscar parceiros:", error);
+                document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
+            }
+        }
+
+        // Função para renderizar a tabela
+        function renderPartners() {
+            const tbody = document.getElementById('partners-table-body');
+            if (!tbody) return;
+            
+            if (partners.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-muted-foreground">Nenhum parceiro encontrado.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            partners.forEach(partner => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 font-medium">${partner.name || ''}</td>
+                    <td>${partner.nickname || ''}</td>
+                    <td>${partner.pix || '-'}</td>
+                    <td><span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Ativo</span></td>
+                    <td class="text-right">
+                        <div class="flex justify-end gap-2">
+                            <button onclick="window.openPartnerModal('${partner.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-primary" title="Editar"><i data-lucide="pencil" class="h-4 w-4"></i></button>
+                            <button onclick="window.deletePartner('${partner.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-red-500" title="Excluir"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // Função para buscar clientes
+        async function fetchClients() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "clients"));
+                clients = [];
+                querySnapshot.forEach((doc) => {
+                    clients.push({ id: doc.id, ...doc.data() });
+                });
+                renderClients();
+            } catch (error) {
+                console.error("Erro ao buscar clientes:", error);
+                document.getElementById('clients-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
+            }
+        }
+
+        // Função para renderizar tabela de clientes
+        function renderClients() {
+            const tbody = document.getElementById('clients-table-body');
+            if (!tbody) return;
+            
+            if (clients.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-muted-foreground">Nenhum cliente encontrado.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            clients.forEach(client => {
+                const partner = partners.find(p => p.id === client.partnerId);
+                const partnerName = partner ? (partner.nickname || partner.name) : '-';
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 font-medium">${client.name || ''}</td>
+                    <td>${client.phone || ''}</td>
+                    <td>${partnerName}</td>
+                    <td>${client.studentName || '-'}</td>
+                    <td class="text-right">
+                        <div class="flex justify-end gap-2">
+                            <button onclick="window.openClientModal('${client.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-primary" title="Editar"><i data-lucide="pencil" class="h-4 w-4"></i></button>
+                            <button onclick="window.deleteClient('${client.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-red-500" title="Excluir"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // Funções globais para acesso via HTML onclick
+        window.openPartnerModal = (id = null) => {
+            const modal = document.getElementById('partnerModal');
+            const title = document.getElementById('modalTitle');
+            const nameInput = document.getElementById('partnerName');
+            const nicknameInput = document.getElementById('partnerNickname');
+            const pixInput = document.getElementById('partnerPix');
+
+            currentPartnerId = id;
+
+            if (id) {
+                const partner = partners.find(p => p.id === id);
+                if (partner) {
+                    title.textContent = 'Editar Parceiro';
+                    nameInput.value = partner.name || '';
+                    nicknameInput.value = partner.nickname || '';
+                    pixInput.value = partner.pix || '';
+                }
+            } else {
+                title.textContent = 'Novo Parceiro';
+                nameInput.value = '';
+                nicknameInput.value = '';
+                pixInput.value = '';
+            }
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closePartnerModal = () => {
+            const modal = document.getElementById('partnerModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        window.savePartner = async () => {
+            const name = document.getElementById('partnerName').value;
+            const nickname = document.getElementById('partnerNickname').value;
+            const pix = document.getElementById('partnerPix').value;
+
+            if (!name || !nickname) {
+                alert('Nome e Apelido são obrigatórios');
+                return;
+            }
+
+            const saveBtn = document.getElementById('savePartnerBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = 'Salvando...';
+            saveBtn.disabled = true;
+
+            try {
+                if (currentPartnerId) {
+                    await updateDoc(doc(db, "partners", currentPartnerId), {
+                        name, nickname, pix
+                    });
+                } else {
+                    await addDoc(collection(db, "partners"), {
+                        name, nickname, pix, status: 'Ativo'
+                    });
+                }
+                window.closePartnerModal();
+                fetchPartners();
+            } catch (e) {
+                console.error("Error saving partner: ", e);
+                alert("Erro ao salvar parceiro: " + e.message);
+            } finally {
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+            }
+        }
+
+        window.deletePartner = async (id) => {
+            if (confirm('Tem certeza que deseja excluir este parceiro?')) {
+                try {
+                    await deleteDoc(doc(db, "partners", id));
+                    fetchPartners();
+                } catch (e) {
+                    console.error("Error deleting partner: ", e);
+                    alert("Erro ao excluir parceiro");
+                }
+            }
+        }
+
+        // Funções para Clientes
+        window.openClientModal = (id = null) => {
+            const modal = document.getElementById('clientModal');
+            const title = document.getElementById('clientModalTitle');
+            const nameInput = document.getElementById('clientName');
+            const phoneInput = document.getElementById('clientPhone');
+            const partnerSelect = document.getElementById('clientPartner');
+            const studentInput = document.getElementById('clientStudent');
+
+            // Popular select de parceiros
+            partnerSelect.innerHTML = '<option value="">Selecione um parceiro...</option>';
+            partners.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nickname || p.name;
+                partnerSelect.appendChild(option);
+            });
+
+            currentClientId = id;
+
+            if (id) {
+                const client = clients.find(c => c.id === id);
+                if (client) {
+                    title.textContent = 'Editar Cliente';
+                    nameInput.value = client.name || '';
+                    phoneInput.value = client.phone || '';
+                    partnerSelect.value = client.partnerId || '';
+                    studentInput.value = client.studentName || '';
+                }
+            } else {
+                title.textContent = 'Novo Cliente';
+                nameInput.value = '';
+                phoneInput.value = '';
+                partnerSelect.value = '';
+                studentInput.value = '';
+            }
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeClientModal = () => {
+            const modal = document.getElementById('clientModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        window.saveClient = async () => {
+            const name = document.getElementById('clientName').value;
+            const phone = document.getElementById('clientPhone').value;
+            const partnerId = document.getElementById('clientPartner').value;
+            const studentName = document.getElementById('clientStudent').value;
+
+            if (!name) {
+                alert('Nome do cliente é obrigatório');
+                return;
+            }
+
+            const saveBtn = document.getElementById('saveClientBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = 'Salvando...';
+            saveBtn.disabled = true;
+
+            try {
+                const clientData = {
+                    name, phone, partnerId, studentName
+                };
+
+                if (currentClientId) {
+                    await updateDoc(doc(db, "clients", currentClientId), clientData);
+                } else {
+                    await addDoc(collection(db, "clients"), {
+                        ...clientData,
+                        lastPurchase: new Date().toISOString()
+                    });
+                }
+                window.closeClientModal();
+                fetchClients();
+            } catch (e) {
+                console.error("Error saving client: ", e);
+                alert("Erro ao salvar cliente: " + e.message);
+            } finally {
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+            }
+        }
+
+        window.deleteClient = async (id) => {
+            if (confirm('Tem certeza que deseja excluir este cliente?')) {
+                try {
+                    await deleteDoc(doc(db, "clients", id));
+                    fetchClients();
+                } catch (e) {
+                    console.error("Error deleting client: ", e);
+                    alert("Erro ao excluir cliente");
+                }
+            }
+        }
+
+        // Inicializar
+        fetchPartners();
+    </script>
+
+    <script>
+        lucide.createIcons();
+
+        function switchTab(tabId) {
+            // Hide all contents
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            // Deactivate all buttons
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('text-muted-foreground');
+            });
+
+            // Show selected content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Activate selected button
+            const btn = document.getElementById('btn-' + tabId);
+            if(btn) {
+                btn.classList.add('active');
+                btn.classList.remove('text-muted-foreground');
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('auth');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

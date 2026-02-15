@@ -1,5 +1,6 @@
+'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingCart, LogIn, GraduationCap, ArrowRight } from 'lucide-react';
@@ -7,16 +8,37 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function LandingPage() {
-  const products = [
-    { id: 1, name: 'Polo Tradicional', price: 45.9, school: 'Colégio Santa Maria', image: PlaceHolderImages[0].imageUrl },
-    { id: 2, name: 'Saia Pregueada', price: 65.0, school: 'Escola Internacional', image: PlaceHolderImages[1].imageUrl },
-    { id: 3, name: 'Calça Social', price: 72.5, school: 'Colégio Militar', image: PlaceHolderImages[2].imageUrl },
-    { id: 4, name: 'Suéter de Lã', price: 89.9, school: 'Colégio Britânico', image: PlaceHolderImages[3].imageUrl },
-    { id: 5, name: 'Jaqueta Tactel', price: 110.0, school: 'Escola Modelo', image: PlaceHolderImages[4].imageUrl },
-    { id: 6, name: 'Shorts de Educação Física', price: 35.0, school: 'Colégio Objetivo', image: PlaceHolderImages[5].imageUrl },
-  ];
+  const [products, setProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const productsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (productsData.length > 0) {
+          setProducts(productsData);
+        } else {
+          // Fallback para dados de exemplo se o banco estiver vazio
+          setProducts([
+            { id: 1, name: 'Polo Tradicional', price: 45.9, school: 'Colégio Santa Maria', image: PlaceHolderImages[0].imageUrl },
+            { id: 2, name: 'Saia Pregueada', price: 65.0, school: 'Escola Internacional', image: PlaceHolderImages[1].imageUrl },
+            { id: 3, name: 'Calça Social', price: 72.5, school: 'Colégio Militar', image: PlaceHolderImages[2].imageUrl },
+            { id: 4, name: 'Suéter de Lã', price: 89.9, school: 'Colégio Britânico', image: PlaceHolderImages[3].imageUrl },
+            { id: 5, name: 'Jaqueta Tactel', price: 110.0, school: 'Escola Modelo', image: PlaceHolderImages[4].imageUrl },
+            { id: 6, name: 'Shorts de Educação Física', price: 35.0, school: 'Colégio Objetivo', image: PlaceHolderImages[5].imageUrl },
+          ]);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar produtos:", error);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -81,11 +103,11 @@ export default function LandingPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {products.map((product) => (
+          {products.map((product: any) => (
             <Card key={product.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300">
               <div className="relative aspect-square overflow-hidden bg-white">
                 <Image
-                  src={product.image}
+                  src={product.image || PlaceHolderImages[0].imageUrl}
                   alt={product.name}
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-500"

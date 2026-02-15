@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - UniformeGestor</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { DEFAULT: '#2E3A87', foreground: '#ffffff' },
+                        background: '#ffffff',
+                        foreground: '#020817',
+                    },
+                    fontFamily: {
+                        body: ['"PT Sans"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="font-body antialiased bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md border">
+        <div class="flex flex-col items-center mb-6">
+            <div class="bg-primary/10 p-3 rounded-full mb-4">
+                <i data-lucide="lock" class="h-8 w-8 text-primary"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-primary">Área Restrita</h1>
+            <p class="text-sm text-gray-500">Entre com suas credenciais de administrador.</p>
+        </div>
+
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
+                <input type="text" id="username" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Digite seu usuário" required>
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                <input type="password" id="password" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Digite sua senha" required>
+            </div>
+            
+            <div id="errorMessage" class="text-red-500 text-sm hidden text-center">
+                Usuário ou senha incorretos.
+            </div>
+
+            <button type="submit" class="w-full bg-primary text-white py-2 rounded-md hover:bg-primary/90 transition-colors font-semibold">
+                Entrar
+            </button>
+        </form>
+
+        <div class="mt-6 text-center">
+            <a href="index.html" class="text-sm text-gray-500 hover:text-primary flex items-center justify-center gap-1">
+                <i data-lucide="arrow-left" class="h-3 w-3"></i> Voltar ao site
+            </a>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMessage');
+
+            // Credenciais definidas
+            if (user === 'Amora' && pass === '4862') {
+                // Salva a sessão
+                sessionStorage.setItem('auth', 'true');
+                window.location.href = 'backstage.html';
+            } else {
+                errorMsg.classList.remove('hidden');
+                // Treme o formulário (opcional, visual)
+                document.querySelector('.bg-white').classList.add('animate-pulse');
+                setTimeout(() => document.querySelector('.bg-white').classList.remove('animate-pulse'), 200);
+            }
+        });
+    </script>
+</body>
+</html>
