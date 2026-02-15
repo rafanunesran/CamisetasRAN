@@ -595,8 +595,8 @@
                 window.closePartnerModal();
                 fetchPartners(); // Atualiza em background para não travar a UI
             } catch (e) {
-                console.error("Error saving partner: ", e);
-                alert("Erro ao salvar parceiro: " + e.message);
+                console.error("DETAILED FIREBASE ERROR (Partner):", e);
+                alert("Erro ao salvar parceiro: " + e.message + "\n\nVerifique o console do navegador (F12) para mais detalhes.");
             } finally {
                 saveBtn.textContent = 'Salvar';
                 saveBtn.disabled = false;
@@ -697,8 +697,8 @@
                 window.closeClientModal();
                 fetchClients(); // Atualiza em background para não travar a UI
             } catch (e) {
-                console.error("Error saving client: ", e);
-                alert("Erro ao salvar cliente: " + e.message);
+                console.error("DETAILED FIREBASE ERROR (Client):", e);
+                alert("Erro ao salvar cliente: " + e.message + "\n\nVerifique o console do navegador (F12) para mais detalhes.");
             } finally {
                 saveBtn.textContent = 'Salvar';
                 saveBtn.disabled = false;
