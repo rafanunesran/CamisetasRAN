@@ -257,24 +257,19 @@
                 <div class="rounded-lg border bg-white shadow-sm">
                     <div class="p-6 border-b flex justify-between items-center">
                         <h3 class="font-semibold">Gestão de Estoque</h3>
-                        <button class="text-xs bg-primary text-white px-3 py-1 rounded">Novo Item</button>
+                        <div class="flex gap-2">
+                            <button onclick="openMovementsModal()" class="text-xs border border-gray-300 bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-50 transition-colors flex items-center gap-1"><i data-lucide="history" class="h-3 w-3"></i> Movimentações</button>
+                            <button onclick="openPurchaseModal()" class="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors flex items-center gap-1"><i data-lucide="shopping-cart" class="h-3 w-3"></i> Nova Compra</button>
+                            <button onclick="openInventoryModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors flex items-center gap-1"><i data-lucide="plus" class="h-3 w-3"></i> Novo Item</button>
+                        </div>
                     </div>
                     <div class="p-6">
                         <table class="w-full text-sm text-left">
                             <thead class="text-muted-foreground font-medium border-b">
-                                <tr><th class="pb-3">Produto</th><th class="pb-3">Estoque</th><th class="pb-3">Status</th></tr>
+                                <tr><th class="pb-3">Imagem</th><th class="pb-3">Nome</th><th class="pb-3">Tipo</th><th class="pb-3">Custo Unit.</th><th class="pb-3">Estoque</th><th class="pb-3 text-right">Ações</th></tr>
                             </thead>
-                            <tbody class="divide-y">
-                                <tr>
-                                    <td class="py-3">Polo Tradicional P</td>
-                                    <td>150</td>
-                                    <td><span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Ok</span></td>
-                                </tr>
-                                <tr>
-                                    <td class="py-3">Polo Tradicional M</td>
-                                    <td>24</td>
-                                    <td><span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">Crítico</span></td>
-                                </tr>
+                            <tbody id="inventory-table-body" class="divide-y">
+                                <tr><td colspan="6" class="py-4 text-center text-muted-foreground">Carregando estoque...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -412,10 +407,145 @@
         </div>
     </div>
 
+    <!-- Modal de Estoque -->
+    <div id="inventoryModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
+            <h2 id="inventoryModalTitle" class="text-xl font-bold text-primary">Novo Item de Estoque</h2>
+            
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Tipo</label>
+                <select id="inventoryType" onchange="toggleInventoryFields()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="Malha">Malha</option>
+                    <option value="Estampa">Estampa</option>
+                </select>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Nome do Item</label>
+                <input id="inventoryName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Ex: Algodão 30.1 ou Estampa Leão">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Custo Unitário (R$)</label>
+                    <input id="inventoryCost" type="number" step="0.01" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="0.00">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Quantidade</label>
+                    <input id="inventoryQuantity" type="number" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="0">
+                </div>
+            </div>
+
+            <div id="inventoryImageContainer" class="space-y-2 hidden">
+                <label class="text-sm font-medium text-gray-700">Imagem da Estampa</label>
+                <div class="flex items-center gap-4">
+                    <input id="inventoryImage" type="file" accept="image/*" onchange="previewImage(this)" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <img id="inventoryImagePreview" src="" alt="Preview" class="h-10 w-10 object-cover rounded border hidden">
+                </div>
+                <p class="text-xs text-muted-foreground">A imagem será salva no sistema.</p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4">
+                <button onclick="closeInventoryModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
+                <button id="saveInventoryBtn" onclick="saveInventory()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Compra -->
+    <div id="purchaseModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-primary">Registrar Compra</h2>
+            
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Fornecedor</label>
+                <input id="purchaseSupplier" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nome do Fornecedor">
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-md border border-gray-200 space-y-4">
+                <h3 class="text-sm font-semibold">Adicionar Item</h3>
+                <div class="grid grid-cols-12 gap-2 items-end">
+                    <div class="col-span-5 space-y-1">
+                        <label class="text-xs font-medium">Item</label>
+                        <select id="purchaseItemSelect" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2 space-y-1">
+                        <label class="text-xs font-medium">Qtd</label>
+                        <input id="purchaseItemQty" type="number" class="flex h-9 w-full rounded-md border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0">
+                    </div>
+                    <div class="col-span-3 space-y-1">
+                        <label class="text-xs font-medium">Valor Total Pago (R$)</label>
+                        <input id="purchaseItemTotal" type="number" step="0.01" class="flex h-9 w-full rounded-md border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00">
+                    </div>
+                    <div class="col-span-2">
+                        <button onclick="addPurchaseItem()" class="w-full h-9 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md text-xs font-medium border border-gray-300">Adicionar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border rounded-md overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-muted-foreground font-medium">
+                        <tr><th class="px-4 py-2">Item</th><th class="px-4 py-2">Qtd</th><th class="px-4 py-2">Total</th><th class="px-4 py-2 text-right">Ação</th></tr>
+                    </thead>
+                    <tbody id="purchaseItemsList" class="divide-y">
+                        <!-- Itens adicionados -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 pt-2">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Frete Total (R$)</label>
+                    <input id="purchaseShipping" type="number" step="0.01" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00">
+                </div>
+                <div class="flex flex-col justify-end items-end">
+                    <span class="text-sm text-muted-foreground">Total da Compra</span>
+                    <span id="purchaseTotalDisplay" class="text-2xl font-bold text-primary">R$ 0,00</span>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t">
+                <button onclick="closePurchaseModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="finalizePurchaseBtn" onclick="finalizePurchase()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Finalizar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Movimentações -->
+    <div id="movementsModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-primary">Extrato de Movimentações</h2>
+                <button onclick="closeMovementsModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            <div class="border rounded-md overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-muted-foreground font-medium">
+                        <tr>
+                            <th class="px-4 py-3">Data</th>
+                            <th class="px-4 py-3">Tipo</th>
+                            <th class="px-4 py-3">Item</th>
+                            <th class="px-4 py-3">Qtd</th>
+                            <th class="px-4 py-3">Valor Unit.</th>
+                            <th class="px-4 py-3">Origem/Destino</th>
+                        </tr>
+                    </thead>
+                    <tbody id="movementsTableBody" class="divide-y">
+                        <tr><td colspan="6" class="p-4 text-center text-muted-foreground">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAWZEZskuEMIby9dr5iWfH2G3nsXj14gr4",
@@ -429,11 +559,15 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
         let partners = [];
         let clients = [];
+        let inventory = [];
         let currentPartnerId = null;
         let currentClientId = null;
+        let currentInventoryId = null;
+        let purchaseList = [];
 
         // Função para buscar parceiros
         async function fetchPartners() {
@@ -445,6 +579,7 @@
                 });
                 renderPartners();
                 fetchClients(); // Busca clientes depois de ter os parceiros para mapear nomes
+                fetchInventory();
             } catch (error) {
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
@@ -521,6 +656,55 @@
                         <div class="flex justify-end gap-2">
                             <button onclick="window.openClientModal('${client.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-primary" title="Editar"><i data-lucide="pencil" class="h-4 w-4"></i></button>
                             <button onclick="window.deleteClient('${client.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-red-500" title="Excluir"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // Função para buscar estoque
+        async function fetchInventory() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "inventory"));
+                inventory = [];
+                querySnapshot.forEach((doc) => {
+                    inventory.push({ id: doc.id, ...doc.data() });
+                });
+                renderInventory();
+            } catch (error) {
+                console.error("Erro ao buscar estoque:", error);
+                document.getElementById('inventory-table-body').innerHTML = '<tr><td colspan="6" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
+            }
+        }
+
+        // Função para renderizar tabela de estoque
+        function renderInventory() {
+            const tbody = document.getElementById('inventory-table-body');
+            if (!tbody) return;
+            
+            if (inventory.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-muted-foreground">Nenhum item no estoque.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            inventory.forEach(item => {
+                const isPrint = item.type === 'Estampa';
+                const imageHtml = isPrint && item.image ? `<img src="${item.image}" class="h-8 w-8 object-cover rounded border" alt="Estampa">` : '<div class="h-8 w-8 bg-gray-100 rounded border flex items-center justify-center"><i data-lucide="package" class="h-4 w-4 text-gray-400"></i></div>';
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3">${imageHtml}</td>
+                    <td class="font-medium">${item.name || ''}</td>
+                    <td><span class="px-2 py-1 rounded-full text-xs ${isPrint ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">${item.type}</span></td>
+                    <td>R$ ${parseFloat(item.cost || 0).toFixed(2)}</td>
+                    <td>${item.quantity || 0}</td>
+                    <td class="text-right">
+                        <div class="flex justify-end gap-2">
+                            <button onclick="window.openInventoryModal('${item.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-primary" title="Editar"><i data-lucide="pencil" class="h-4 w-4"></i></button>
+                            <button onclick="window.deleteInventory('${item.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-red-500" title="Excluir"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
                         </div>
                     </td>
                 `;
@@ -715,6 +899,339 @@
                     alert("Erro ao excluir cliente");
                 }
             }
+        }
+
+        window.previewImage = (input) => {
+            const preview = document.getElementById('inventoryImagePreview');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                preview.classList.add('hidden');
+            }
+        }
+
+        // Funções para Estoque
+        window.openInventoryModal = (id = null) => {
+            const modal = document.getElementById('inventoryModal');
+            const title = document.getElementById('inventoryModalTitle');
+            const typeInput = document.getElementById('inventoryType');
+            const nameInput = document.getElementById('inventoryName');
+            const costInput = document.getElementById('inventoryCost');
+            const qtyInput = document.getElementById('inventoryQuantity');
+            const imageInput = document.getElementById('inventoryImage');
+            const imagePreview = document.getElementById('inventoryImagePreview');
+
+            // Resetar botão
+            const saveBtn = document.getElementById('saveInventoryBtn');
+            saveBtn.textContent = 'Salvar';
+            saveBtn.disabled = false;
+
+            currentInventoryId = id;
+
+            if (id) {
+                const item = inventory.find(i => i.id === id);
+                if (item) {
+                    title.textContent = 'Editar Item';
+                    typeInput.value = item.type || 'Malha';
+                    nameInput.value = item.name || '';
+                    costInput.value = item.cost || '';
+                    qtyInput.value = item.quantity || '';
+                    // imageInput.value não pode ser definido programaticamente por segurança
+                    if (item.image) {
+                        imagePreview.src = item.image;
+                        imagePreview.classList.remove('hidden');
+                    } else {
+                        imagePreview.classList.add('hidden');
+                    }
+                }
+            } else {
+                title.textContent = 'Novo Item';
+                typeInput.value = 'Malha';
+                nameInput.value = '';
+                costInput.value = '';
+                qtyInput.value = '';
+                imageInput.value = '';
+                imagePreview.classList.add('hidden');
+            }
+            
+            window.toggleInventoryFields(); // Atualiza visibilidade do campo de imagem
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeInventoryModal = () => {
+            const modal = document.getElementById('inventoryModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        window.toggleInventoryFields = () => {
+            const type = document.getElementById('inventoryType').value;
+            const imageContainer = document.getElementById('inventoryImageContainer');
+            if (type === 'Estampa') {
+                imageContainer.classList.remove('hidden');
+            } else {
+                imageContainer.classList.add('hidden');
+            }
+        }
+
+        window.saveInventory = async () => {
+            const type = document.getElementById('inventoryType').value;
+            const name = document.getElementById('inventoryName').value;
+            const cost = document.getElementById('inventoryCost').value;
+            const quantity = document.getElementById('inventoryQuantity').value;
+            const imageInput = document.getElementById('inventoryImage');
+
+            if (!name) { alert('Nome é obrigatório'); return; }
+
+            const saveBtn = document.getElementById('saveInventoryBtn');
+            saveBtn.textContent = 'Salvando...';
+            saveBtn.disabled = true;
+
+            try {
+                let imageUrl = '';
+                
+                // Upload se houver arquivo selecionado
+                if (imageInput.files.length > 0) {
+                    const file = imageInput.files[0];
+                    const storageRef = ref(storage, 'estoque/' + Date.now() + '_' + file.name);
+                    await uploadBytes(storageRef, file);
+                    imageUrl = await getDownloadURL(storageRef);
+                } else if (currentInventoryId) {
+                    // Manter imagem existente se estiver editando e não enviou nova
+                    const currentItem = inventory.find(i => i.id === currentInventoryId);
+                    imageUrl = currentItem.image || '';
+                }
+
+                const itemData = { type, name, cost, quantity, image: imageUrl };
+                
+                if (currentInventoryId) {
+                    await updateDoc(doc(db, "inventory", currentInventoryId), itemData);
+                } else {
+                    await addDoc(collection(db, "inventory"), itemData);
+                }
+                window.closeInventoryModal();
+                fetchInventory();
+            } catch (e) {
+                console.error("Erro ao salvar estoque:", e);
+                alert("Erro ao salvar: " + e.message);
+            } finally {
+                saveBtn.textContent = 'Salvar';
+                saveBtn.disabled = false;
+            }
+        }
+
+        window.deleteInventory = async (id) => {
+            if (confirm('Excluir este item?')) {
+                try {
+                    await deleteDoc(doc(db, "inventory", id));
+                    fetchInventory();
+                } catch (e) {
+                    console.error("Erro ao excluir:", e);
+                }
+            }
+        }
+
+        // --- Lógica de Compras ---
+        window.openPurchaseModal = () => {
+            purchaseList = [];
+            document.getElementById('purchaseSupplier').value = '';
+            document.getElementById('purchaseShipping').value = '';
+            document.getElementById('purchaseItemQty').value = '';
+            document.getElementById('purchaseItemTotal').value = '';
+            renderPurchaseList();
+            
+            // Popular dropdown
+            const select = document.getElementById('purchaseItemSelect');
+            select.innerHTML = '<option value="">Selecione um item...</option>';
+            inventory.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name;
+                select.appendChild(option);
+            });
+
+            document.getElementById('purchaseModal').classList.remove('hidden');
+            document.getElementById('purchaseModal').classList.add('flex');
+        }
+
+        window.closePurchaseModal = () => {
+            document.getElementById('purchaseModal').classList.add('hidden');
+            document.getElementById('purchaseModal').classList.remove('flex');
+        }
+
+        window.addPurchaseItem = () => {
+            const itemId = document.getElementById('purchaseItemSelect').value;
+            const qty = parseFloat(document.getElementById('purchaseItemQty').value);
+            const total = parseFloat(document.getElementById('purchaseItemTotal').value);
+
+            if (!itemId || !qty || !total) {
+                alert("Preencha todos os campos do item.");
+                return;
+            }
+
+            const item = inventory.find(i => i.id === itemId);
+            purchaseList.push({
+                id: itemId,
+                name: item.name,
+                qty: qty,
+                total: total
+            });
+
+            // Limpar campos de item
+            document.getElementById('purchaseItemSelect').value = '';
+            document.getElementById('purchaseItemQty').value = '';
+            document.getElementById('purchaseItemTotal').value = '';
+            
+            renderPurchaseList();
+        }
+
+        window.removePurchaseItem = (index) => {
+            purchaseList.splice(index, 1);
+            renderPurchaseList();
+        }
+
+        function renderPurchaseList() {
+            const tbody = document.getElementById('purchaseItemsList');
+            tbody.innerHTML = '';
+            let totalPurchase = 0;
+
+            purchaseList.forEach((item, index) => {
+                totalPurchase += item.total;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-2">${item.name}</td>
+                    <td class="px-4 py-2">${item.qty}</td>
+                    <td class="px-4 py-2">R$ ${item.total.toFixed(2)}</td>
+                    <td class="px-4 py-2 text-right">
+                        <button onclick="removePurchaseItem(${index})" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const shipping = parseFloat(document.getElementById('purchaseShipping').value) || 0;
+            document.getElementById('purchaseTotalDisplay').textContent = `R$ ${(totalPurchase + shipping).toFixed(2)}`;
+            lucide.createIcons();
+        }
+
+        // Atualiza total ao mudar frete
+        document.getElementById('purchaseShipping').addEventListener('input', renderPurchaseList);
+
+        window.finalizePurchase = async () => {
+            const supplier = document.getElementById('purchaseSupplier').value;
+            const shipping = parseFloat(document.getElementById('purchaseShipping').value) || 0;
+
+            if (!supplier || purchaseList.length === 0) {
+                alert("Informe o fornecedor e adicione pelo menos um item.");
+                return;
+            }
+
+            const btn = document.getElementById('finalizePurchaseBtn');
+            btn.textContent = 'Processando...';
+            btn.disabled = true;
+
+            try {
+                const totalItemsValue = purchaseList.reduce((acc, item) => acc + item.total, 0);
+
+                for (const item of purchaseList) {
+                    // Calcular frete proporcional ao valor do item
+                    const itemShare = item.total / totalItemsValue;
+                    const itemShipping = shipping * itemShare;
+                    const totalCostForItem = item.total + itemShipping;
+                    const unitCostNew = totalCostForItem / item.qty;
+
+                    // Buscar dados atuais do estoque
+                    const currentItem = inventory.find(i => i.id === item.id);
+                    const currentQty = parseFloat(currentItem.quantity) || 0;
+                    const currentCost = parseFloat(currentItem.cost) || 0;
+
+                    // Custo Médio Ponderado
+                    const newQty = currentQty + item.qty;
+                    const newAvgCost = ((currentQty * currentCost) + (item.qty * unitCostNew)) / newQty;
+
+                    // Atualizar Estoque
+                    await updateDoc(doc(db, "inventory", item.id), {
+                        quantity: newQty,
+                        cost: newAvgCost
+                    });
+
+                    // Registrar Movimentação
+                    await addDoc(collection(db, "movements"), {
+                        date: new Date().toISOString(),
+                        type: 'Entrada',
+                        itemId: item.id,
+                        itemName: item.name,
+                        quantity: item.qty,
+                        unitValue: unitCostNew,
+                        entity: supplier,
+                        details: 'Compra'
+                    });
+                }
+
+                alert("Compra registrada com sucesso!");
+                window.closePurchaseModal();
+                fetchInventory();
+            } catch (e) {
+                console.error("Erro na compra:", e);
+                alert("Erro ao finalizar compra: " + e.message);
+            } finally {
+                btn.textContent = 'Finalizar Compra';
+                btn.disabled = false;
+            }
+        }
+
+        // --- Lógica de Movimentações ---
+        window.openMovementsModal = async () => {
+            document.getElementById('movementsModal').classList.remove('hidden');
+            document.getElementById('movementsModal').classList.add('flex');
+            
+            const tbody = document.getElementById('movementsTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center">Carregando...</td></tr>';
+
+            try {
+                const q = await getDocs(collection(db, "movements")); // Idealmente usar orderBy('date', 'desc') mas requer index
+                const movements = [];
+                q.forEach(doc => movements.push(doc.data()));
+                
+                // Ordenar localmente por data (desc)
+                movements.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                tbody.innerHTML = '';
+                if (movements.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-muted-foreground">Nenhuma movimentação registrada.</td></tr>';
+                    return;
+                }
+
+                movements.forEach(mov => {
+                    const date = new Date(mov.date).toLocaleDateString('pt-BR') + ' ' + new Date(mov.date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                    const typeClass = mov.type === 'Entrada' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="px-4 py-3">${date}</td>
+                        <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs font-medium ${typeClass}">${mov.type}</span></td>
+                        <td class="px-4 py-3 font-medium">${mov.itemName}</td>
+                        <td class="px-4 py-3">${mov.quantity}</td>
+                        <td class="px-4 py-3">R$ ${parseFloat(mov.unitValue).toFixed(2)}</td>
+                        <td class="px-4 py-3 text-muted-foreground">${mov.entity || '-'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error("Erro ao buscar movimentações:", e);
+                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
+            }
+        }
+
+        window.closeMovementsModal = () => {
+            document.getElementById('movementsModal').classList.add('hidden');
+            document.getElementById('movementsModal').classList.remove('flex');
         }
 
         // Inicializar
