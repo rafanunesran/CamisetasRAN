@@ -537,6 +537,11 @@
             const nicknameInput = document.getElementById('partnerNickname');
             const pixInput = document.getElementById('partnerPix');
 
+            // Resetar estado do botão ao abrir
+            const saveBtn = document.getElementById('savePartnerBtn');
+            saveBtn.textContent = 'Salvar';
+            saveBtn.disabled = false;
+
             currentPartnerId = id;
 
             if (id) {
@@ -574,7 +579,6 @@
             }
 
             const saveBtn = document.getElementById('savePartnerBtn');
-            const originalText = saveBtn.textContent;
             saveBtn.textContent = 'Salvando...';
             saveBtn.disabled = true;
 
@@ -589,12 +593,12 @@
                     });
                 }
                 window.closePartnerModal();
-                fetchPartners();
+                fetchPartners(); // Atualiza em background para não travar a UI
             } catch (e) {
                 console.error("Error saving partner: ", e);
                 alert("Erro ao salvar parceiro: " + e.message);
             } finally {
-                saveBtn.textContent = originalText;
+                saveBtn.textContent = 'Salvar';
                 saveBtn.disabled = false;
             }
         }
@@ -603,7 +607,7 @@
             if (confirm('Tem certeza que deseja excluir este parceiro?')) {
                 try {
                     await deleteDoc(doc(db, "partners", id));
-                    fetchPartners();
+                    await fetchPartners();
                 } catch (e) {
                     console.error("Error deleting partner: ", e);
                     alert("Erro ao excluir parceiro");
@@ -619,6 +623,11 @@
             const phoneInput = document.getElementById('clientPhone');
             const partnerSelect = document.getElementById('clientPartner');
             const studentInput = document.getElementById('clientStudent');
+
+            // Resetar estado do botão ao abrir
+            const saveBtn = document.getElementById('saveClientBtn');
+            saveBtn.textContent = 'Salvar';
+            saveBtn.disabled = false;
 
             // Popular select de parceiros
             partnerSelect.innerHTML = '<option value="">Selecione um parceiro...</option>';
@@ -669,7 +678,6 @@
             }
 
             const saveBtn = document.getElementById('saveClientBtn');
-            const originalText = saveBtn.textContent;
             saveBtn.textContent = 'Salvando...';
             saveBtn.disabled = true;
 
@@ -687,12 +695,12 @@
                     });
                 }
                 window.closeClientModal();
-                fetchClients();
+                fetchClients(); // Atualiza em background para não travar a UI
             } catch (e) {
                 console.error("Error saving client: ", e);
                 alert("Erro ao salvar cliente: " + e.message);
             } finally {
-                saveBtn.textContent = originalText;
+                saveBtn.textContent = 'Salvar';
                 saveBtn.disabled = false;
             }
         }
@@ -701,7 +709,7 @@
             if (confirm('Tem certeza que deseja excluir este cliente?')) {
                 try {
                     await deleteDoc(doc(db, "clients", id));
-                    fetchClients();
+                    await fetchClients();
                 } catch (e) {
                     console.error("Error deleting client: ", e);
                     alert("Erro ao excluir cliente");
