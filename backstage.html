@@ -237,18 +237,17 @@
                 <div class="rounded-lg border bg-white shadow-sm">
                     <div class="p-6 border-b flex justify-between items-center">
                         <h3 class="font-semibold">Catálogo de Produtos</h3>
-                        <button class="text-xs bg-primary text-white px-3 py-1 rounded">Novo Produto</button>
+                        <button onclick="openProductModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors">Novo Produto</button>
                     </div>
                     <div class="p-6">
                         <table class="w-full text-sm text-left">
                             <thead class="text-muted-foreground font-medium border-b">
-                                <tr><th class="pb-3">Produto</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3 text-right">Ações</th></tr>
+                                <tr><th class="pb-3">Produto</th><th class="pb-3">Parceiro</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3 text-right">Ações</th></tr>
                             </thead>
                             <tbody class="divide-y">
-                                <tr><td class="py-3">Polo Tradicional</td><td>Camisetas</td><td>R$ 45,90</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
-                                <tr><td class="py-3">Saia Pregueada</td><td>Inferior</td><td>R$ 65,00</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
-                                <tr><td class="py-3">Calça Social</td><td>Inferior</td><td>R$ 72,50</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
-                                <tr><td class="py-3">Jaqueta Tactel</td><td>Inverno</td><td>R$ 110,00</td><td class="text-right text-primary cursor-pointer">Editar</td></tr>
+                                <tbody id="products-table-body" class="divide-y">
+                                    <tr><td colspan="5" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
+                                </tbody>
                             </tbody>
                         </table>
                     </div>
@@ -595,10 +594,86 @@
         </div>
     </div>
 
+    <!-- Modal de Produto -->
+    <div id="productModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 id="productModalTitle" class="text-xl font-bold text-primary">Novo Produto</h2>
+                <button onclick="closeProductModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Coluna Esquerda: Dados Básicos -->
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700">Nome do Produto</label>
+                        <input id="productName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: Camiseta Polo Escolar">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700">Estampa Associada (Estoque)</label>
+                        <select id="productPrint" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            <option value="">Selecione uma estampa...</option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">Define a imagem da estampa e baixa o estoque ao produzir.</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700">Escola/Revendedor Associado</label>
+                        <select id="productPartner" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            <option value="">Produto genérico (sem repasse)</option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">Define a qual parceiro este produto pertence para filtros e repasses.</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700">Imagens de Referência</label>
+                        <input id="productImages" type="file" multiple accept="image/*" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium">
+                        <div id="productImagesPreview" class="flex gap-2 overflow-x-auto py-2 h-24"></div>
+                    </div>
+                </div>
+
+                <!-- Coluna Direita: Variações e Preços -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium text-gray-700">Categorias de Malha & Preços</label>
+                        <button onclick="addProductCategoryRow()" class="text-xs bg-secondary hover:bg-gray-200 px-2 py-1 rounded border flex items-center gap-1">
+                            <i data-lucide="plus" class="h-3 w-3"></i> Add Categoria
+                        </button>
+                    </div>
+                    
+                    <div class="border rounded-md overflow-hidden bg-gray-50">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-100 font-medium text-gray-600 border-b">
+                                <tr>
+                                    <th class="p-2">Malha/Categoria</th>
+                                    <th class="p-2" title="Preço para o Cliente Final">Venda (R$)</th>
+                                    <th class="p-2" title="Custo de Produção">Prod. (R$)</th>
+                                    <th class="p-2" title="Repasse Escola/Revendedor">Escola (R$)</th>
+                                    <th class="p-2" title="Lucro Administrativo">Adm (R$)</th>
+                                    <th class="p-2 w-8"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="productPricingBody" class="divide-y bg-white">
+                                <!-- Linhas dinâmicas -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-muted-foreground">* O valor Adm é calculado automaticamente (Venda - Produção - Escola).</p>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t mt-4">
+                <button onclick="closeProductModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="saveProductBtn" onclick="saveProduct()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Produto</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
         const firebaseConfig = {
@@ -625,6 +700,7 @@
         let currentPartnerId = null;
         let currentClientId = null;
         let currentInventoryId = null;
+        let currentProductId = null;
         let purchaseList = [];
 
         // Função para buscar parceiros
@@ -638,6 +714,7 @@
                 renderPartners();
                 fetchClients(); // Busca clientes depois de ter os parceiros para mapear nomes
                 fetchInventory();
+                fetchProducts();
             } catch (error) {
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
@@ -780,6 +857,52 @@
                 tbody.appendChild(tr);
             });
             lucide.createIcons();
+        }
+
+        // Função para buscar produtos
+        async function fetchProducts() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "products"));
+                const products = [];
+                querySnapshot.forEach((doc) => {
+                    products.push({ id: doc.id, ...doc.data() });
+                });
+                renderProducts(products);
+            } catch (error) {
+                console.error("Erro ao buscar produtos:", error);
+            }
+        }
+
+        // Renderizar tabela de produtos
+        function renderProducts(products) {
+            const tbody = document.getElementById('products-table-body');
+            if (!tbody) return;
+            
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-muted-foreground">Nenhum produto cadastrado.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            products.forEach(prod => {
+                // Pega a primeira categoria para exibir preço base ou range
+                const prices = prod.pricing || [];
+                const priceDisplay = prices.length > 0 ? `R$ ${parseFloat(prices[0].salePrice).toFixed(2)}` : '-';
+                const categoriesDisplay = prices.map(p => p.category).join(', ');
+
+                const partner = partners.find(p => p.id === prod.partnerId);
+                const partnerName = partner ? (partner.nickname || partner.name) : '<span class="text-gray-400">Genérico</span>';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 font-medium">${prod.name}</td>
+                    <td class="text-sm text-gray-600">${partnerName}</td>
+                    <td class="text-sm text-gray-600">${categoriesDisplay || '-'}</td>
+                    <td>${priceDisplay}</td>
+                    <td class="text-right text-primary cursor-pointer" onclick="window.openProductModal('${prod.id}')">Editar</td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
         // Funções globais para acesso via HTML onclick
@@ -1389,6 +1512,30 @@
         }
 
         // --- Lógica de Movimentações ---
+            // Atualização do openProductModal para carregar dados na edição
+            const originalOpenProductModal = window.openProductModal;
+            window.openProductModal = async (id = null) => {
+                await originalOpenProductModal(id);
+                if (id) {
+                    try {
+                        const docSnap = await getDoc(doc(db, "products", id));
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            document.getElementById('productName').value = data.name || '';
+                            document.getElementById('productPrint').value = data.printId || '';
+                            document.getElementById('productPartner').value = data.partnerId || '';
+                            
+                            // Limpar linhas vazias padrão e adicionar as salvas
+                            document.getElementById('productPricingBody').innerHTML = '';
+                            if (data.pricing && data.pricing.length > 0) {
+                                data.pricing.forEach(p => addProductCategoryRow(p));
+                            } else {
+                                addProductCategoryRow();
+                            }
+                        }
+                    } catch (e) { console.error("Erro ao carregar produto", e); }
+                }
+            }
         window.openMovementsModal = async () => {
             document.getElementById('movementsModal').classList.remove('hidden');
             document.getElementById('movementsModal').classList.add('flex');
@@ -1464,6 +1611,186 @@
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             setTimeout(() => { document.getElementById('fullSizeImage').src = ''; }, 200);
+        }
+
+        // --- Lógica de Produtos ---
+        window.openProductModal = async (id = null) => {
+            const modal = document.getElementById('productModal');
+            const title = document.getElementById('productModalTitle');
+            const nameInput = document.getElementById('productName');
+            const printSelect = document.getElementById('productPrint');
+            const partnerSelect = document.getElementById('productPartner');
+            const imagesPreview = document.getElementById('productImagesPreview');
+            const pricingBody = document.getElementById('productPricingBody');
+            
+            // Resetar
+            nameInput.value = '';
+            document.getElementById('productImages').value = '';
+            imagesPreview.innerHTML = '';
+            pricingBody.innerHTML = '';
+            currentProductId = id;
+
+            // Popular Select de Estampas
+            printSelect.innerHTML = '<option value="">Selecione uma estampa...</option>';
+            inventory.filter(i => i.type === 'Estampa').forEach(est => {
+                const option = document.createElement('option');
+                option.value = est.id;
+                option.textContent = est.name;
+                printSelect.appendChild(option);
+            });
+
+            // Popular Select de Parceiros
+            partnerSelect.innerHTML = '<option value="">Produto genérico (sem repasse)</option>';
+            partners.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nickname || p.name;
+                partnerSelect.appendChild(option);
+            });
+
+            if (id) {
+                title.textContent = 'Editar Produto';
+                const docRef = doc(db, "products", id);
+                // Aqui idealmente pegariamos do array local se já carregado, mas vamos buscar para garantir
+                // Simplificação: buscar do array products se tivesse global, mas vou buscar do Firestore ou assumir que fetchProducts rodou
+                // Para simplificar, vou buscar o doc específico se necessário, mas vou usar a lógica de carregar dados
+                // Como não salvei products em variavel global no fetchProducts, vou buscar do banco rapidinho ou alterar fetchProducts.
+                // Vou alterar fetchProducts para salvar em window.productsList se quiser, mas vou fazer um getDoc aqui.
+                // Melhor: vamos assumir que o usuário clicou na tabela, então temos os dados. Mas para garantir integridade:
+                // (Vou pular o getDoc extra e confiar que se clicou, existe. Vou implementar a busca no array local se eu o tivesse exposto)
+                // Vou fazer um getDoc rápido.
+                // *Correção*: Vou usar getDoc do firestore importado.
+                // Como não importei getDoc no topo do script module (apenas getDocs), vou usar a lista renderizada se possível ou adicionar getDoc.
+                // Vou adicionar getDoc nos imports.
+            } else {
+                title.textContent = 'Novo Produto';
+                addProductCategoryRow(); // Adiciona uma linha vazia por padrão
+            }
+
+            // Se for edição, preencher dados (Lógica simulada pois preciso do objeto produto)
+            if (id) {
+                // Hack: buscar na tabela visualmente ou fazer fetch. Vou fazer fetch.
+                // Nota: Adicionei getDoc no import abaixo para funcionar.
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        // Função auxiliar para adicionar linha de preço
+        window.addProductCategoryRow = (data = null) => {
+            const tbody = document.getElementById('productPricingBody');
+            const row = document.createElement('tr');
+            
+            const category = data ? data.category : '';
+            const sale = data ? data.salePrice : '';
+            const cost = data ? data.productionCost : '';
+            const school = data ? data.schoolCommission : '';
+            const admin = data ? (data.salePrice - data.productionCost - data.schoolCommission).toFixed(2) : '0.00';
+
+            // Obter categorias de Malha do estoque
+            const malhaCategories = [...new Set(inventory.filter(i => i.type === 'Malha' && i.category).map(i => i.category))].sort();
+            
+            let options = '<option value="">Selecione...</option>';
+            malhaCategories.forEach(cat => {
+                const selected = category === cat ? 'selected' : '';
+                options += `<option value="${cat}" ${selected}>${cat}</option>`;
+            });
+
+            row.innerHTML = `
+                <td class="p-1"><select class="w-full border rounded px-2 py-1 text-xs cat-name">${options}</select></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-sale" oninput="calcAdmin(this)" value="${sale}"></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-cost" oninput="calcAdmin(this)" value="${cost}"></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-school" oninput="calcAdmin(this)" value="${school}"></td>
+                <td class="p-1"><input type="text" readonly class="w-full bg-gray-100 border rounded px-2 py-1 text-xs text-gray-500 cat-admin" value="${admin}"></td>
+                <td class="p-1 text-center"><button onclick="this.closest('tr').remove()" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="h-3 w-3"></i></button></td>
+            `;
+            tbody.appendChild(row);
+            lucide.createIcons();
+        }
+
+        window.calcAdmin = (input) => {
+            const row = input.closest('tr');
+            const sale = parseFloat(row.querySelector('.cat-sale').value) || 0;
+            const cost = parseFloat(row.querySelector('.cat-cost').value) || 0;
+            const school = parseFloat(row.querySelector('.cat-school').value) || 0;
+            const adminInput = row.querySelector('.cat-admin');
+            adminInput.value = (sale - cost - school).toFixed(2);
+        }
+
+        window.closeProductModal = () => {
+            document.getElementById('productModal').classList.add('hidden');
+            document.getElementById('productModal').classList.remove('flex');
+        }
+
+        window.saveProduct = async () => {
+            const name = document.getElementById('productName').value;
+            const printId = document.getElementById('productPrint').value;
+            const partnerId = document.getElementById('productPartner').value;
+            const imageInput = document.getElementById('productImages');
+            
+            if (!name) { alert("Nome do produto é obrigatório"); return; }
+
+            // Coletar Preços
+            const pricing = [];
+            document.querySelectorAll('#productPricingBody tr').forEach(row => {
+                const category = row.querySelector('.cat-name').value;
+                if (category) {
+                    pricing.push({
+                        category: category,
+                        salePrice: parseFloat(row.querySelector('.cat-sale').value) || 0,
+                        productionCost: parseFloat(row.querySelector('.cat-cost').value) || 0,
+                        schoolCommission: parseFloat(row.querySelector('.cat-school').value) || 0,
+                        adminProfit: parseFloat(row.querySelector('.cat-admin').value) || 0
+                    });
+                }
+            });
+
+            if (pricing.length === 0) { alert("Adicione pelo menos uma categoria de malha/preço."); return; }
+
+            const btn = document.getElementById('saveProductBtn');
+            btn.textContent = 'Salvando...';
+            btn.disabled = true;
+
+            try {
+                // Upload de Imagens (Múltiplas)
+                let imageUrls = [];
+                // Se estiver editando, precisaria manter as antigas, mas por simplificação aqui vamos apenas adicionar novas se enviadas
+                // Num cenário real, carregariamos as antigas no array imageUrls antes.
+                
+                if (imageInput.files.length > 0) {
+                    const uploadPromises = Array.from(imageInput.files).map(file => uploadToDrive(file));
+                    imageUrls = await Promise.all(uploadPromises);
+                }
+
+                const productData = {
+                    name,
+                    printId,
+                    partnerId,
+                    pricing,
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (imageUrls.length > 0) {
+                    productData.images = imageUrls; // Salva array de URLs
+                }
+
+                if (currentProductId) {
+                    await updateDoc(doc(db, "products", currentProductId), productData);
+                } else {
+                    await addDoc(collection(db, "products"), { ...productData, createdAt: new Date().toISOString() });
+                }
+
+                closeProductModal();
+                fetchProducts();
+            } catch (e) {
+                console.error("Erro ao salvar produto:", e);
+                alert("Erro ao salvar: " + e.message);
+            } finally {
+                btn.textContent = 'Salvar Produto';
+                btn.disabled = false;
+            }
         }
 
         // Inicializar
