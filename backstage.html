@@ -243,10 +243,12 @@
                         <table class="w-full text-sm text-left">
                             <thead class="text-muted-foreground font-medium border-b">
                                 <tr><th class="pb-3">Produto</th><th class="pb-3">Parceiro</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3 text-right">Ações</th></tr>
+                                <tr><th class="pb-3">Imagem</th><th class="pb-3">Produto</th><th class="pb-3">Parceiro</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3 text-right">Ações</th></tr>
                             </thead>
                             <tbody class="divide-y">
                                 <tbody id="products-table-body" class="divide-y">
                                     <tr><td colspan="5" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
+                                    <tr><td colspan="6" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
                                 </tbody>
                             </tbody>
                         </table>
@@ -890,6 +892,7 @@
             
             if (products.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-muted-foreground">Nenhum produto cadastrado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-muted-foreground">Nenhum produto cadastrado.</td></tr>';
                 return;
             }
 
@@ -903,8 +906,29 @@
                 const partner = partners.find(p => p.id === prod.partnerId);
                 const partnerName = partner ? (partner.nickname || partner.name) : '<span class="text-gray-400">Genérico</span>';
 
+                // Lógica para imagem do produto
+                let productImageUrl = null;
+                let useBlackBackground = false;
+                if (prod.images && prod.images.length > 0) {
+                    productImageUrl = prod.images[0]; // Usa a primeira imagem de referência
+                } else if (prod.printId) {
+                    const printItem = inventory.find(i => i.id === prod.printId);
+                    if (printItem && printItem.image) {
+                        productImageUrl = printItem.image; // Usa a imagem da estampa
+                        useBlackBackground = true; // Aplica fundo preto para a estampa
+                    }
+                }
+
+                let imageHtml = '<div class="h-10 w-10 bg-gray-100 rounded border flex items-center justify-center"><i data-lucide="shirt" class="h-5 w-5 text-gray-400"></i></div>';
+                if (productImageUrl) {
+                    const displayUrl = getDisplayUrl(productImageUrl);
+                    const bgClass = useBlackBackground ? 'bg-black' : 'bg-white';
+                    imageHtml = `<img src="${displayUrl}" referrerpolicy="no-referrer" class="h-10 w-10 object-contain rounded border ${bgClass} p-1">`;
+                }
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
+                    <td class="py-3">${imageHtml}</td>
                     <td class="py-3 font-medium">${prod.name}</td>
                     <td class="text-sm text-gray-600">${partnerName}</td>
                     <td class="text-sm text-gray-600">${categoriesDisplay || '-'}</td>
@@ -913,6 +937,7 @@
                 `;
                 tbody.appendChild(tr);
             });
+            lucide.createIcons();
         }
 
         // Funções globais para acesso via HTML onclick
@@ -1717,7 +1742,7 @@
                 <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-sale" oninput="calcAdmin(this)" value="${sale}"></td>
                 <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-cost" oninput="calcAdmin(this)" value="${cost}"></td>
                 <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-school" oninput="calcAdmin(this)" value="${school}"></td>
-                <td class="p-1"><input type="text" readonly class="w-full bg-gray-100 border rounded px-2 py-1 text-xs text-gray-500 cat-admin" value="${admin}"></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-admin" oninput="calcSale(this)" value="${admin}"></td>
                 <td class="p-1 text-center"><button onclick="this.closest('tr').remove()" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="h-3 w-3"></i></button></td>
             `;
             tbody.appendChild(row);
@@ -1731,6 +1756,15 @@
             const school = parseFloat(row.querySelector('.cat-school').value) || 0;
             const adminInput = row.querySelector('.cat-admin');
             adminInput.value = (sale - cost - school).toFixed(2);
+        }
+
+        window.calcSale = (input) => {
+            const row = input.closest('tr');
+            const cost = parseFloat(row.querySelector('.cat-cost').value) || 0;
+            const school = parseFloat(row.querySelector('.cat-school').value) || 0;
+            const admin = parseFloat(row.querySelector('.cat-admin').value) || 0;
+            const saleInput = row.querySelector('.cat-sale');
+            saleInput.value = (cost + school + admin).toFixed(2);
         }
 
         window.closeProductModal = () => {
