@@ -569,7 +569,7 @@
             <button onclick="closeImageModal()" class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors">
                 <i data-lucide="x" class="h-8 w-8"></i>
             </button>
-            <img id="fullSizeImage" src="" alt="Visualização Ampliada" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl object-contain bg-white">
+            <img id="fullSizeImage" src="" alt="Visualização Ampliada" referrerpolicy="no-referrer" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black">
         </div>
     </div>
 
@@ -728,8 +728,9 @@
             tbody.innerHTML = '';
             inventory.forEach(item => {
                 const isPrint = item.type === 'Estampa';
+                const displayUrl = getDisplayUrl(item.image);
                 const imageHtml = isPrint && item.image ? 
-                    `<img src="${item.image}" onclick="openImageModal('${item.image}')" class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity" alt="Estampa" title="Clique para ampliar">` : 
+                    `<img src="${displayUrl}" onclick="openImageModal('${item.image}')" referrerpolicy="no-referrer" class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity" alt="Estampa" title="Clique para ampliar">` : 
                     '<div class="h-8 w-8 bg-gray-100 rounded border flex items-center justify-center"><i data-lucide="package" class="h-4 w-4 text-gray-400"></i></div>';
                 
                 const tr = document.createElement('tr');
@@ -1355,11 +1356,25 @@
             document.getElementById('movementsModal').classList.remove('flex');
         }
 
+        // Helper para converter URLs do Drive para formato direto (lh3)
+        function getDisplayUrl(url) {
+            if (!url) return '';
+            // Converte: https://drive.google.com/uc?export=view&id=XYZ
+            // Para: https://lh3.googleusercontent.com/d/XYZ
+            if (url.includes('drive.google.com') && url.includes('id=')) {
+                const match = url.match(/id=([^&]+)/);
+                if (match && match[1]) {
+                    return `https://lh3.googleusercontent.com/d/${match[1]}`;
+                }
+            }
+            return url;
+        }
+
         // --- Visualização de Imagem ---
         window.openImageModal = (url) => {
             const modal = document.getElementById('imageModal');
             const img = document.getElementById('fullSizeImage');
-            img.src = url;
+            img.src = getDisplayUrl(url);
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
