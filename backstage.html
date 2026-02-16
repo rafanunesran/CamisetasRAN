@@ -33,6 +33,9 @@
         }
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Scripts do Google para Upload no Drive -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
     <style>
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -561,6 +564,10 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
 
+        // --- Configuração do Upload via Apps Script ---
+        // COLE AQUI A URL QUE VOCÊ COPIOU NO PASSO 1
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkgUduzLRYSABf5bY5YZrRCmWr8yFOeS0CIW4JMS1tC-MS4GqWaNUBXp8PvOBlnhSqHg/exec';
+
         let partners = [];
         let clients = [];
         let inventory = [];
@@ -980,6 +987,43 @@
             }
         }
 
+        // Função auxiliar para upload no Google Drive via Script
+        async function uploadToDrive(file) {
+            if (APPS_SCRIPT_URL.includes('SEU_CODIGO_AQUI')) {
+                alert("Configure a URL do Google Apps Script no código (linha ~586)!");
+                throw new Error("Script URL not configured");
+            }
+
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = async () => {
+                    try {
+                        const payload = {
+                            name: Date.now() + '_' + file.name,
+                            type: file.type,
+                            image: reader.result // Base64 completo
+                        };
+
+                        const response = await fetch(APPS_SCRIPT_URL, {
+                            method: 'POST',
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await response.json();
+                        if (data.result === 'success') {
+                            resolve(data.url);
+                        } else {
+                            throw new Error(data.error || 'Erro desconhecido no script');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        reject(err);
+                    }
+                };
+                reader.onerror = error => reject(error);
+            });
+        }
+
         window.saveInventory = async () => {
             const type = document.getElementById('inventoryType').value;
             const name = document.getElementById('inventoryName').value;
@@ -999,9 +1043,8 @@
                 // Upload se houver arquivo selecionado
                 if (imageInput.files.length > 0) {
                     const file = imageInput.files[0];
-                    const storageRef = ref(storage, 'estoque/' + Date.now() + '_' + file.name);
-                    await uploadBytes(storageRef, file);
-                    imageUrl = await getDownloadURL(storageRef);
+                    // Substituindo Firebase Storage por Google Drive
+                    imageUrl = await uploadToDrive(file);
                 } else if (currentInventoryId) {
                     // Manter imagem existente se estiver editando e não enviou nova
                     const currentItem = inventory.find(i => i.id === currentInventoryId);
