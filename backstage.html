@@ -670,7 +670,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-xs text-muted-foreground">* O valor Adm é calculado automaticamente (Venda - Produção - Escola).</p>
+                    <p class="text-xs text-muted-foreground">* Defina os valores manualmente para cada campo.</p>
                 </div>
             </div>
 
@@ -1739,32 +1739,14 @@
 
             row.innerHTML = `
                 <td class="p-1"><select class="w-full border rounded px-2 py-1 text-xs cat-name">${options}</select></td>
-                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-sale" oninput="calcAdmin(this)" value="${sale}"></td>
-                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-cost" oninput="calcAdmin(this)" value="${cost}"></td>
-                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-school" oninput="calcAdmin(this)" value="${school}"></td>
-                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-admin" oninput="calcSale(this)" value="${admin}"></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-sale" value="${sale}"></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-cost" value="${cost}"></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-school" value="${school}"></td>
+                <td class="p-1"><input type="number" step="0.01" class="w-full border rounded px-2 py-1 text-xs cat-admin" value="${admin}"></td>
                 <td class="p-1 text-center"><button onclick="this.closest('tr').remove()" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="h-3 w-3"></i></button></td>
             `;
             tbody.appendChild(row);
             lucide.createIcons();
-        }
-
-        window.calcAdmin = (input) => {
-            const row = input.closest('tr');
-            const sale = parseFloat(row.querySelector('.cat-sale').value) || 0;
-            const cost = parseFloat(row.querySelector('.cat-cost').value) || 0;
-            const school = parseFloat(row.querySelector('.cat-school').value) || 0;
-            const adminInput = row.querySelector('.cat-admin');
-            adminInput.value = (sale - cost - school).toFixed(2);
-        }
-
-        window.calcSale = (input) => {
-            const row = input.closest('tr');
-            const cost = parseFloat(row.querySelector('.cat-cost').value) || 0;
-            const school = parseFloat(row.querySelector('.cat-school').value) || 0;
-            const admin = parseFloat(row.querySelector('.cat-admin').value) || 0;
-            const saleInput = row.querySelector('.cat-sale');
-            saleInput.value = (cost + school + admin).toFixed(2);
         }
 
         window.closeProductModal = () => {
