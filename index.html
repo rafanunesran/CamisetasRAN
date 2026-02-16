@@ -37,6 +37,12 @@
 
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        /* Utilitário para esconder scrollbar em modais */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
 </head>
 <body class="font-body antialiased min-h-screen flex flex-col text-foreground bg-background">
 
@@ -55,9 +61,10 @@
             </nav>
 
             <div class="flex items-center gap-4">
-                <button class="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <button onclick="openCart()" class="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors relative">
                     <i data-lucide="shopping-cart" class="h-4 w-4"></i>
                     Ver Carrinho
+                    <span id="cartCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold h-5 w-5 flex items-center justify-center rounded-full hidden">0</span>
                 </button>
             </div>
         </div>
@@ -91,51 +98,11 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            <!-- Items (Hardcoded based on page.tsx) -->
-            <div class="group overflow-hidden rounded-lg border bg-card text-card-foreground shadow-md hover:shadow-xl transition-all duration-300">
-                <div class="relative aspect-square overflow-hidden bg-white">
-                    <img src="https://placehold.co/600x600/png?text=Polo+Tradicional" alt="Polo Tradicional" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500">
-                </div>
-                <div class="p-6 pb-2">
-                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors border-transparent bg-secondary text-secondary-foreground w-fit mb-2 uppercase tracking-wider">Colégio Santa Maria</span>
-                    <h3 class="text-lg font-semibold leading-none tracking-tight group-hover:text-primary transition-colors mt-2">Polo Tradicional</h3>
-                    <p class="text-sm text-muted-foreground mt-1">Materiais premium com alta durabilidade.</p>
-                </div>
-                <div class="p-6 pt-0">
-                    <div class="flex items-baseline gap-1 mb-4">
-                        <span class="text-sm font-medium text-muted-foreground">R$</span>
-                        <span class="text-2xl font-bold text-primary">45,90</span>
-                    </div>
-                    <button class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full group">
-                        Adicionar
-                        <i data-lucide="arrow-right" class="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform"></i>
-                    </button>
-                </div>
+        <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <!-- Produtos carregados via JS -->
+            <div class="col-span-full text-center py-12 text-muted-foreground">
+                Carregando produtos...
             </div>
-
-            <div class="group overflow-hidden rounded-lg border bg-card text-card-foreground shadow-md hover:shadow-xl transition-all duration-300">
-                <div class="relative aspect-square overflow-hidden bg-white">
-                    <img src="https://placehold.co/600x600/png?text=Saia+Pregueada" alt="Saia Pregueada" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500">
-                </div>
-                <div class="p-6 pb-2">
-                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors border-transparent bg-secondary text-secondary-foreground w-fit mb-2 uppercase tracking-wider">Escola Internacional</span>
-                    <h3 class="text-lg font-semibold leading-none tracking-tight group-hover:text-primary transition-colors mt-2">Saia Pregueada</h3>
-                    <p class="text-sm text-muted-foreground mt-1">Materiais premium com alta durabilidade.</p>
-                </div>
-                <div class="p-6 pt-0">
-                    <div class="flex items-baseline gap-1 mb-4">
-                        <span class="text-sm font-medium text-muted-foreground">R$</span>
-                        <span class="text-2xl font-bold text-primary">65,00</span>
-                    </div>
-                    <button class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full group">
-                        Adicionar
-                        <i data-lucide="arrow-right" class="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Mais itens podem ser adicionados aqui seguindo o padrão acima -->
         </div>
     </main>
 
@@ -174,9 +141,469 @@
         </div>
     </footer>
 
-    <!-- Inicializa os ícones -->
-    <script>
-        lucide.createIcons();
+    <!-- Modal de Detalhes do Produto (Adicionar ao Carrinho) -->
+    <div id="productModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-lg w-full max-w-2xl shadow-xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+            <!-- Imagem do Produto -->
+            <div class="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-4 relative">
+                <img id="modalProductImage" src="" alt="Produto" class="max-h-64 md:max-h-full object-contain">
+                <button onclick="closeProductModal()" class="absolute top-2 right-2 md:hidden bg-white/80 rounded-full p-1">
+                    <i data-lucide="x" class="h-6 w-6"></i>
+                </button>
+            </div>
+            
+            <!-- Detalhes e Formulário -->
+            <div class="w-full md:w-1/2 p-6 flex flex-col overflow-y-auto">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span id="modalProductSchool" class="text-xs font-bold text-primary uppercase tracking-wider bg-primary/10 px-2 py-1 rounded">Escola</span>
+                        <h2 id="modalProductName" class="text-2xl font-bold text-gray-900 mt-2">Nome do Produto</h2>
+                    </div>
+                    <button onclick="closeProductModal()" class="hidden md:block text-gray-400 hover:text-gray-600">
+                        <i data-lucide="x" class="h-6 w-6"></i>
+                    </button>
+                </div>
+
+                <div class="mt-6 space-y-4 flex-grow">
+                    <!-- Seleção de Variação (Preço) -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                        <select id="modalProductCategory" onchange="updateVariations()" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 border px-3">
+                            <!-- Opções preenchidas via JS -->
+                        </select>
+                    </div>
+
+                    <!-- Seleção de Variação do Estoque -->
+                    <div id="variationContainer">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Variação / Tamanho</label>
+                        <select id="modalProductVariation" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 border px-3">
+                            <!-- Preenchido via JS baseado na categoria -->
+                        </select>
+                    </div>
+
+                    <!-- Quantidade -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
+                        <div class="flex items-center border border-gray-300 rounded-md w-32">
+                            <button onclick="adjustQty(-1)" class="px-3 py-2 text-gray-600 hover:bg-gray-100">-</button>
+                            <input id="modalProductQty" type="number" value="1" min="1" class="w-full text-center border-none focus:ring-0 p-0" readonly>
+                            <button onclick="adjustQty(1)" class="px-3 py-2 text-gray-600 hover:bg-gray-100">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-4 border-t">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-gray-600">Total:</span>
+                        <span id="modalProductPrice" class="text-2xl font-bold text-primary">R$ 0,00</span>
+                    </div>
+                    <button onclick="addToCart()" class="w-full bg-primary text-white py-3 rounded-md font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="shopping-cart" class="h-5 w-5"></i>
+                        Adicionar ao Carrinho
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Página/Modal de Carrinho -->
+    <div id="cartModal" class="fixed inset-0 z-[100] hidden bg-white flex-col">
+        <div class="container mx-auto px-4 h-full flex flex-col">
+            <!-- Header do Carrinho -->
+            <div class="h-16 flex items-center justify-between border-b">
+                <h2 class="text-xl font-bold text-primary flex items-center gap-2">
+                    <i data-lucide="shopping-bag" class="h-6 w-6"></i>
+                    Seu Carrinho
+                </h2>
+                <button onclick="closeCart()" class="text-gray-500 hover:text-primary flex items-center gap-1">
+                    Fechar <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <!-- Lista de Itens -->
+            <div class="flex-grow overflow-y-auto py-6">
+                <div id="cartItemsContainer" class="space-y-4 max-w-4xl mx-auto">
+                    <!-- Itens do carrinho renderizados via JS -->
+                    <div class="text-center text-gray-500 py-10">Seu carrinho está vazio.</div>
+                </div>
+            </div>
+
+            <!-- Footer do Carrinho -->
+            <div class="border-t bg-gray-50 py-6">
+                <div class="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="text-lg">
+                        Total do Pedido: <span id="cartTotal" class="font-bold text-2xl text-primary ml-2">R$ 0,00</span>
+                    </div>
+                    <div class="flex gap-4 w-full md:w-auto">
+                        <button onclick="closeCart()" class="flex-1 md:flex-none px-6 py-3 border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-white">Continuar Comprando</button>
+                        <button onclick="checkout()" class="flex-1 md:flex-none px-8 py-3 bg-green-600 text-white rounded-md font-bold hover:bg-green-700 shadow-lg flex items-center justify-center gap-2">
+                            Finalizar Pedido <i data-lucide="arrow-right" class="h-5 w-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAWZEZskuEMIby9dr5iWfH2G3nsXj14gr4",
+            authDomain: "camisetasran.firebaseapp.com",
+            projectId: "camisetasran",
+            storageBucket: "camisetasran.firebasestorage.app",
+            messagingSenderId: "983902425471",
+            appId: "1:983902425471:web:c072c921574fd2415d8a4a",
+            measurementId: "G-6FJGXVCYV6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let products = [];
+        let partners = [];
+        let inventory = [];
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let currentProduct = null;
+
+        // Inicialização
+        async function initStore() {
+            try {
+                // Carregar dados em paralelo
+                const [prodSnap, partSnap, invSnap] = await Promise.all([
+                    getDocs(collection(db, "products")),
+                    getDocs(collection(db, "partners")),
+                    getDocs(collection(db, "inventory"))
+                ]);
+
+                products = prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                partners = partSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                inventory = invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                renderProductsGrid();
+                updateCartUI();
+            } catch (error) {
+                console.error("Erro ao carregar loja:", error);
+                document.getElementById('products-grid').innerHTML = '<div class="col-span-full text-center text-red-500">Erro ao carregar produtos. Tente novamente mais tarde.</div>';
+            }
+        }
+
+        // Helper para URL de imagem
+        function getDisplayUrl(url) {
+            if (!url) return 'https://placehold.co/600x600/png?text=Sem+Imagem';
+            if (url.includes('drive.google.com') && url.includes('id=')) {
+                const match = url.match(/id=([^&]+)/);
+                if (match && match[1]) return `https://lh3.googleusercontent.com/d/${match[1]}`;
+            }
+            return url;
+        }
+
+        // Renderizar Grade de Produtos
+        function renderProductsGrid() {
+            const grid = document.getElementById('products-grid');
+            grid.innerHTML = '';
+
+            // Filtrar apenas produtos ativos
+            const activeProducts = products.filter(p => !p.status || p.status === 'Ativo');
+
+            if (activeProducts.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center text-muted-foreground">Nenhum produto disponível no momento.</div>';
+                return;
+            }
+
+            activeProducts.forEach(prod => {
+                // Resolver Escola
+                const partner = partners.find(p => p.id === prod.partnerId);
+                const schoolName = partner ? (partner.nickname || partner.name) : 'Geral';
+
+                // Resolver Imagem
+                let imageUrl = null;
+                let bgClass = 'bg-white';
+                if (prod.images && prod.images.length > 0) {
+                    imageUrl = prod.images[0];
+                } else if (prod.printId) {
+                    const printItem = inventory.find(i => i.id === prod.printId);
+                    if (printItem && printItem.image) {
+                        imageUrl = printItem.image;
+                        bgClass = 'bg-black'; // Fundo preto para estampas
+                    }
+                }
+                const displayImg = getDisplayUrl(imageUrl);
+
+                // Resolver Preço (Menor preço)
+                const prices = prod.pricing || [];
+                const priceDisplay = prices.length > 0 ? `R$ ${Math.min(...prices.map(p => p.salePrice)).toFixed(2).replace('.', ',')}` : 'Sob Consulta';
+
+                const card = document.createElement('div');
+                card.className = 'group overflow-hidden rounded-lg border bg-card text-card-foreground shadow-md hover:shadow-xl transition-all duration-300 flex flex-col';
+                card.innerHTML = `
+                    <div class="relative aspect-square overflow-hidden ${bgClass}">
+                        <img src="${displayImg}" alt="${prod.name}" referrerpolicy="no-referrer" class="object-contain w-full h-full p-4 group-hover:scale-105 transition-transform duration-500">
+                    </div>
+                    <div class="p-6 pb-2 flex-grow">
+                        <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors border-transparent bg-secondary text-secondary-foreground w-fit mb-2 uppercase tracking-wider">${schoolName}</span>
+                        <h3 class="text-lg font-semibold leading-tight group-hover:text-primary transition-colors mt-2">${prod.name}</h3>
+                    </div>
+                    <div class="p-6 pt-0 mt-auto">
+                        <div class="flex items-baseline gap-1 mb-4">
+                            <span class="text-2xl font-bold text-primary">${priceDisplay}</span>
+                        </div>
+                        <button onclick="window.openProductDetails('${prod.id}')" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full group transition-colors">
+                            Adicionar
+                            <i data-lucide="arrow-right" class="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform"></i>
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // --- Lógica do Modal de Produto ---
+        window.openProductDetails = (id) => {
+            currentProduct = products.find(p => p.id === id);
+            if (!currentProduct) return;
+
+            // Preencher dados
+            document.getElementById('modalProductName').textContent = currentProduct.name;
+            
+            const partner = partners.find(p => p.id === currentProduct.partnerId);
+            document.getElementById('modalProductSchool').textContent = partner ? (partner.nickname || partner.name) : 'Geral';
+
+            // Imagem
+            let imageUrl = null;
+            let bgClass = 'bg-white';
+            if (currentProduct.images && currentProduct.images.length > 0) {
+                imageUrl = currentProduct.images[0];
+            } else if (currentProduct.printId) {
+                const printItem = inventory.find(i => i.id === currentProduct.printId);
+                if (printItem && printItem.image) {
+                    imageUrl = printItem.image;
+                    bgClass = 'bg-black';
+                }
+            }
+            const imgEl = document.getElementById('modalProductImage');
+            imgEl.src = getDisplayUrl(imageUrl);
+            imgEl.parentElement.className = `w-full md:w-1/2 flex items-center justify-center p-4 relative ${bgClass}`;
+
+            // Variações
+            const select = document.getElementById('modalProductCategory');
+            select.innerHTML = '';
+            (currentProduct.pricing || []).forEach((price, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.dataset.price = price.salePrice;
+                option.textContent = `${price.category} - R$ ${price.salePrice.toFixed(2)}`;
+                select.appendChild(option);
+            });
+
+            updateVariations(); // Carrega as variações da primeira categoria
+
+            // Resetar Tamanho e Qtd
+            document.getElementById('modalProductQty').value = 1;
+
+
+            const modal = document.getElementById('productModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeProductModal = () => {
+            document.getElementById('productModal').classList.add('hidden');
+            document.getElementById('productModal').classList.remove('flex');
+        }
+
+        window.updateVariations = () => {
+            const catSelect = document.getElementById('modalProductCategory');
+            const varSelect = document.getElementById('modalProductVariation');
+            
+            // Atualizar Preço
+            updateModalPrice();
+
+            // Filtrar variações do estoque
+            const selectedIndex = catSelect.value;
+            if (selectedIndex === "") return;
+            
+            const categoryName = currentProduct.pricing[selectedIndex].category;
+            // Busca itens no estoque que são 'Malha' e pertencem à categoria selecionada
+            const variations = inventory.filter(i => i.type === 'Malha' && i.category === categoryName);
+
+            varSelect.innerHTML = '';
+            variations.forEach(v => {
+                const option = document.createElement('option');
+                option.value = v.name; // Usar o nome do item como valor (ex: Algodão Branco)
+                option.textContent = v.name;
+                varSelect.appendChild(option);
+            });
+            
+            if (variations.length === 0) {
+                const option = document.createElement('option');
+                option.value = "Padrão";
+                option.textContent = "Padrão";
+                varSelect.appendChild(option);
+            }
+        }
+
+        window.updateModalPrice = () => {
+            const select = document.getElementById('modalProductCategory');
+            const price = parseFloat(select.options[select.selectedIndex]?.dataset.price || 0);
+            const qty = parseInt(document.getElementById('modalProductQty').value);
+            document.getElementById('modalProductPrice').textContent = `R$ ${(price * qty).toFixed(2).replace('.', ',')}`;
+        }
+
+        window.adjustQty = (delta) => {
+            const input = document.getElementById('modalProductQty');
+            let val = parseInt(input.value) + delta;
+            if (val < 1) val = 1;
+            input.value = val;
+            updateModalPrice();
+        }
+
+        // --- Lógica do Carrinho ---
+        window.addToCart = () => {
+            const variation = document.getElementById('modalProductVariation').value;
+            if (!variation) {
+                alert("Por favor, selecione uma variação.");
+                return;
+            }
+
+            const select = document.getElementById('modalProductCategory');
+            const variationIndex = select.value;
+            const categoryName = currentProduct.pricing[variationIndex].category;
+            const price = parseFloat(currentProduct.pricing[variationIndex].salePrice);
+            const qty = parseInt(document.getElementById('modalProductQty').value);
+
+            // Cria ID único para o item no carrinho (Produto + Categoria + Variação)
+            const cartItemId = `${currentProduct.id}-${variationIndex}-${variation}`;
+            
+            const existingItem = cart.find(item => item.cartItemId === cartItemId);
+
+            if (existingItem) {
+                existingItem.qty += qty;
+            } else {
+                cart.push({
+                    cartItemId,
+                    productId: currentProduct.id,
+                    name: currentProduct.name,
+                    image: document.getElementById('modalProductImage').src,
+                    variation: categoryName,
+                    size: variation,
+                    price: price,
+                    qty: qty
+                });
+            }
+
+            saveCart();
+            closeProductModal();
+            openCart(); // Feedback imediato
+        }
+
+        window.removeFromCart = (index) => {
+            cart.splice(index, 1);
+            saveCart();
+            renderCartItems();
+        }
+
+        window.updateCartItemQty = (index, delta) => {
+            if (cart[index]) {
+                const newQty = cart[index].qty + delta;
+                if (newQty >= 1) {
+                    cart[index].qty = newQty;
+                    saveCart();
+                    renderCartItems();
+                }
+            }
+        }
+
+        function saveCart() {
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            const count = cart.reduce((acc, item) => acc + item.qty, 0);
+            const badge = document.getElementById('cartCount');
+            badge.textContent = count;
+            if (count > 0) badge.classList.remove('hidden');
+            else badge.classList.add('hidden');
+        }
+
+        window.openCart = () => {
+            renderCartItems();
+            const modal = document.getElementById('cartModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeCart = () => {
+            document.getElementById('cartModal').classList.add('hidden');
+            document.getElementById('cartModal').classList.remove('flex');
+        }
+
+        function renderCartItems() {
+            const container = document.getElementById('cartItemsContainer');
+            container.innerHTML = '';
+            let total = 0;
+
+            if (cart.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-10 flex flex-col items-center"><i data-lucide="shopping-cart" class="h-12 w-12 mb-4 opacity-20"></i>Seu carrinho está vazio.</div>';
+                document.getElementById('cartTotal').textContent = 'R$ 0,00';
+                lucide.createIcons();
+                return;
+            }
+
+            cart.forEach((item, index) => {
+                const itemTotal = item.price * item.qty;
+                total += itemTotal;
+
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-4 border-b pb-4';
+                div.innerHTML = `
+                    <img src="${item.image}" class="h-20 w-20 object-contain rounded border bg-gray-50">
+                    <div class="flex-grow">
+                        <h3 class="font-bold text-gray-900">${item.name}</h3>
+                        <p class="text-sm text-gray-600">Tecido: ${item.variation} | Tam: ${item.size}</p>
+                        <div class="flex items-center gap-3 mt-2">
+                            <div class="flex items-center border rounded-md">
+                                <button onclick="updateCartItemQty(${index}, -1)" class="px-2 py-1 hover:bg-gray-100 text-gray-600">-</button>
+                                <span class="text-sm font-medium w-8 text-center border-x py-1">${item.qty}</span>
+                                <button onclick="updateCartItemQty(${index}, 1)" class="px-2 py-1 hover:bg-gray-100 text-gray-600">+</button>
+                            </div>
+                            <span class="text-xs text-gray-500">R$ ${item.price.toFixed(2).replace('.', ',')} un.</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold mb-2">R$ ${itemTotal.toFixed(2).replace('.', ',')}</div>
+                        <button onclick="removeFromCart(${index})" class="text-red-500 hover:text-red-700 text-sm flex items-center gap-1 ml-auto">
+                            <i data-lucide="trash-2" class="h-4 w-4"></i> Remover
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            document.getElementById('cartTotal').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+            lucide.createIcons();
+        }
+
+        window.checkout = () => {
+            if (cart.length === 0) return;
+            // Aqui você pode implementar a lógica de salvar o pedido no Firebase
+            // Por enquanto, vamos apenas simular
+            const msg = "Olá! Gostaria de finalizar meu pedido:\n\n" + 
+                cart.map(i => `- ${i.qty}x ${i.name} (${i.variation}, Tam: ${i.size})`).join('\n') +
+                `\n\nTotal: ${document.getElementById('cartTotal').textContent}`;
+            
+            // Exemplo: Redirecionar para WhatsApp
+            // window.open(`https://wa.me/55SEUNUMERO?text=${encodeURIComponent(msg)}`, '_blank');
+            alert("Funcionalidade de checkout será implementada em breve!\n\n" + msg);
+        }
+
+        // Iniciar
+        initStore();
     </script>
 </body>
 </html>
