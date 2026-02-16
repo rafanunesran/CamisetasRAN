@@ -221,7 +221,7 @@
                     <div class="p-6">
                         <table class="w-full text-sm text-left">
                             <thead class="text-muted-foreground font-medium border-b">
-                                <tr><th class="pb-3">Nome Oficial</th><th class="pb-3">Nick name</th><th class="pb-3">Chave Pix</th><th class="pb-3">Status</th><th class="pb-3 text-right">Ações</th></tr>
+                                <tr><th class="pb-3">Nome Oficial</th><th class="pb-3">Nick name</th><th class="pb-3">Categoria</th><th class="pb-3">Chave Pix</th><th class="pb-3">Status</th><th class="pb-3 text-right">Ações</th></tr>
                             </thead>
                             <tbody id="partners-table-body" class="divide-y">
                                 <!-- Dados carregados via Firebase -->
@@ -368,6 +368,15 @@
             <div class="space-y-2">
                 <label class="text-sm font-medium text-gray-700">Nick name (Apelido)</label>
                 <input id="partnerNickname" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Nome Fantasia ou Apelido">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Categoria</label>
+                <select id="partnerCategory" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="Escola">Escola</option>
+                    <option value="Revendedor">Revendedor</option>
+                    <option value="Produção">Produção</option>
+                    <option value="ADM">ADM</option>
+                </select>
             </div>
             <div class="space-y-2">
                 <label class="text-sm font-medium text-gray-700">Chave Pix (Opcional)</label>
@@ -727,7 +736,7 @@
             if (!tbody) return;
             
             if (partners.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-muted-foreground">Nenhum parceiro encontrado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-muted-foreground">Nenhum parceiro encontrado.</td></tr>';
                 return;
             }
 
@@ -737,6 +746,7 @@
                 tr.innerHTML = `
                     <td class="py-3 font-medium">${partner.name || ''}</td>
                     <td>${partner.nickname || ''}</td>
+                    <td><span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">${partner.category || 'Escola'}</span></td>
                     <td>${partner.pix || '-'}</td>
                     <td><span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Ativo</span></td>
                     <td class="text-right">
@@ -911,6 +921,7 @@
             const title = document.getElementById('modalTitle');
             const nameInput = document.getElementById('partnerName');
             const nicknameInput = document.getElementById('partnerNickname');
+            const categoryInput = document.getElementById('partnerCategory');
             const pixInput = document.getElementById('partnerPix');
 
             // Resetar estado do botão ao abrir
@@ -926,12 +937,14 @@
                     title.textContent = 'Editar Parceiro';
                     nameInput.value = partner.name || '';
                     nicknameInput.value = partner.nickname || '';
+                    categoryInput.value = partner.category || 'Escola';
                     pixInput.value = partner.pix || '';
                 }
             } else {
                 title.textContent = 'Novo Parceiro';
                 nameInput.value = '';
                 nicknameInput.value = '';
+                categoryInput.value = 'Escola';
                 pixInput.value = '';
             }
             modal.classList.remove('hidden');
@@ -947,6 +960,7 @@
         window.savePartner = async () => {
             const name = document.getElementById('partnerName').value;
             const nickname = document.getElementById('partnerNickname').value;
+            const category = document.getElementById('partnerCategory').value;
             const pix = document.getElementById('partnerPix').value;
 
             if (!name || !nickname) {
@@ -961,11 +975,11 @@
             try {
                 if (currentPartnerId) {
                     await updateDoc(doc(db, "partners", currentPartnerId), {
-                        name, nickname, pix
+                        name, nickname, category, pix
                     });
                 } else {
                     await addDoc(collection(db, "partners"), {
-                        name, nickname, pix, status: 'Ativo'
+                        name, nickname, category, pix, status: 'Ativo'
                     });
                 }
                 window.closePartnerModal();
