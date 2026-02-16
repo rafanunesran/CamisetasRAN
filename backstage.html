@@ -242,13 +242,11 @@
                     <div class="p-6">
                         <table class="w-full text-sm text-left">
                             <thead class="text-muted-foreground font-medium border-b">
-                                <tr><th class="pb-3">Produto</th><th class="pb-3">Parceiro</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3 text-right">Ações</th></tr>
-                                <tr><th class="pb-3">Imagem</th><th class="pb-3">Produto</th><th class="pb-3">Parceiro</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3 text-right">Ações</th></tr>
+                                <tr><th class="pb-3">Imagem</th><th class="pb-3">Produto</th><th class="pb-3">Parceiro</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3">Status</th><th class="pb-3 text-right">Ações</th></tr>
                             </thead>
                             <tbody class="divide-y">
                                 <tbody id="products-table-body" class="divide-y">
-                                    <tr><td colspan="5" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
-                                    <tr><td colspan="6" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
+                                    <tr><td colspan="7" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
                                 </tbody>
                             </tbody>
                         </table>
@@ -891,8 +889,7 @@
             if (!tbody) return;
             
             if (products.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-muted-foreground">Nenhum produto cadastrado.</td></tr>';
-                tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-muted-foreground">Nenhum produto cadastrado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-muted-foreground">Nenhum produto cadastrado.</td></tr>';
                 return;
             }
 
@@ -926,14 +923,29 @@
                     imageHtml = `<img src="${displayUrl}" referrerpolicy="no-referrer" class="h-10 w-10 object-contain rounded border ${bgClass} p-1">`;
                 }
 
+                const status = prod.status || 'Ativo';
+                const statusBadge = status === 'Ativo' 
+                    ? '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Ativo</span>' 
+                    : '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Inativo</span>';
+                
+                const opacityClass = status === 'Inativo' ? 'opacity-60' : '';
+
                 const tr = document.createElement('tr');
+                tr.className = opacityClass;
                 tr.innerHTML = `
                     <td class="py-3">${imageHtml}</td>
                     <td class="py-3 font-medium">${prod.name}</td>
                     <td class="text-sm text-gray-600">${partnerName}</td>
                     <td class="text-sm text-gray-600">${categoriesDisplay || '-'}</td>
                     <td>${priceDisplay}</td>
-                    <td class="text-right text-primary cursor-pointer" onclick="window.openProductModal('${prod.id}')">Editar</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-right">
+                        <div class="flex justify-end gap-2">
+                            <button onclick="window.toggleProductStatus('${prod.id}', '${status}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors ${status === 'Ativo' ? 'text-orange-500' : 'text-green-600'}" title="${status === 'Ativo' ? 'Inativar' : 'Ativar'}"><i data-lucide="${status === 'Ativo' ? 'power-off' : 'power'}" class="h-4 w-4"></i></button>
+                            <button onclick="window.openProductModal('${prod.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-primary" title="Editar"><i data-lucide="pencil" class="h-4 w-4"></i></button>
+                            <button onclick="window.deleteProduct('${prod.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-red-500" title="Excluir"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                        </div>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1551,30 +1563,6 @@
         }
 
         // --- Lógica de Movimentações ---
-            // Atualização do openProductModal para carregar dados na edição
-            const originalOpenProductModal = window.openProductModal;
-            window.openProductModal = async (id = null) => {
-                await originalOpenProductModal(id);
-                if (id) {
-                    try {
-                        const docSnap = await getDoc(doc(db, "products", id));
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            document.getElementById('productName').value = data.name || '';
-                            document.getElementById('productPrint').value = data.printId || '';
-                            document.getElementById('productPartner').value = data.partnerId || '';
-                            
-                            // Limpar linhas vazias padrão e adicionar as salvas
-                            document.getElementById('productPricingBody').innerHTML = '';
-                            if (data.pricing && data.pricing.length > 0) {
-                                data.pricing.forEach(p => addProductCategoryRow(p));
-                            } else {
-                                addProductCategoryRow();
-                            }
-                        }
-                    } catch (e) { console.error("Erro ao carregar produto", e); }
-                }
-            }
         window.openMovementsModal = async () => {
             document.getElementById('movementsModal').classList.remove('hidden');
             document.getElementById('movementsModal').classList.add('flex');
@@ -1689,27 +1677,28 @@
 
             if (id) {
                 title.textContent = 'Editar Produto';
-                const docRef = doc(db, "products", id);
-                // Aqui idealmente pegariamos do array local se já carregado, mas vamos buscar para garantir
-                // Simplificação: buscar do array products se tivesse global, mas vou buscar do Firestore ou assumir que fetchProducts rodou
-                // Para simplificar, vou buscar o doc específico se necessário, mas vou usar a lógica de carregar dados
-                // Como não salvei products em variavel global no fetchProducts, vou buscar do banco rapidinho ou alterar fetchProducts.
-                // Vou alterar fetchProducts para salvar em window.productsList se quiser, mas vou fazer um getDoc aqui.
-                // Melhor: vamos assumir que o usuário clicou na tabela, então temos os dados. Mas para garantir integridade:
-                // (Vou pular o getDoc extra e confiar que se clicou, existe. Vou implementar a busca no array local se eu o tivesse exposto)
-                // Vou fazer um getDoc rápido.
-                // *Correção*: Vou usar getDoc do firestore importado.
-                // Como não importei getDoc no topo do script module (apenas getDocs), vou usar a lista renderizada se possível ou adicionar getDoc.
-                // Vou adicionar getDoc nos imports.
+                try {
+                    const docSnap = await getDoc(doc(db, "products", id));
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        nameInput.value = data.name || '';
+                        printSelect.value = data.printId || '';
+                        partnerSelect.value = data.partnerId || '';
+                        
+                        // Limpar linhas vazias padrão e adicionar as salvas
+                        pricingBody.innerHTML = '';
+                        if (data.pricing && data.pricing.length > 0) {
+                            data.pricing.forEach(p => addProductCategoryRow(p));
+                        } else {
+                            addProductCategoryRow();
+                        }
+                    }
+                } catch (e) { console.error("Erro ao carregar produto", e); }
             } else {
                 title.textContent = 'Novo Produto';
+                printSelect.value = '';
+                partnerSelect.value = '';
                 addProductCategoryRow(); // Adiciona uma linha vazia por padrão
-            }
-
-            // Se for edição, preencher dados (Lógica simulada pois preciso do objeto produto)
-            if (id) {
-                // Hack: buscar na tabela visualmente ou fazer fetch. Vou fazer fetch.
-                // Nota: Adicionei getDoc no import abaixo para funcionar.
             }
 
             modal.classList.remove('hidden');
@@ -1809,7 +1798,7 @@
                 if (currentProductId) {
                     await updateDoc(doc(db, "products", currentProductId), productData);
                 } else {
-                    await addDoc(collection(db, "products"), { ...productData, createdAt: new Date().toISOString() });
+                    await addDoc(collection(db, "products"), { ...productData, status: 'Ativo', createdAt: new Date().toISOString() });
                 }
 
                 closeProductModal();
@@ -1820,6 +1809,35 @@
             } finally {
                 btn.textContent = 'Salvar Produto';
                 btn.disabled = false;
+            }
+        }
+
+        window.deleteProduct = async (id) => {
+            if (confirm('Tem certeza que deseja excluir este produto permanentemente? Isso não pode ser desfeito.')) {
+                try {
+                    await deleteDoc(doc(db, "products", id));
+                    fetchProducts();
+                } catch (e) {
+                    console.error("Erro ao excluir produto:", e);
+                    alert("Erro ao excluir: " + e.message);
+                }
+            }
+        }
+
+        window.toggleProductStatus = async (id, currentStatus) => {
+            const newStatus = currentStatus === 'Ativo' ? 'Inativo' : 'Ativo';
+            const confirmMsg = newStatus === 'Inativo' 
+                ? 'Deseja inativar este produto? Ele não aparecerá mais no catálogo público.' 
+                : 'Deseja reativar este produto?';
+
+            if (confirm(confirmMsg)) {
+                try {
+                    await updateDoc(doc(db, "products", id), { status: newStatus });
+                    fetchProducts();
+                } catch (e) {
+                    console.error("Erro ao alterar status:", e);
+                    alert("Erro ao alterar status: " + e.message);
+                }
             }
         }
 
