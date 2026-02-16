@@ -428,6 +428,18 @@
                 <input id="inventoryName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Ex: Algodão 30.1 ou Estampa Leão">
             </div>
 
+            <div id="inventoryCategoryContainer" class="space-y-2 hidden">
+                <label class="text-sm font-medium text-gray-700">Categoria</label>
+                <div class="flex gap-2">
+                    <select id="inventoryCategory" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option value="">Selecione...</option>
+                    </select>
+                    <button onclick="createNewCategory()" class="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors" title="Criar Nova Categoria">
+                        <i data-lucide="plus" class="h-4 w-4"></i>
+                    </button>
+                </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-gray-700">Custo Unitário (R$)</label>
@@ -548,6 +560,16 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização de Imagem (Zoom) -->
+    <div id="imageModal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/80 backdrop-blur-sm" onclick="closeImageModal()">
+        <div class="relative max-w-4xl max-h-[90vh] p-4" onclick="event.stopPropagation()">
+            <button onclick="closeImageModal()" class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors">
+                <i data-lucide="x" class="h-8 w-8"></i>
+            </button>
+            <img id="fullSizeImage" src="" alt="Visualização Ampliada" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl object-contain bg-white">
         </div>
     </div>
 
@@ -706,7 +728,9 @@
             tbody.innerHTML = '';
             inventory.forEach(item => {
                 const isPrint = item.type === 'Estampa';
-                const imageHtml = isPrint && item.image ? `<img src="${item.image}" class="h-8 w-8 object-cover rounded border" alt="Estampa">` : '<div class="h-8 w-8 bg-gray-100 rounded border flex items-center justify-center"><i data-lucide="package" class="h-4 w-4 text-gray-400"></i></div>';
+                const imageHtml = isPrint && item.image ? 
+                    `<img src="${item.image}" onclick="openImageModal('${item.image}')" class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity" alt="Estampa" title="Clique para ampliar">` : 
+                    '<div class="h-8 w-8 bg-gray-100 rounded border flex items-center justify-center"><i data-lucide="package" class="h-4 w-4 text-gray-400"></i></div>';
                 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -937,6 +961,7 @@
             const nameInput = document.getElementById('inventoryName');
             const costInput = document.getElementById('inventoryCost');
             const qtyInput = document.getElementById('inventoryQuantity');
+            const categorySelect = document.getElementById('inventoryCategory');
             const schoolSelect = document.getElementById('inventorySchool');
             const imageInput = document.getElementById('inventoryImage');
             const imagePreview = document.getElementById('inventoryImagePreview');
@@ -955,6 +980,16 @@
                 schoolSelect.appendChild(option);
             });
 
+            // Popular select de categorias (baseado nos itens existentes)
+            const uniqueCategories = [...new Set(inventory.map(i => i.category).filter(c => c))].sort();
+            categorySelect.innerHTML = '<option value="">Selecione...</option>';
+            uniqueCategories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                categorySelect.appendChild(option);
+            });
+
             currentInventoryId = id;
 
             if (id) {
@@ -963,6 +998,7 @@
                     title.textContent = 'Editar Item';
                     typeInput.value = item.type || 'Malha';
                     nameInput.value = item.name || '';
+                    categorySelect.value = item.category || '';
                     costInput.value = item.cost || '';
                     qtyInput.value = item.quantity || '';
                     schoolSelect.value = item.partnerId || '';
@@ -978,6 +1014,7 @@
                 title.textContent = 'Novo Item';
                 typeInput.value = 'Malha';
                 nameInput.value = '';
+                categorySelect.value = '';
                 costInput.value = '';
                 qtyInput.value = '';
                 schoolSelect.value = '';
@@ -988,6 +1025,7 @@
             window.toggleInventoryFields(); // Atualiza visibilidade do campo de imagem
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+            lucide.createIcons(); // Atualiza ícones (para o botão de +)
         }
 
         window.closeInventoryModal = () => {
@@ -1000,12 +1038,28 @@
             const type = document.getElementById('inventoryType').value;
             const imageContainer = document.getElementById('inventoryImageContainer');
             const schoolContainer = document.getElementById('inventorySchoolContainer');
+            const categoryContainer = document.getElementById('inventoryCategoryContainer');
+            
             if (type === 'Estampa') {
                 imageContainer.classList.remove('hidden');
                 schoolContainer.classList.remove('hidden');
+                categoryContainer.classList.add('hidden');
             } else {
                 imageContainer.classList.add('hidden');
                 schoolContainer.classList.add('hidden');
+                categoryContainer.classList.remove('hidden');
+            }
+        }
+
+        window.createNewCategory = () => {
+            const newCat = prompt("Digite o nome da nova categoria:");
+            if (newCat && newCat.trim() !== "") {
+                const select = document.getElementById('inventoryCategory');
+                const option = document.createElement('option');
+                option.value = newCat.trim();
+                option.textContent = newCat.trim();
+                select.appendChild(option);
+                select.value = newCat.trim();
             }
         }
 
@@ -1052,6 +1106,7 @@
             const cost = document.getElementById('inventoryCost').value;
             const quantity = document.getElementById('inventoryQuantity').value;
             const partnerId = document.getElementById('inventorySchool').value;
+            const category = document.getElementById('inventoryCategory').value;
             const imageInput = document.getElementById('inventoryImage');
 
             if (!name) { alert('Nome é obrigatório'); return; }
@@ -1074,7 +1129,7 @@
                     imageUrl = currentItem.image || '';
                 }
 
-                const itemData = { type, name, cost, quantity, image: imageUrl, partnerId };
+                const itemData = { type, name, cost, quantity, image: imageUrl, partnerId, category };
                 
                 if (currentInventoryId) {
                     await updateDoc(doc(db, "inventory", currentInventoryId), itemData);
@@ -1298,6 +1353,22 @@
         window.closeMovementsModal = () => {
             document.getElementById('movementsModal').classList.add('hidden');
             document.getElementById('movementsModal').classList.remove('flex');
+        }
+
+        // --- Visualização de Imagem ---
+        window.openImageModal = (url) => {
+            const modal = document.getElementById('imageModal');
+            const img = document.getElementById('fullSizeImage');
+            img.src = url;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeImageModal = () => {
+            const modal = document.getElementById('imageModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            setTimeout(() => { document.getElementById('fullSizeImage').src = ''; }, 200);
         }
 
         // Inicializar
