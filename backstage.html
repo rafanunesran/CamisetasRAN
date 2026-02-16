@@ -420,6 +420,7 @@
                 <select id="inventoryType" onchange="toggleInventoryFields()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                     <option value="Malha">Malha</option>
                     <option value="Estampa">Estampa</option>
+                    <option value="Insumo">Insumo</option>
                 </select>
             </div>
 
@@ -437,6 +438,27 @@
                     <button onclick="createNewCategory()" class="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors" title="Criar Nova Categoria">
                         <i data-lucide="plus" class="h-4 w-4"></i>
                     </button>
+                </div>
+            </div>
+
+            <div id="inventoryUsageContainer" class="space-y-2 hidden bg-gray-50 p-3 rounded border border-gray-200">
+                <label class="text-sm font-medium text-gray-700 block">Regra de Uso (Automação)</label>
+                <select id="inventoryUsageType" onchange="toggleUsageFields()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="unit">Por Item (Ex: 1 Etiqueta por peça)</option>
+                    <option value="batch">Por Lote (Ex: 1 Embalagem a cada 5 peças)</option>
+                    <option value="order">Por Pedido (Ex: 1 Brinde por pedido)</option>
+                </select>
+                
+                <div id="usageUnitConfig" class="usage-config hidden text-sm text-gray-600 flex items-center flex-wrap">
+                    Usar <input id="usageUnitQty" type="number" value="1" min="1" class="w-16 border border-gray-300 rounded px-2 py-1 mx-2 text-center focus:outline-none focus:ring-1 focus:ring-primary"> unidade(s) por item produzido.
+                </div>
+
+                <div id="usageBatchConfig" class="usage-config hidden text-sm text-gray-600 flex items-center flex-wrap">
+                    Usar <input id="usageBatchQty" type="number" value="1" min="1" class="w-16 border border-gray-300 rounded px-2 py-1 mx-2 text-center focus:outline-none focus:ring-1 focus:ring-primary"> unidade(s) a cada <input id="usageBatchLimit" type="number" value="5" min="1" class="w-16 border border-gray-300 rounded px-2 py-1 mx-2 text-center focus:outline-none focus:ring-1 focus:ring-primary"> itens.
+                </div>
+
+                <div id="usageOrderConfig" class="usage-config hidden text-sm text-gray-600 flex items-center flex-wrap">
+                    Usar <input id="usageOrderQty" type="number" value="1" min="1" class="w-16 border border-gray-300 rounded px-2 py-1 mx-2 text-center focus:outline-none focus:ring-1 focus:ring-primary"> unidade(s) por pedido total.
                 </div>
             </div>
 
@@ -728,16 +750,24 @@
             tbody.innerHTML = '';
             inventory.forEach(item => {
                 const isPrint = item.type === 'Estampa';
+                const isInsumo = item.type === 'Insumo';
                 const displayUrl = getDisplayUrl(item.image);
                 const imageHtml = isPrint && item.image ? 
                     `<img src="${displayUrl}" onclick="openImageModal('${item.image}')" referrerpolicy="no-referrer" class="h-8 w-8 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity" alt="Estampa" title="Clique para ampliar">` : 
                     '<div class="h-8 w-8 bg-gray-100 rounded border flex items-center justify-center"><i data-lucide="package" class="h-4 w-4 text-gray-400"></i></div>';
                 
+                let typeBadgeClass = 'bg-blue-100 text-blue-800'; // Malha (Default)
+                if (isPrint) typeBadgeClass = 'bg-purple-100 text-purple-800';
+                if (isInsumo) typeBadgeClass = 'bg-orange-100 text-orange-800';
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="py-3">${imageHtml}</td>
                     <td class="font-medium">${item.name || ''}</td>
-                    <td><span class="px-2 py-1 rounded-full text-xs ${isPrint ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">${item.type}</span></td>
+                    <td>
+                        <span class="px-2 py-1 rounded-full text-xs ${typeBadgeClass}">${item.type}</span>
+                        ${!isPrint && item.category ? `<span class="text-xs text-gray-500 ml-2">(${item.category})</span>` : ''}
+                    </td>
                     <td>R$ ${parseFloat(item.cost || 0).toFixed(2)}</td>
                     <td>${item.quantity || 0}</td>
                     <td class="text-right">
@@ -966,6 +996,12 @@
             const schoolSelect = document.getElementById('inventorySchool');
             const imageInput = document.getElementById('inventoryImage');
             const imagePreview = document.getElementById('inventoryImagePreview');
+            
+            const usageTypeSelect = document.getElementById('inventoryUsageType');
+            const usageUnitQty = document.getElementById('usageUnitQty');
+            const usageBatchQty = document.getElementById('usageBatchQty');
+            const usageBatchLimit = document.getElementById('usageBatchLimit');
+            const usageOrderQty = document.getElementById('usageOrderQty');
 
             // Resetar botão
             const saveBtn = document.getElementById('saveInventoryBtn');
@@ -1010,6 +1046,16 @@
                     } else {
                         imagePreview.classList.add('hidden');
                     }
+
+                    // Carregar regras de uso se existirem
+                    if (item.usageRule) {
+                        usageTypeSelect.value = item.usageRule.type || 'unit';
+                        if (item.usageRule.type === 'unit') usageUnitQty.value = item.usageRule.qty || 1;
+                        if (item.usageRule.type === 'batch') { usageBatchQty.value = item.usageRule.qty || 1; usageBatchLimit.value = item.usageRule.limit || 5; }
+                        if (item.usageRule.type === 'order') usageOrderQty.value = item.usageRule.qty || 1;
+                    } else {
+                        usageTypeSelect.value = 'unit';
+                    }
                 }
             } else {
                 title.textContent = 'Novo Item';
@@ -1021,6 +1067,11 @@
                 schoolSelect.value = '';
                 imageInput.value = '';
                 imagePreview.classList.add('hidden');
+                usageTypeSelect.value = 'unit';
+                usageUnitQty.value = '1';
+                usageBatchQty.value = '1';
+                usageBatchLimit.value = '5';
+                usageOrderQty.value = '1';
             }
             
             window.toggleInventoryFields(); // Atualiza visibilidade do campo de imagem
@@ -1040,16 +1091,33 @@
             const imageContainer = document.getElementById('inventoryImageContainer');
             const schoolContainer = document.getElementById('inventorySchoolContainer');
             const categoryContainer = document.getElementById('inventoryCategoryContainer');
+            const usageContainer = document.getElementById('inventoryUsageContainer');
             
             if (type === 'Estampa') {
                 imageContainer.classList.remove('hidden');
                 schoolContainer.classList.remove('hidden');
                 categoryContainer.classList.add('hidden');
-            } else {
+                usageContainer.classList.add('hidden');
+            } else if (type === 'Insumo') {
                 imageContainer.classList.add('hidden');
                 schoolContainer.classList.add('hidden');
                 categoryContainer.classList.remove('hidden');
+                usageContainer.classList.remove('hidden');
+                window.toggleUsageFields();
+            } else { // Malha
+                imageContainer.classList.add('hidden');
+                schoolContainer.classList.add('hidden');
+                categoryContainer.classList.remove('hidden');
+                usageContainer.classList.add('hidden');
             }
+        }
+
+        window.toggleUsageFields = () => {
+            const type = document.getElementById('inventoryUsageType').value;
+            document.querySelectorAll('.usage-config').forEach(el => el.classList.add('hidden'));
+            if (type === 'unit') document.getElementById('usageUnitConfig').classList.remove('hidden');
+            if (type === 'batch') document.getElementById('usageBatchConfig').classList.remove('hidden');
+            if (type === 'order') document.getElementById('usageOrderConfig').classList.remove('hidden');
         }
 
         window.createNewCategory = () => {
@@ -1130,7 +1198,19 @@
                     imageUrl = currentItem.image || '';
                 }
 
-                const itemData = { type, name, cost, quantity, image: imageUrl, partnerId, category };
+                // Capturar regra de uso se for Insumo
+                let usageRule = null;
+                if (type === 'Insumo') {
+                    const ruleType = document.getElementById('inventoryUsageType').value;
+                    if (ruleType === 'unit') usageRule = { type: 'unit', qty: document.getElementById('usageUnitQty').value };
+                    if (ruleType === 'batch') usageRule = { type: 'batch', qty: document.getElementById('usageBatchQty').value, limit: document.getElementById('usageBatchLimit').value };
+                    if (ruleType === 'order') usageRule = { type: 'order', qty: document.getElementById('usageOrderQty').value };
+                }
+
+                const itemData = { 
+                    type, name, cost, quantity, image: imageUrl, partnerId, category,
+                    usageRule: usageRule // Salva a regra no objeto
+                };
                 
                 if (currentInventoryId) {
                     await updateDoc(doc(db, "inventory", currentInventoryId), itemData);
