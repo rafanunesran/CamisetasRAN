@@ -439,6 +439,13 @@
                 </div>
             </div>
 
+            <div id="inventorySchoolContainer" class="space-y-2 hidden">
+                <label class="text-sm font-medium text-gray-700">Escola/Revendedor</label>
+                <select id="inventorySchool" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+
             <div id="inventoryImageContainer" class="space-y-2 hidden">
                 <label class="text-sm font-medium text-gray-700">Imagem da Estampa</label>
                 <div class="flex items-center gap-4">
@@ -930,6 +937,7 @@
             const nameInput = document.getElementById('inventoryName');
             const costInput = document.getElementById('inventoryCost');
             const qtyInput = document.getElementById('inventoryQuantity');
+            const schoolSelect = document.getElementById('inventorySchool');
             const imageInput = document.getElementById('inventoryImage');
             const imagePreview = document.getElementById('inventoryImagePreview');
 
@@ -937,6 +945,15 @@
             const saveBtn = document.getElementById('saveInventoryBtn');
             saveBtn.textContent = 'Salvar';
             saveBtn.disabled = false;
+
+            // Popular select de escolas
+            schoolSelect.innerHTML = '<option value="">Selecione...</option>';
+            partners.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nickname || p.name;
+                schoolSelect.appendChild(option);
+            });
 
             currentInventoryId = id;
 
@@ -948,6 +965,7 @@
                     nameInput.value = item.name || '';
                     costInput.value = item.cost || '';
                     qtyInput.value = item.quantity || '';
+                    schoolSelect.value = item.partnerId || '';
                     // imageInput.value não pode ser definido programaticamente por segurança
                     if (item.image) {
                         imagePreview.src = item.image;
@@ -962,6 +980,7 @@
                 nameInput.value = '';
                 costInput.value = '';
                 qtyInput.value = '';
+                schoolSelect.value = '';
                 imageInput.value = '';
                 imagePreview.classList.add('hidden');
             }
@@ -980,10 +999,13 @@
         window.toggleInventoryFields = () => {
             const type = document.getElementById('inventoryType').value;
             const imageContainer = document.getElementById('inventoryImageContainer');
+            const schoolContainer = document.getElementById('inventorySchoolContainer');
             if (type === 'Estampa') {
                 imageContainer.classList.remove('hidden');
+                schoolContainer.classList.remove('hidden');
             } else {
                 imageContainer.classList.add('hidden');
+                schoolContainer.classList.add('hidden');
             }
         }
 
@@ -1029,6 +1051,7 @@
             const name = document.getElementById('inventoryName').value;
             const cost = document.getElementById('inventoryCost').value;
             const quantity = document.getElementById('inventoryQuantity').value;
+            const partnerId = document.getElementById('inventorySchool').value;
             const imageInput = document.getElementById('inventoryImage');
 
             if (!name) { alert('Nome é obrigatório'); return; }
@@ -1051,7 +1074,7 @@
                     imageUrl = currentItem.image || '';
                 }
 
-                const itemData = { type, name, cost, quantity, image: imageUrl };
+                const itemData = { type, name, cost, quantity, image: imageUrl, partnerId };
                 
                 if (currentInventoryId) {
                     await updateDoc(doc(db, "inventory", currentInventoryId), itemData);
