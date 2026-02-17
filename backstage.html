@@ -284,31 +284,57 @@
 
             <!-- Production Tab -->
             <div id="production" class="tab-content space-y-6">
-                <div class="rounded-lg border bg-white shadow-sm">
-                    <div class="p-6 border-b">
-                        <h3 class="font-semibold">Controle de Produção</h3>
+                <div class="flex justify-between items-center">
+                    <h3 class="font-semibold text-lg">Kanban de Produção</h3>
+                    <button onclick="openOrderModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors flex items-center gap-1">
+                        <i data-lucide="plus" class="h-3 w-3"></i> Novo Orçamento
+                    </button>
+                </div>
+                
+                <div class="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-250px)]">
+                    <!-- Coluna Orçamento -->
+                    <div class="min-w-[280px] w-[280px] flex flex-col bg-gray-100 rounded-lg border border-gray-200">
+                        <div class="p-3 font-bold text-gray-700 border-b bg-gray-50 rounded-t-lg flex justify-between items-center">
+                            <span>Orçamento</span>
+                            <span id="count-orcamento" class="bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <div id="col-orcamento" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
                     </div>
-                    <div class="p-6 space-y-4">
-                        <div class="border rounded-lg p-4">
-                            <div class="flex justify-between mb-2">
-                                <h4 class="font-bold text-sm">Polo Tradicional M <span class="font-normal text-muted-foreground">- Sta. Maria</span></h4>
-                                <span class="text-xs bg-primary text-white px-2 py-0.5 rounded">Corte</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-accent h-2 rounded-full" style="width: 25%"></div>
-                            </div>
-                            <p class="text-xs text-right mt-1 text-muted-foreground">25%</p>
+
+                    <!-- Coluna Pendente -->
+                    <div class="min-w-[280px] w-[280px] flex flex-col bg-yellow-50 rounded-lg border border-yellow-100">
+                        <div class="p-3 font-bold text-yellow-800 border-b bg-yellow-100/50 rounded-t-lg flex justify-between items-center">
+                            <span>Pendente</span>
+                            <span id="count-pendente" class="bg-yellow-200 text-yellow-800 text-xs px-2 py-0.5 rounded-full">0</span>
                         </div>
-                        <div class="border rounded-lg p-4">
-                            <div class="flex justify-between mb-2">
-                                <h4 class="font-bold text-sm">Suéter de Lã <span class="font-normal text-muted-foreground">- Britânico</span></h4>
-                                <span class="text-xs bg-primary text-white px-2 py-0.5 rounded">Costura</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-accent h-2 rounded-full" style="width: 60%"></div>
-                            </div>
-                            <p class="text-xs text-right mt-1 text-muted-foreground">60%</p>
+                        <div id="col-pendente" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
+                    </div>
+
+                    <!-- Coluna Produção -->
+                    <div class="min-w-[280px] w-[280px] flex flex-col bg-blue-50 rounded-lg border border-blue-100">
+                        <div class="p-3 font-bold text-blue-800 border-b bg-blue-100/50 rounded-t-lg flex justify-between items-center">
+                            <span>Produção</span>
+                            <span id="count-producao" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full">0</span>
                         </div>
+                        <div id="col-producao" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
+                    </div>
+
+                    <!-- Coluna Finalizado -->
+                    <div class="min-w-[280px] w-[280px] flex flex-col bg-green-50 rounded-lg border border-green-100">
+                        <div class="p-3 font-bold text-green-800 border-b bg-green-100/50 rounded-t-lg flex justify-between items-center">
+                            <span>Finalizado</span>
+                            <span id="count-finalizado" class="bg-green-200 text-green-800 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <div id="col-finalizado" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
+                    </div>
+
+                    <!-- Coluna Arquivado -->
+                    <div class="min-w-[280px] w-[280px] flex flex-col bg-gray-100 rounded-lg border border-gray-200 opacity-75">
+                        <div class="p-3 font-bold text-gray-600 border-b bg-gray-200 rounded-t-lg flex justify-between items-center">
+                            <span>Arquivado</span>
+                            <span id="count-arquivado" class="bg-gray-300 text-gray-700 text-xs px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <div id="col-arquivado" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
                     </div>
                 </div>
             </div>
@@ -683,6 +709,89 @@
         </div>
     </div>
 
+    <!-- Modal de Orçamento/Pedido -->
+    <div id="orderModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-3xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 id="orderModalTitle" class="text-xl font-bold text-primary">Novo Orçamento</h2>
+                <button onclick="closeOrderModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Nome do Cliente</label>
+                    <input id="orderClientName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nome do Cliente">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Telefone / WhatsApp</label>
+                    <input id="orderClientPhone" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="(00) 00000-0000">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Revendedor / Escola</label>
+                    <select id="orderPartner" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div id="orderStudentContainer" class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Nome do Estudante (Opcional)</label>
+                    <input id="orderStudentName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nome do Aluno">
+                </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-md border border-gray-200 space-y-4">
+                <h3 class="text-sm font-semibold">Adicionar Produtos</h3>
+                <div class="grid grid-cols-12 gap-2 items-end">
+                    <div class="col-span-4 space-y-1">
+                        <label class="text-xs font-medium">Produto</label>
+                        <select id="orderProductSelect" onchange="onOrderProductChange()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="col-span-3 space-y-1">
+                        <label class="text-xs font-medium">Categoria</label>
+                        <select id="orderProductCategory" onchange="onOrderCategoryChange()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2 space-y-1">
+                        <label class="text-xs font-medium">Tamanho/Var.</label>
+                        <select id="orderProductSize" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="col-span-1 space-y-1">
+                        <label class="text-xs font-medium">Qtd</label>
+                        <input id="orderProductQty" type="number" value="1" min="1" class="flex h-9 w-full rounded-md border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div class="col-span-2 space-y-1">
+                        <label class="text-xs font-medium">Valor (R$)</label>
+                        <input id="orderProductPrice" type="number" step="0.01" class="flex h-9 w-full rounded-md border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button onclick="addOrderProduct()" class="w-full md:w-auto px-4 h-9 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md text-xs font-medium border border-gray-300">Adicionar Item</button>
+                </div>
+            </div>
+
+            <div class="border rounded-md overflow-hidden max-h-40 overflow-y-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-muted-foreground font-medium sticky top-0">
+                        <tr><th class="px-4 py-2">Produto</th><th class="px-4 py-2">Cat. / Tam.</th><th class="px-4 py-2">Qtd</th><th class="px-4 py-2">Total</th><th class="px-4 py-2 text-right">Ação</th></tr>
+                    </thead>
+                    <tbody id="orderItemsList" class="divide-y"></tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t">
+                <div class="text-lg font-bold">Total: <span id="orderTotalDisplay" class="text-primary">R$ 0,00</span></div>
+                <div class="flex gap-2">
+                    <button onclick="closeOrderModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button id="saveOrderBtn" onclick="saveOrder()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Orçamento</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -715,6 +824,8 @@
         let currentInventoryId = null;
         let currentProductId = null;
         let purchaseList = [];
+        let orderList = []; // Itens do pedido atual
+        let currentOrderId = null;
 
         // Função para buscar parceiros
         async function fetchPartners() {
@@ -728,6 +839,7 @@
                 fetchClients(); // Busca clientes depois de ter os parceiros para mapear nomes
                 fetchInventory();
                 fetchProducts();
+                fetchOrders();
             } catch (error) {
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
@@ -1842,6 +1954,420 @@
                     console.error("Erro ao alterar status:", e);
                     alert("Erro ao alterar status: " + e.message);
                 }
+            }
+        }
+
+        // --- Lógica de Pedidos / Kanban ---
+        
+        async function fetchOrders() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "orders"));
+                const orders = [];
+                querySnapshot.forEach((doc) => {
+                    orders.push({ id: doc.id, ...doc.data() });
+                });
+                renderKanban(orders);
+            } catch (error) {
+                console.error("Erro ao buscar pedidos:", error);
+            }
+        }
+
+        function renderKanban(orders) {
+            const columns = {
+                'Orçamento': document.getElementById('col-orcamento'),
+                'Pendente': document.getElementById('col-pendente'),
+                'Produção': document.getElementById('col-producao'),
+                'Finalizado': document.getElementById('col-finalizado'),
+                'Arquivado': document.getElementById('col-arquivado')
+            };
+            
+            const counts = {
+                'Orçamento': 0, 'Pendente': 0, 'Produção': 0, 'Finalizado': 0, 'Arquivado': 0
+            };
+
+            // Limpar colunas
+            Object.values(columns).forEach(col => col.innerHTML = '');
+
+            orders.forEach(order => {
+                const status = order.status || 'Orçamento';
+                if (columns[status]) {
+                    counts[status]++;
+                    const partner = partners.find(p => p.id === order.partnerId);
+                    const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
+                    
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-3 rounded shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer group relative';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="font-bold text-sm text-gray-800">${order.clientName}</span>
+                            <span class="text-xs font-mono text-gray-400">#${order.id.slice(-4)}</span>
+                        </div>
+                        <div class="text-xs text-gray-600 mb-2 flex items-center gap-1">
+                            <i data-lucide="building-2" class="h-3 w-3"></i> ${partnerName}
+                            ${order.studentName ? `<span class="text-gray-400">• ${order.studentName}</span>` : ''}
+                        </div>
+                        <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                            <span class="font-bold text-primary text-sm">R$ ${parseFloat(order.total).toFixed(2)}</span>
+                            <div class="flex gap-1">
+                                <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1 hover:bg-green-100 text-green-600 rounded" title="Enviar WhatsApp"><i data-lucide="message-circle" class="h-3 w-3"></i></button>
+                                <button onclick="window.openOrderModal('${order.id}')" class="p-1 hover:bg-gray-100 text-blue-600 rounded" title="Editar"><i data-lucide="pencil" class="h-3 w-3"></i></button>
+                                <button onclick="window.deleteOrder('${order.id}')" class="p-1 hover:bg-red-100 text-red-600 rounded" title="Excluir"><i data-lucide="trash-2" class="h-3 w-3"></i></button>
+                            </div>
+                        </div>
+                        <div class="mt-2 flex justify-between items-center">
+                            <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none" onclick="event.stopPropagation()">
+                                <option value="Orçamento" ${status === 'Orçamento' ? 'selected' : ''}>Orçamento</option>
+                                <option value="Pendente" ${status === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                                <option value="Produção" ${status === 'Produção' ? 'selected' : ''}>Produção</option>
+                                <option value="Finalizado" ${status === 'Finalizado' ? 'selected' : ''}>Finalizado</option>
+                                <option value="Arquivado" ${status === 'Arquivado' ? 'selected' : ''}>Arquivado</option>
+                            </select>
+                        </div>
+                    `;
+                    columns[status].appendChild(card);
+                }
+            });
+
+            // Atualizar contadores
+            document.getElementById('count-orcamento').textContent = counts['Orçamento'];
+            document.getElementById('count-pendente').textContent = counts['Pendente'];
+            document.getElementById('count-producao').textContent = counts['Produção'];
+            document.getElementById('count-finalizado').textContent = counts['Finalizado'];
+            document.getElementById('count-arquivado').textContent = counts['Arquivado'];
+            
+            lucide.createIcons();
+        }
+
+        window.openOrderModal = async (id = null) => {
+            currentOrderId = id;
+            orderList = [];
+            
+            // Resetar campos
+            document.getElementById('orderClientName').value = '';
+            document.getElementById('orderClientPhone').value = '';
+            document.getElementById('orderPartner').value = '';
+            document.getElementById('orderStudentName').value = '';
+            
+            // Configuração inicial do campo Estudante (Oculto por padrão)
+            const studentContainer = document.getElementById('orderStudentContainer');
+            studentContainer.classList.add('hidden');
+            
+            document.getElementById('orderProductQty').value = 1;
+            document.getElementById('orderProductPrice').value = '';
+            
+            // Popular Select de Parceiros
+            const partnerSelect = document.getElementById('orderPartner');
+            partnerSelect.innerHTML = '<option value="">Selecione...</option>';
+            
+            // Filtrar apenas Escola e Revendedor
+            const validPartners = partners.filter(p => {
+                const cat = String(p.category || '').trim().toLowerCase();
+                return cat === 'escola' || cat === 'revendedor';
+            });
+            
+            // Ordenar alfabeticamente para facilitar a busca
+            validPartners.sort((a, b) => {
+                const nameA = (a.nickname || a.name || '').toLowerCase();
+                const nameB = (b.nickname || b.name || '').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+            
+            validPartners.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = `${p.nickname || p.name} - ${p.category}`;
+                option.dataset.category = p.category;
+                partnerSelect.appendChild(option);
+            });
+
+            // Listener para mostrar/esconder nome do estudante
+            partnerSelect.onchange = () => {
+                const selectedOption = partnerSelect.options[partnerSelect.selectedIndex];
+                const category = selectedOption && selectedOption.dataset.category 
+                    ? String(selectedOption.dataset.category).trim().toLowerCase() 
+                    : '';
+                
+                if (category === 'escola') {
+                    studentContainer.classList.remove('hidden');
+                } else {
+                    studentContainer.classList.add('hidden');
+                    document.getElementById('orderStudentName').value = '';
+                }
+            };
+
+            // Popular Select de Produtos (Carregar produtos do banco)
+            const productSelect = document.getElementById('orderProductSelect');
+            productSelect.innerHTML = '<option value="">Selecione...</option>';
+            // Resetar selects dependentes
+            document.getElementById('orderProductCategory').innerHTML = '<option value="">Selecione...</option>';
+            document.getElementById('orderProductSize').innerHTML = '<option value="">Selecione...</option>';
+
+            const prodSnap = await getDocs(collection(db, "products"));
+            prodSnap.forEach(doc => {
+                const p = doc.data();
+                // Filtrar apenas produtos ativos se necessário, ou mostrar todos
+                if (p.status !== 'Inativo') {
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = p.name;
+                    // Guardar preço base no dataset para facilitar
+                    const price = p.pricing && p.pricing.length > 0 ? p.pricing[0].salePrice : 0;
+                    option.dataset.price = price;
+                    if (p.pricing) {
+                        option.dataset.pricing = JSON.stringify(p.pricing);
+                    }
+                    productSelect.appendChild(option);
+                }
+            });
+
+            // Evento para atualizar preço ao selecionar produto
+            productSelect.onchange = () => {
+                const price = productSelect.options[productSelect.selectedIndex].dataset.price;
+                document.getElementById('orderProductPrice').value = price || '';
+                window.onOrderProductChange();
+            };
+
+            if (id) {
+                document.getElementById('orderModalTitle').textContent = 'Editar Orçamento';
+                const docSnap = await getDoc(doc(db, "orders", id));
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    document.getElementById('orderClientName').value = data.clientName;
+                    document.getElementById('orderClientPhone').value = data.clientPhone;
+                    document.getElementById('orderPartner').value = data.partnerId;
+                    
+                    // Verificar visibilidade do estudante ao editar
+                    const partner = partners.find(p => p.id === data.partnerId);
+                    if (partner && (partner.category || '').trim().toLowerCase() === 'escola') {
+                        document.getElementById('orderStudentContainer').classList.remove('hidden');
+                    } else {
+                        document.getElementById('orderStudentContainer').classList.add('hidden');
+                    }
+
+                    if (data.studentName) {
+                        document.getElementById('orderStudentName').value = data.studentName;
+                    }
+                    orderList = data.items || [];
+                }
+            } else {
+                document.getElementById('orderModalTitle').textContent = 'Novo Orçamento';
+            }
+
+            renderOrderItems();
+            document.getElementById('orderModal').classList.remove('hidden');
+            document.getElementById('orderModal').classList.add('flex');
+        }
+
+        window.closeOrderModal = () => {
+            document.getElementById('orderModal').classList.add('hidden');
+            document.getElementById('orderModal').classList.remove('flex');
+        }
+
+        window.onOrderProductChange = () => {
+            const productSelect = document.getElementById('orderProductSelect');
+            const categorySelect = document.getElementById('orderProductCategory');
+            const sizeSelect = document.getElementById('orderProductSize');
+            const priceInput = document.getElementById('orderProductPrice');
+            
+            categorySelect.innerHTML = '<option value="">Selecione...</option>';
+            sizeSelect.innerHTML = '<option value="">Selecione...</option>';
+            priceInput.value = '';
+
+            const selectedOption = productSelect.options[productSelect.selectedIndex];
+            if (selectedOption && selectedOption.dataset.pricing) {
+                const pricing = JSON.parse(selectedOption.dataset.pricing);
+                pricing.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.category;
+                    option.textContent = p.category;
+                    option.dataset.price = p.salePrice;
+                    categorySelect.appendChild(option);
+                });
+            }
+        }
+
+        window.onOrderCategoryChange = () => {
+            const categorySelect = document.getElementById('orderProductCategory');
+            const sizeSelect = document.getElementById('orderProductSize');
+            const priceInput = document.getElementById('orderProductPrice');
+            const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+            
+            if (selectedOption && selectedOption.dataset.price) {
+                priceInput.value = selectedOption.dataset.price;
+            }
+
+            // Popular Tamanhos/Variações do Estoque
+            sizeSelect.innerHTML = '<option value="">Selecione...</option>';
+            const categoryName = categorySelect.value;
+            
+            if (categoryName) {
+                // Filtra itens do estoque que são 'Malha' e da categoria selecionada
+                const variations = inventory.filter(i => i.type === 'Malha' && i.category === categoryName);
+                
+                variations.forEach(v => {
+                    const option = document.createElement('option');
+                    option.value = v.name;
+                    option.textContent = v.name;
+                    sizeSelect.appendChild(option);
+                });
+
+                if (variations.length === 0) {
+                     // Fallback para tamanhos padrões se não houver variações no estoque
+                     const standardSizes = ["2", "4", "6", "8", "10", "12", "14", "16", "P", "M", "G", "GG", "XG"];
+                     standardSizes.forEach(s => {
+                        const option = document.createElement('option');
+                        option.value = s;
+                        option.textContent = s;
+                        sizeSelect.appendChild(option);
+                     });
+                }
+            }
+        }
+
+        window.addOrderProduct = () => {
+            const select = document.getElementById('orderProductSelect');
+            const productId = select.value;
+            const productName = select.options[select.selectedIndex].text;
+            const category = document.getElementById('orderProductCategory').value;
+            const size = document.getElementById('orderProductSize').value;
+            const qty = parseFloat(document.getElementById('orderProductQty').value);
+            const price = parseFloat(document.getElementById('orderProductPrice').value);
+
+            if (!productId || !qty || isNaN(price)) {
+                alert("Selecione um produto, quantidade e verifique o valor.");
+                return;
+            }
+
+            orderList.push({ productId, name: productName, category, size, qty, price, total: qty * price });
+            renderOrderItems();
+            
+            // Resetar inputs de produto
+            select.value = '';
+            document.getElementById('orderProductCategory').innerHTML = '<option value="">Selecione...</option>';
+            document.getElementById('orderProductSize').innerHTML = '<option value="">Selecione...</option>';
+            document.getElementById('orderProductQty').value = 1;
+            document.getElementById('orderProductPrice').value = '';
+        }
+
+        window.removeOrderProduct = (index) => {
+            orderList.splice(index, 1);
+            renderOrderItems();
+        }
+
+        function renderOrderItems() {
+            const tbody = document.getElementById('orderItemsList');
+            tbody.innerHTML = '';
+            let total = 0;
+
+            orderList.forEach((item, index) => {
+                total += item.total;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-2">${item.name}</td>
+                    <td class="px-4 py-2 text-xs text-gray-600">${item.category || '-'} / ${item.size || '-'}</td>
+                    <td class="px-4 py-2">${item.qty}</td>
+                    <td class="px-4 py-2">R$ ${item.total.toFixed(2)}</td>
+                    <td class="px-4 py-2 text-right">
+                        <button onclick="removeOrderProduct(${index})" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('orderTotalDisplay').textContent = `R$ ${total.toFixed(2)}`;
+            lucide.createIcons();
+        }
+
+        window.saveOrder = async () => {
+            const clientName = document.getElementById('orderClientName').value;
+            const clientPhone = document.getElementById('orderClientPhone').value;
+            const partnerId = document.getElementById('orderPartner').value;
+            const studentName = document.getElementById('orderStudentName').value;
+
+            if (!clientName || orderList.length === 0) {
+                alert("Informe o nome do cliente e adicione pelo menos um produto.");
+                return;
+            }
+
+            const total = orderList.reduce((acc, item) => acc + item.total, 0);
+            const orderData = {
+                clientName,
+                clientPhone,
+                partnerId,
+                studentName,
+                items: orderList,
+                total,
+                updatedAt: new Date().toISOString()
+            };
+
+            const btn = document.getElementById('saveOrderBtn');
+            btn.textContent = 'Salvando...';
+            btn.disabled = true;
+
+            try {
+                if (currentOrderId) {
+                    await updateDoc(doc(db, "orders", currentOrderId), orderData);
+                } else {
+                    await addDoc(collection(db, "orders"), { 
+                        ...orderData, 
+                        status: 'Orçamento', 
+                        createdAt: new Date().toISOString() 
+                    });
+                }
+                closeOrderModal();
+                fetchOrders();
+            } catch (e) {
+                console.error("Erro ao salvar pedido:", e);
+                alert("Erro ao salvar: " + e.message);
+            } finally {
+                btn.textContent = 'Salvar Orçamento';
+                btn.disabled = false;
+            }
+        }
+
+        window.deleteOrder = async (id) => {
+            if (confirm('Excluir este orçamento/pedido?')) {
+                try {
+                    await deleteDoc(doc(db, "orders", id));
+                    fetchOrders();
+                } catch (e) {
+                    console.error("Erro ao excluir:", e);
+                }
+            }
+        }
+
+        window.updateOrderStatus = async (id, newStatus) => {
+            try {
+                await updateDoc(doc(db, "orders", id), { status: newStatus });
+                fetchOrders(); // Re-renderizar para mover o card
+            } catch (e) {
+                console.error("Erro ao atualizar status:", e);
+            }
+        }
+
+        window.sendOrderToWhatsapp = async (id) => {
+            try {
+                const docSnap = await getDoc(doc(db, "orders", id));
+                if (!docSnap.exists()) return;
+                const order = docSnap.data();
+                
+                const phone = order.clientPhone.replace(/\D/g, '');
+                if (!phone) {
+                    alert("Telefone do cliente não informado ou inválido.");
+                    return;
+                }
+
+                let msg = `*Olá ${order.clientName}, segue seu orçamento:*\n\n`;
+                order.items.forEach(item => {
+                    msg += `- ${item.qty}x ${item.name} (${item.category || ''} ${item.size || ''}): R$ ${item.total.toFixed(2)}\n`;
+                });
+                msg += `\n*Total: R$ ${order.total.toFixed(2)}*`;
+                
+                if (order.studentName) msg += `\nAluno: ${order.studentName}`;
+                
+                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            } catch (e) {
+                console.error("Erro ao gerar link:", e);
             }
         }
 
