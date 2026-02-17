@@ -1140,6 +1140,7 @@
                 document.getElementById('errors-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
             }
         }
+        window.fetchErrors = fetchErrors;
 
         function renderErrors() {
             const tbody = document.getElementById('errors-table-body');
@@ -1352,6 +1353,7 @@
             });
             lucide.createIcons();
         }
+        window.renderInventory = renderInventory;
 
         // Função para buscar produtos
         async function fetchProducts() {
@@ -1366,6 +1368,7 @@
                 console.error("Erro ao buscar produtos:", error);
             }
         }
+        window.fetchProducts = fetchProducts;
 
         // Renderizar tabela de produtos
         function renderProducts(products) {
@@ -2345,6 +2348,7 @@
                 console.error("Erro ao buscar pedidos:", error);
             }
         }
+        window.fetchOrders = fetchOrders;
 
         window.switchProductionStatus = (status) => {
             currentProductionStatus = status;
@@ -3348,6 +3352,12 @@
             btn.disabled = true;
 
             try {
+                // Garantir produtos carregados para referência de estampa
+                if (!window.cachedProducts) {
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
                 const updatePromises = [];
                 const qtyDifference = newQty - originalQty;
 
@@ -3411,9 +3421,16 @@
             if (!errorToDelete) return;
 
             try {
+                // Garantir produtos carregados para referência de estampa
+                if (!window.cachedProducts) {
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
                 const deletePromises = [];
                 const order = window.allOrders.find(o => o.id === errorToDelete.orderId);
-                const errorItem = order.items.find(i => i.name === errorToDelete.productName && i.category === errorToDelete.category && i.size === errorToDelete.size);
+                // Verifica se o pedido ainda existe para calcular devolução
+                const errorItem = order ? order.items.find(i => i.name === errorToDelete.productName && i.category === errorToDelete.category && i.size === errorToDelete.size) : null;
 
                 if (errorItem) {
                     const materialsToReturn = getMaterialsForErrorItem(errorItem, errorToDelete.errorQty);
