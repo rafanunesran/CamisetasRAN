@@ -299,6 +299,11 @@
                     <button onclick="switchProductionStatus('Finalizado')" id="tab-prod-finalizado" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Finalizados</button>
                     <button onclick="switchProductionStatus('Arquivado')" id="tab-prod-arquivado" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Arquivados</button>
                 </div>
+                
+                <div id="production-actions" class="hidden bg-blue-50 p-2 rounded border border-blue-100 flex justify-between items-center">
+                    <span class="text-sm text-blue-800 font-medium"><span id="selected-count">0</span> pedidos selecionados</span>
+                    <button onclick="generateMaterialReport()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="clipboard-list" class="h-3 w-3"></i> Gerar Relatório de Materiais</button>
+                </div>
 
                 <!-- Container da Lista -->
                 <div id="production-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-[calc(100vh-300px)] overflow-y-auto content-start">
@@ -797,6 +802,47 @@
         </div>
     </div>
 
+    <!-- Modal de Relatório de Materiais -->
+    <div id="materialReportModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 class="text-xl font-bold text-primary">Relatório de Produção e Compras</h2>
+                <button onclick="document.getElementById('materialReportModal').classList.add('hidden'); document.getElementById('materialReportModal').classList.remove('flex');" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Coluna: Necessário -->
+                <div class="space-y-2">
+                    <h3 class="font-semibold text-gray-700 flex items-center gap-2"><i data-lucide="list-todo" class="h-4 w-4"></i> Necessário para Produção</h3>
+                    <div class="border rounded-md overflow-hidden bg-gray-50">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-100 text-muted-foreground font-medium"><tr><th class="p-2">Item</th><th class="p-2 text-right">Qtd Total</th></tr></thead>
+                            <tbody id="reportNeedsBody" class="divide-y bg-white"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- Coluna: Compras -->
+                <div class="space-y-2">
+                    <h3 class="font-semibold text-red-600 flex items-center gap-2"><i data-lucide="shopping-cart" class="h-4 w-4"></i> Falta no Estoque (Comprar)</h3>
+                    <div class="border rounded-md overflow-hidden bg-red-50">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-red-100 text-red-800 font-medium"><tr><th class="p-2">Item</th><th class="p-2 text-right">Falta</th><th class="p-2 text-right">Estoque Atual</th></tr></thead>
+                            <tbody id="reportMissingBody" class="divide-y bg-white"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-xs text-gray-500 mt-4">
+                * O cálculo de "Falta" considera o estoque atual menos os itens reservados para outros pedidos em andamento (Pendente/Produção) não selecionados.
+            </div>
+            
+            <div class="flex justify-end pt-4 border-t">
+                <button onclick="window.print()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"><i data-lucide="printer" class="h-4 w-4"></i> Imprimir</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -833,6 +879,7 @@
         let currentOrderId = null;
         let currentProductionStatus = 'Orçamento';
         let orderToConfirmId = null;
+        let selectedOrderIds = new Set();
 
         // Função para buscar parceiros
         async function fetchPartners() {
@@ -1981,6 +2028,8 @@
 
         window.switchProductionStatus = (status) => {
             currentProductionStatus = status;
+            selectedOrderIds.clear(); // Limpar seleção ao mudar de aba
+            updateSelectionUI();
             
             // Atualizar UI dos botões
             document.querySelectorAll('.prod-tab-btn').forEach(btn => {
@@ -2018,6 +2067,12 @@
                 const approveBtn = currentProductionStatus === 'Orçamento' 
                     ? `<button onclick="openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
                     : '';
+                
+                // Checkbox de seleção (apenas para Pendente e Produção)
+                const showCheckbox = currentProductionStatus === 'Pendente' || currentProductionStatus === 'Produção';
+                const checkboxHtml = showCheckbox 
+                    ? `<input type="checkbox" onchange="toggleOrderSelection('${order.id}')" class="absolute top-4 right-4 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary z-10" ${selectedOrderIds.has(order.id) ? 'checked' : ''}>` 
+                    : '';
 
                 // Gerar HTML da lista de itens
                 let itemsHtml = '';
@@ -2035,6 +2090,7 @@
                 const card = document.createElement('div');
                 card.className = `bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col h-full ${obsStyle}`;
                 card.innerHTML = `
+                    ${checkboxHtml}
                     <div class="flex justify-between items-start mb-1">
                         <div>
                             <div class="font-bold text-sm text-gray-800">${order.clientName}</div>
@@ -2077,6 +2133,168 @@
             });
             
             lucide.createIcons();
+        }
+
+        // --- Lógica de Seleção e Relatório ---
+        window.toggleOrderSelection = (id) => {
+            if (selectedOrderIds.has(id)) {
+                selectedOrderIds.delete(id);
+            } else {
+                selectedOrderIds.add(id);
+            }
+            updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            const count = selectedOrderIds.size;
+            document.getElementById('selected-count').textContent = count;
+            const actions = document.getElementById('production-actions');
+            if (count > 0) {
+                actions.classList.remove('hidden');
+            } else {
+                actions.classList.add('hidden');
+            }
+        }
+
+        window.generateMaterialReport = async () => {
+            // 1. Buscar todos os pedidos ativos para calcular reserva
+            const allOrdersSnap = await getDocs(collection(db, "orders"));
+            const allOrders = [];
+            allOrdersSnap.forEach(doc => allOrders.push({id: doc.id, ...doc.data()}));
+
+            // Filtra pedidos ativos (Pendente/Produção)
+            const activeOrders = allOrders.filter(o => o.status === 'Pendente' || o.status === 'Produção');
+
+            // Mapas de cálculo
+            const needs = {}; // O que os selecionados precisam
+            const reserved = {}; // O que os OUTROS ativos precisam
+
+            // Função auxiliar para somar materiais
+            const calculateMaterials = (order, targetMap) => {
+                if (!order.items) return;
+                
+                // A. Itens do Pedido (Malhas e Estampas)
+                order.items.forEach(item => {
+                    // 1. Malha (Baseado no Tamanho/Variação que é o nome do item no estoque)
+                    // Procura no estoque um item do tipo Malha com esse nome e categoria
+                    const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
+                    if (malhaItem) {
+                        targetMap[malhaItem.id] = (targetMap[malhaItem.id] || 0) + item.qty;
+                    }
+
+                    // 2. Estampa (Baseado no Produto -> printId)
+                    // Precisamos achar o produto original para pegar o printId
+                    // Como não temos a lista de produtos completa aqui fácil, vamos assumir que o estoque de estampas tem o ID salvo ou buscar.
+                    // Melhor: Vamos iterar os produtos carregados (fetchProducts já rodou)
+                    // Nota: `products` variável global pode não estar populada se não abriu a aba. Vamos garantir.
+                });
+
+                // B. Insumos (Regras Globais)
+                inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
+                    let qtyNeeded = 0;
+                    const rule = insumo.usageRule || { type: 'unit', qty: 1 };
+                    
+                    if (rule.type === 'unit') {
+                        // Soma total de itens no pedido
+                        const totalItems = order.items.reduce((acc, i) => acc + i.qty, 0);
+                        qtyNeeded = totalItems * (parseFloat(rule.qty) || 1);
+                    } else if (rule.type === 'order') {
+                        qtyNeeded = (parseFloat(rule.qty) || 1);
+                    } else if (rule.type === 'batch') {
+                        const totalItems = order.items.reduce((acc, i) => acc + i.qty, 0);
+                        const limit = parseFloat(rule.limit) || 1;
+                        qtyNeeded = Math.ceil(totalItems / limit) * (parseFloat(rule.qty) || 1);
+                    }
+                    
+                    if (qtyNeeded > 0) {
+                        targetMap[insumo.id] = (targetMap[insumo.id] || 0) + qtyNeeded;
+                    }
+                });
+            };
+
+            // Calcular necessidades
+            // Precisamos iterar os pedidos selecionados e buscar os produtos para ver as estampas
+            // Para simplificar, vamos fazer um loop assíncrono se precisar buscar produtos, mas tentaremos usar o cache
+            
+            // Garantir produtos carregados para link de estampa
+            if (!window.cachedProducts) {
+                const pSnap = await getDocs(collection(db, "products"));
+                window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+            }
+
+            const processOrder = (order, targetMap) => {
+                if (!order.items) return;
+                order.items.forEach(item => {
+                    // Malha
+                    const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
+                    if (malhaItem) targetMap[malhaItem.id] = (targetMap[malhaItem.id] || 0) + item.qty;
+
+                    // Estampa
+                    const prod = window.cachedProducts.find(p => p.id === item.productId);
+                    if (prod && prod.printId) {
+                        targetMap[prod.printId] = (targetMap[prod.printId] || 0) + item.qty;
+                    }
+                });
+                // Insumos (código repetido da lógica acima, simplificado aqui)
+                inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
+                    let q = 0;
+                    const r = insumo.usageRule || {type:'unit', qty:1};
+                    const total = order.items.reduce((a,b)=>a+b.qty,0);
+                    if(r.type==='unit') q = total * r.qty;
+                    if(r.type==='order') q = parseFloat(r.qty);
+                    if(r.type==='batch') q = Math.ceil(total/r.limit)*r.qty;
+                    if(q>0) targetMap[insumo.id] = (targetMap[insumo.id]||0)+q;
+                });
+            };
+
+            activeOrders.forEach(order => {
+                if (selectedOrderIds.has(order.id)) {
+                    processOrder(order, needs);
+                } else {
+                    processOrder(order, reserved);
+                }
+            });
+
+            // Renderizar Relatório
+            const needsBody = document.getElementById('reportNeedsBody');
+            const missingBody = document.getElementById('reportMissingBody');
+            needsBody.innerHTML = '';
+            missingBody.innerHTML = '';
+
+            Object.keys(needs).forEach(itemId => {
+                const item = inventory.find(i => i.id === itemId);
+                if (!item) return;
+
+                const qtyNeeded = needs[itemId];
+                const qtyReserved = reserved[itemId] || 0;
+                const currentStock = parseFloat(item.quantity) || 0;
+                const netStock = currentStock - qtyReserved;
+                const missing = Math.max(0, qtyNeeded - netStock);
+
+                // Linha de Necessidade
+                const trNeed = document.createElement('tr');
+                trNeed.innerHTML = `<td class="p-2 border-b">${item.name} <span class="text-xs text-gray-500">(${item.type})</span></td><td class="p-2 border-b text-right font-bold">${qtyNeeded}</td>`;
+                needsBody.appendChild(trNeed);
+
+                // Linha de Falta (se houver)
+                if (missing > 0) {
+                    const trMiss = document.createElement('tr');
+                    trMiss.innerHTML = `
+                        <td class="p-2 border-b text-red-700 font-medium">${item.name}</td>
+                        <td class="p-2 border-b text-right text-red-700 font-bold">${missing}</td>
+                        <td class="p-2 border-b text-right text-gray-500">${currentStock} (Disp: ${netStock})</td>
+                    `;
+                    missingBody.appendChild(trMiss);
+                }
+            });
+
+            if (missingBody.children.length === 0) {
+                missingBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-green-600 font-medium">Estoque suficiente para os pedidos selecionados!</td></tr>';
+            }
+
+            const modal = document.getElementById('materialReportModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         }
 
         window.openOrderModal = async (id = null) => {
@@ -2483,8 +2701,55 @@
 
         window.updateOrderStatus = async (id, newStatus) => {
             try {
+                // Se o status mudar para Finalizado, descontar estoque
+                if (newStatus === 'Finalizado') {
+                    const orderSnap = await getDoc(doc(db, "orders", id));
+                    const order = orderSnap.data();
+                    
+                    // Carregar produtos para ver estampas
+                    if (!window.cachedProducts) {
+                        const pSnap = await getDocs(collection(db, "products"));
+                        window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    }
+
+                    // Calcular materiais para ESTE pedido
+                    const materialsToDeduct = {};
+                    
+                    // Lógica idêntica ao relatório
+                    if (order.items) {
+                        order.items.forEach(item => {
+                            const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
+                            if (malhaItem) materialsToDeduct[malhaItem.id] = (materialsToDeduct[malhaItem.id] || 0) + item.qty;
+
+                            const prod = window.cachedProducts.find(p => p.id === item.productId);
+                            if (prod && prod.printId) materialsToDeduct[prod.printId] = (materialsToDeduct[prod.printId] || 0) + item.qty;
+                        });
+
+                        inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
+                            let q = 0;
+                            const r = insumo.usageRule || {type:'unit', qty:1};
+                            const total = order.items.reduce((a,b)=>a+b.qty,0);
+                            if(r.type==='unit') q = total * r.qty;
+                            if(r.type==='order') q = parseFloat(r.qty);
+                            if(r.type==='batch') q = Math.ceil(total/r.limit)*r.qty;
+                            if(q>0) materialsToDeduct[insumo.id] = (materialsToDeduct[insumo.id]||0)+q;
+                        });
+                    }
+
+                    // Atualizar Estoque no Firebase
+                    for (const [itemId, qty] of Object.entries(materialsToDeduct)) {
+                        const invItem = inventory.find(i => i.id === itemId);
+                        if (invItem) {
+                            const newQty = (parseFloat(invItem.quantity) || 0) - qty;
+                            await updateDoc(doc(db, "inventory", itemId), { quantity: newQty });
+                        }
+                    }
+                    // Recarregar estoque localmente
+                    await fetchInventory();
+                }
+
                 await updateDoc(doc(db, "orders", id), { status: newStatus });
-                fetchOrders(); // Re-renderizar para mover o card
+                fetchOrders(); 
             } catch (e) {
                 console.error("Erro ao atualizar status:", e);
             }
@@ -2502,14 +2767,20 @@
                     return;
                 }
 
-                let msg = `*Olá ${order.clientName}, segue seu orçamento:*\n\n`;
-                order.items.forEach(item => {
-                    msg += `- ${item.qty}x ${item.name} (${item.category || ''} ${item.size || ''}): R$ ${item.total.toFixed(2)}\n`;
-                });
-                msg += `\n*Total: R$ ${order.total.toFixed(2)}*`;
-                
-                if (order.studentName) msg += `\nAluno: ${order.studentName}`;
-                if (order.observation) msg += `\nObs: ${order.observation}`;
+                let msg = "";
+                if (order.status === 'Finalizado') {
+                    msg = `Olá, tudo bem? Seu pedido já está disponível para retirada na secretaria! Importante! No momento da retirada, verifique o nome do responsável e do estudante na etiqueta. Muito Obrigado.`;
+                } else {
+                    // Mensagem padrão de orçamento/acompanhamento
+                    msg = `*Olá ${order.clientName}, segue detalhes do seu pedido:*\n\n`;
+                    order.items.forEach(item => {
+                        msg += `- ${item.qty}x ${item.name} (${item.category || ''} ${item.size || ''}): R$ ${item.total.toFixed(2)}\n`;
+                    });
+                    msg += `\n*Total: R$ ${order.total.toFixed(2)}*`;
+                    
+                    if (order.studentName) msg += `\nAluno: ${order.studentName}`;
+                    if (order.observation) msg += `\nObs: ${order.observation}`;
+                }
                 
                 window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
             } catch (e) {
