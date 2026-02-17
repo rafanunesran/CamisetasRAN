@@ -86,6 +86,10 @@
                 <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="factory" class="h-5 w-5"></i></div>
                 <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Produção</span>
             </button>
+            <button onclick="switchTab('errors')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="alert-triangle" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Erros de Produção</span>
+            </button>
             <button onclick="switchTab('transfers')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
                 <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="arrow-right-left" class="h-5 w-5"></i></div>
                 <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Repasses</span>
@@ -153,6 +157,9 @@
                 </button>
                 <button onclick="switchTab('production')" id="btn-production" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
                     <i data-lucide="factory" class="h-4 w-4"></i> Produção
+                </button>
+                <button onclick="switchTab('errors')" id="btn-errors" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="alert-triangle" class="h-4 w-4"></i> Erros de Produção
                 </button>
                 <button onclick="switchTab('transfers')" id="btn-transfers" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
                     <i data-lucide="arrow-right-left" class="h-4 w-4"></i> Repasses
@@ -342,6 +349,32 @@
                 <!-- Container da Lista -->
                 <div id="production-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-[calc(100vh-300px)] overflow-y-auto content-start">
                     <!-- Cards renderizados via JS -->
+                </div>
+            </div>
+
+            <!-- Production Errors Tab -->
+            <div id="errors" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b">
+                        <h3 class="font-semibold">Histórico de Erros de Produção</h3>
+                        <p class="text-sm text-muted-foreground">Itens registrados como perda durante a produção.</p>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-muted-foreground font-medium border-b">
+                                <tr>
+                                    <th class="pb-3">Data</th>
+                                    <th class="pb-3">Pedido / Cliente</th>
+                                    <th class="pb-3">Produto</th>
+                                    <th class="pb-3">Qtd. Perdida</th>
+                                    <th class="pb-3">Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="errors-table-body" class="divide-y">
+                                <tr><td colspan="5" class="py-4 text-center text-muted-foreground">Carregando histórico de erros...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -888,6 +921,45 @@
         </div>
     </div>
 
+    <!-- Modal de Erro de Produção -->
+    <div id="errorModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 class="text-xl font-bold text-destructive">Reportar Erro de Produção</h2>
+                <button onclick="closeErrorModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <p class="text-sm text-gray-600">
+                Registre os itens que foram perdidos durante a produção. Isso <span class="font-bold">não</span> reverterá o uso de materiais do estoque, mas marcará a perda para fins de relatório.
+            </p>
+
+            <div class="border rounded-md overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-muted-foreground font-medium">
+                        <tr>
+                            <th class="px-4 py-2">Produto</th>
+                            <th class="px-4 py-2">Qtd no Pedido</th>
+                            <th class="px-4 py-2 w-32">Qtd com Erro</th>
+                        </tr>
+                    </thead>
+                    <tbody id="errorItemsList" class="divide-y bg-white">
+                        <!-- Itens do pedido carregados via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Motivo do Erro</label>
+                <textarea id="errorReason" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive" rows="2" placeholder="Ex: Estampa torta, costura defeituosa, mancha no tecido..."></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t">
+                <button onclick="closeErrorModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="saveErrorBtn" onclick="saveProductionError()" class="px-4 py-2 text-sm font-medium text-white bg-destructive rounded-md hover:bg-destructive/90">Registrar Perda</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Relatório de Materiais -->
     <div id="materialReportModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
@@ -993,6 +1065,8 @@
         let currentProductionStatus = 'Orçamento';
         let orderToConfirmId = null;
         let selectedOrderIds = new Set();
+        let errorToReportId = null;
+        let productionErrors = [];
         window.allOrders = []; // Global para acesso no dashboard
 
         // Função para buscar parceiros
@@ -1009,12 +1083,60 @@
                 fetchInventory();
                 fetchProducts();
                 fetchOrders();
+                fetchErrors();
                 // fetchTransfers será chamado ao clicar na aba ou manualmente se necessário, mas vamos popular o filtro de parceiros dele
                 checkAutoArchive(); // Verifica arquivamento automático ao iniciar
             } catch (error) {
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
             }
+        }
+
+        // Função para buscar erros de produção
+        async function fetchErrors() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "productionErrors"));
+                productionErrors = [];
+                querySnapshot.forEach((doc) => {
+                    productionErrors.push({ id: doc.id, ...doc.data() });
+                });
+                renderErrors();
+            } catch (error) {
+                console.error("Erro ao buscar erros de produção:", error);
+                document.getElementById('errors-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
+            }
+        }
+
+        function renderErrors() {
+            const tbody = document.getElementById('errors-table-body');
+            if (!tbody) return;
+
+            // Ordenar por data mais recente
+            productionErrors.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            if (productionErrors.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-muted-foreground">Nenhum erro de produção registrado.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            productionErrors.forEach(error => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3">${new Date(error.createdAt).toLocaleDateString('pt-BR')}</td>
+                    <td>
+                        <div class="font-medium">#${error.orderId.slice(-4)}</div>
+                        <div class="text-xs text-muted-foreground">${error.clientName}</div>
+                    </td>
+                    <td>
+                        <div class="font-medium">${error.productName}</div>
+                        <div class="text-xs text-muted-foreground">${error.category} / ${error.size}</div>
+                    </td>
+                    <td class="font-bold text-destructive">${error.errorQty}</td>
+                    <td class="text-sm text-muted-foreground">${error.reason}</td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
         // Popula o filtro de parceiros na aba de produtos
@@ -2234,6 +2356,9 @@
                 const partner = partners.find(p => p.id === order.partnerId);
                 const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
                 
+                const hasError = order.hasError;
+                const errorIndicator = hasError ? `<i data-lucide="alert-triangle" class="h-3.5 w-3.5 text-destructive" title="Este pedido teve um erro de produção registrado."></i>` : '';
+
                 // Botão de Aprovar apenas se for Orçamento
                 const approveBtn = currentProductionStatus === 'Orçamento' 
                     ? `<button onclick="openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
@@ -2243,6 +2368,11 @@
                 const showLabelBtn = ['Produção', 'Finalizado', 'Entregue'].includes(currentProductionStatus);
                 const labelBtn = showLabelBtn
                     ? `<button onclick="printOrderLabel('${order.id}')" class="p-1.5 hover:bg-purple-50 text-purple-600 rounded bg-purple-50" title="Imprimir Etiqueta"><i data-lucide="tag" class="h-3.5 w-3.5"></i></button>` : '';
+
+                // Botão de Erro
+                const showErrorBtn = ['Produção', 'Finalizado'].includes(currentProductionStatus);
+                const errorBtn = showErrorBtn
+                    ? `<button onclick="openErrorModal('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Reportar Erro de Produção"><i data-lucide="alert-triangle" class="h-3.5 w-3.5"></i></button>` : '';
                 
                 // Checkbox de seleção (apenas para Pendente e Produção)
                 const showCheckbox = currentProductionStatus === 'Pendente' || currentProductionStatus === 'Produção';
@@ -2273,7 +2403,10 @@
                             <div class="font-bold text-sm text-gray-800">${order.clientName}</div>
                             <div class="text-xs font-medium text-blue-600">${order.studentName || ''}</div>
                         </div>
-                        <span class="text-xs font-mono text-gray-400">#${order.id.slice(-4)}</span>
+                        <div class="flex items-center gap-2">
+                            ${errorIndicator}
+                            <span class="text-xs font-mono text-gray-400">#${order.id.slice(-4)}</span>
+                        </div>
                     </div>
                     ${hasObservation ? `<div class="text-[10px] text-yellow-700 bg-yellow-50 p-1 rounded mb-2 border border-yellow-100 flex items-start gap-1"><i data-lucide="alert-circle" class="h-3 w-3 shrink-0 mt-0.5"></i> <span class="line-clamp-2">${order.observation}</span></div>` : ''}
                     
@@ -2287,6 +2420,7 @@
                             <div class="flex gap-1">
                                 <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
                                 ${labelBtn}
+                                ${errorBtn}
                                 <button onclick="window.openOrderModal('${order.id}')" class="p-1.5 hover:bg-blue-50 text-blue-600 rounded bg-blue-50" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
                                 <button onclick="window.deleteOrder('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Excluir"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
                             </div>
@@ -2960,6 +3094,167 @@
             }
         }
 
+        // --- Lógica de Erros de Produção ---
+        window.openErrorModal = (orderId) => {
+            errorToReportId = orderId;
+            const order = window.allOrders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const tbody = document.getElementById('errorItemsList');
+            tbody.innerHTML = '';
+            document.getElementById('errorReason').value = '';
+
+            order.items.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.dataset.index = index;
+                tr.innerHTML = `
+                    <td class="px-4 py-3">
+                        <div class="font-medium">${item.name}</div>
+                        <div class="text-xs text-gray-500">${item.category} / ${item.size}</div>
+                    </td>
+                    <td class="px-4 py-3 text-center">${item.qty}</td>
+                    <td class="px-4 py-3">
+                        <input type="number" min="0" max="${item.qty}" class="error-qty-input w-full border rounded px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-destructive" placeholder="0">
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const modal = document.getElementById('errorModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeErrorModal = () => {
+            const modal = document.getElementById('errorModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        window.saveProductionError = async () => {
+            const reason = document.getElementById('errorReason').value;
+            if (!reason) {
+                alert("Por favor, descreva o motivo do erro.");
+                return;
+            }
+
+            const order = window.allOrders.find(o => o.id === errorToReportId);
+            if (!order) return;
+
+            const btn = document.getElementById('saveErrorBtn');
+            btn.textContent = 'Salvando...';
+            btn.disabled = true;
+
+            try {
+                const errorPromises = [];
+                const errorInputs = document.querySelectorAll('.error-qty-input');
+                const inventoryUpdates = {}; // itemId -> quantidade para baixar
+
+                // Garantir produtos carregados para referência de estampa
+                if (!window.cachedProducts) {
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
+                let hasErrors = false;
+
+                errorInputs.forEach(input => {
+                    const errorQty = parseInt(input.value);
+                    if (errorQty > 0) {
+                        hasErrors = true;
+                        const tr = input.closest('tr');
+                        const itemIndex = parseInt(tr.dataset.index);
+                        const item = order.items[itemIndex];
+
+                        const errorData = {
+                            orderId: order.id,
+                            clientName: order.clientName,
+                            productName: item.name,
+                            category: item.category,
+                            size: item.size,
+                            errorQty: errorQty,
+                            reason: reason,
+                            createdAt: new Date().toISOString()
+                        };
+                        errorPromises.push(addDoc(collection(db, "productionErrors"), errorData));
+
+                        // Calcular materiais para baixa imediata (Perda)
+                        // 1. Malha
+                        const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
+                        if (malhaItem) {
+                            inventoryUpdates[malhaItem.id] = (inventoryUpdates[malhaItem.id] || 0) + errorQty;
+                        }
+
+                        // 2. Estampa
+                        const prod = window.cachedProducts.find(p => p.id === item.productId);
+                        if (prod && prod.printId) {
+                            inventoryUpdates[prod.printId] = (inventoryUpdates[prod.printId] || 0) + errorQty;
+                        }
+
+                        // 3. Insumos (Considerando apenas regras unitárias para erros parciais)
+                        inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
+                            const r = insumo.usageRule || {type:'unit', qty:1};
+                            if(r.type === 'unit') {
+                                const q = errorQty * (parseFloat(r.qty) || 1);
+                                if(q > 0) inventoryUpdates[insumo.id] = (inventoryUpdates[insumo.id] || 0) + q;
+                            }
+                            // Regras de lote/pedido (batch/order) geralmente não se aplicam a perdas unitárias, 
+                            // então ignoramos para evitar baixa excessiva.
+                        });
+                    }
+                });
+
+                if (!hasErrors) {
+                    alert("Nenhuma quantidade de erro foi inserida.");
+                    btn.textContent = 'Registrar Perda';
+                    btn.disabled = false;
+                    return;
+                }
+
+                // Executar atualizações de estoque (Baixa por Perda)
+                for (const [itemId, qty] of Object.entries(inventoryUpdates)) {
+                    const invItem = inventory.find(i => i.id === itemId);
+                    if (invItem) {
+                        const currentQty = parseFloat(invItem.quantity) || 0;
+                        const newQty = currentQty - qty;
+                        
+                        // Atualizar documento do estoque
+                        errorPromises.push(updateDoc(doc(db, "inventory", itemId), { quantity: newQty }));
+                        
+                        // Registrar Movimentação de Saída/Perda
+                        errorPromises.push(addDoc(collection(db, "movements"), {
+                            date: new Date().toISOString(),
+                            type: 'Saída',
+                            itemId: itemId,
+                            itemName: invItem.name,
+                            quantity: qty,
+                            unitValue: invItem.cost || 0,
+                            entity: 'Produção (Erro)',
+                            details: `Perda no pedido #${order.id.slice(-4)}: ${reason}`
+                        }));
+                    }
+                }
+
+                // Marcar o pedido como tendo um erro
+                errorPromises.push(updateDoc(doc(db, "orders", order.id), { hasError: true }));
+
+                await Promise.all(errorPromises);
+
+                alert("Erro registrado e materiais baixados do estoque.");
+                closeErrorModal();
+                fetchOrders(); // Para atualizar o indicador na UI
+                fetchErrors(); // Para atualizar a lista de erros
+                fetchInventory(); // Atualizar UI de estoque
+
+            } catch (e) {
+                console.error("Erro ao registrar erro de produção:", e);
+                alert("Erro ao salvar: " + e.message);
+            } finally {
+                btn.textContent = 'Registrar Perda';
+                btn.disabled = false;
+            }
+        }
+
         window.sendOrderToWhatsapp = async (id) => {
             try {
                 const docSnap = await getDoc(doc(db, "orders", id));
@@ -3346,6 +3641,9 @@
         function switchTab(tabId) {
             if (tabId === 'transfers') {
                 fetchTransfers();
+            }
+            if (tabId === 'errors') {
+                fetchErrors();
             }
             if (tabId === 'overview') {
                 fetchOrders(); // Recarrega dados para o dashboard
