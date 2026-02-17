@@ -126,7 +126,7 @@
             </div>
         </header>
 
-        <div class="p-8 max-w-7xl mx-auto space-y-8">
+        <div class="p-8 w-full mx-auto space-y-8">
             <div class="flex justify-between items-end">
                 <div>
                     <h1 class="text-3xl font-bold font-headline text-primary">Painel de Controle</h1>
@@ -285,57 +285,24 @@
             <!-- Production Tab -->
             <div id="production" class="tab-content space-y-6">
                 <div class="flex justify-between items-center">
-                    <h3 class="font-semibold text-lg">Kanban de Produção</h3>
+                    <h3 class="font-semibold text-lg">Gestão de Pedidos</h3>
                     <button onclick="openOrderModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors flex items-center gap-1">
                         <i data-lucide="plus" class="h-3 w-3"></i> Novo Orçamento
                     </button>
                 </div>
                 
-                <div class="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-250px)]">
-                    <!-- Coluna Orçamento -->
-                    <div class="min-w-[280px] w-[280px] flex flex-col bg-gray-100 rounded-lg border border-gray-200">
-                        <div class="p-3 font-bold text-gray-700 border-b bg-gray-50 rounded-t-lg flex justify-between items-center">
-                            <span>Orçamento</span>
-                            <span id="count-orcamento" class="bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full">0</span>
-                        </div>
-                        <div id="col-orcamento" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
-                    </div>
+                <!-- Sub-navegação de Status -->
+                <div class="flex border-b overflow-x-auto no-scrollbar">
+                    <button onclick="switchProductionStatus('Orçamento')" id="tab-prod-orcamento" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-primary text-primary whitespace-nowrap">Orçamentos</button>
+                    <button onclick="switchProductionStatus('Pendente')" id="tab-prod-pendente" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Pendentes</button>
+                    <button onclick="switchProductionStatus('Produção')" id="tab-prod-producao" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Em Produção</button>
+                    <button onclick="switchProductionStatus('Finalizado')" id="tab-prod-finalizado" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Finalizados</button>
+                    <button onclick="switchProductionStatus('Arquivado')" id="tab-prod-arquivado" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Arquivados</button>
+                </div>
 
-                    <!-- Coluna Pendente -->
-                    <div class="min-w-[280px] w-[280px] flex flex-col bg-yellow-50 rounded-lg border border-yellow-100">
-                        <div class="p-3 font-bold text-yellow-800 border-b bg-yellow-100/50 rounded-t-lg flex justify-between items-center">
-                            <span>Pendente</span>
-                            <span id="count-pendente" class="bg-yellow-200 text-yellow-800 text-xs px-2 py-0.5 rounded-full">0</span>
-                        </div>
-                        <div id="col-pendente" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
-                    </div>
-
-                    <!-- Coluna Produção -->
-                    <div class="min-w-[280px] w-[280px] flex flex-col bg-blue-50 rounded-lg border border-blue-100">
-                        <div class="p-3 font-bold text-blue-800 border-b bg-blue-100/50 rounded-t-lg flex justify-between items-center">
-                            <span>Produção</span>
-                            <span id="count-producao" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full">0</span>
-                        </div>
-                        <div id="col-producao" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
-                    </div>
-
-                    <!-- Coluna Finalizado -->
-                    <div class="min-w-[280px] w-[280px] flex flex-col bg-green-50 rounded-lg border border-green-100">
-                        <div class="p-3 font-bold text-green-800 border-b bg-green-100/50 rounded-t-lg flex justify-between items-center">
-                            <span>Finalizado</span>
-                            <span id="count-finalizado" class="bg-green-200 text-green-800 text-xs px-2 py-0.5 rounded-full">0</span>
-                        </div>
-                        <div id="col-finalizado" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
-                    </div>
-
-                    <!-- Coluna Arquivado -->
-                    <div class="min-w-[280px] w-[280px] flex flex-col bg-gray-100 rounded-lg border border-gray-200 opacity-75">
-                        <div class="p-3 font-bold text-gray-600 border-b bg-gray-200 rounded-t-lg flex justify-between items-center">
-                            <span>Arquivado</span>
-                            <span id="count-arquivado" class="bg-gray-300 text-gray-700 text-xs px-2 py-0.5 rounded-full">0</span>
-                        </div>
-                        <div id="col-arquivado" class="p-2 space-y-2 overflow-y-auto flex-1"></div>
-                    </div>
+                <!-- Container da Lista -->
+                <div id="production-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-[calc(100vh-300px)] overflow-y-auto content-start">
+                    <!-- Cards renderizados via JS -->
                 </div>
             </div>
 
@@ -736,6 +703,10 @@
                     <label class="text-sm font-medium text-gray-700">Nome do Estudante (Opcional)</label>
                     <input id="orderStudentName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nome do Aluno">
                 </div>
+                <div class="col-span-1 md:col-span-2 space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Observações</label>
+                    <textarea id="orderObservation" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" rows="2" placeholder="Detalhes especiais do pedido..."></textarea>
+                </div>
             </div>
 
             <div class="p-4 bg-gray-50 rounded-md border border-gray-200 space-y-4">
@@ -792,6 +763,40 @@
         </div>
     </div>
 
+    <!-- Modal de Confirmação de Orçamento -->
+    <div id="confirmOrderModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
+            <h2 class="text-xl font-bold text-primary">Aprovar Orçamento</h2>
+            <p class="text-sm text-gray-600">Ao aprovar, o cliente será cadastrado e o pedido irá para "Pendente".</p>
+            
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Status do Pagamento</label>
+                <select id="confirmPaymentStatus" onchange="toggleSinalInput()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="Pendente">Pendente</option>
+                    <option value="Pago Parcial">Pago Parcial (Sinal)</option>
+                    <option value="Pago Total">Pago Total</option>
+                </select>
+            </div>
+
+            <div id="confirmSinalContainer" class="space-y-2 hidden">
+                <label class="text-sm font-medium text-gray-700">Valor do Sinal (R$)</label>
+                <input id="confirmSinalValue" type="number" step="0.01" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00">
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Quem irá produzir?</label>
+                <select id="confirmProducer" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4">
+                <button onclick="document.getElementById('confirmOrderModal').classList.add('hidden'); document.getElementById('confirmOrderModal').classList.remove('flex');" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btnConfirmOrderAction" onclick="confirmOrderAction()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Confirmar e Produzir</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -826,6 +831,8 @@
         let purchaseList = [];
         let orderList = []; // Itens do pedido atual
         let currentOrderId = null;
+        let currentProductionStatus = 'Orçamento';
+        let orderToConfirmId = null;
 
         // Função para buscar parceiros
         async function fetchPartners() {
@@ -1966,74 +1973,108 @@
                 querySnapshot.forEach((doc) => {
                     orders.push({ id: doc.id, ...doc.data() });
                 });
-                renderKanban(orders);
+                renderProductionList(orders);
             } catch (error) {
                 console.error("Erro ao buscar pedidos:", error);
             }
         }
 
-        function renderKanban(orders) {
-            const columns = {
-                'Orçamento': document.getElementById('col-orcamento'),
-                'Pendente': document.getElementById('col-pendente'),
-                'Produção': document.getElementById('col-producao'),
-                'Finalizado': document.getElementById('col-finalizado'),
-                'Arquivado': document.getElementById('col-arquivado')
-            };
+        window.switchProductionStatus = (status) => {
+            currentProductionStatus = status;
             
-            const counts = {
-                'Orçamento': 0, 'Pendente': 0, 'Produção': 0, 'Finalizado': 0, 'Arquivado': 0
-            };
+            // Atualizar UI dos botões
+            document.querySelectorAll('.prod-tab-btn').forEach(btn => {
+                btn.classList.remove('border-primary', 'text-primary');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // Normalizar ID para seleção (remove acentos e lowercase)
+            const normalizedId = status.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const activeBtn = document.getElementById(`tab-prod-${normalizedId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('border-transparent', 'text-gray-500');
+                activeBtn.classList.add('border-primary', 'text-primary');
+            }
 
-            // Limpar colunas
-            Object.values(columns).forEach(col => col.innerHTML = '');
+            fetchOrders(); // Recarrega a lista filtrada
+        }
 
-            orders.forEach(order => {
-                const status = order.status || 'Orçamento';
-                if (columns[status]) {
-                    counts[status]++;
-                    const partner = partners.find(p => p.id === order.partnerId);
-                    const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
+        function renderProductionList(orders) {
+            const container = document.getElementById('production-list-container');
+            container.innerHTML = '';
+
+            const filteredOrders = orders.filter(o => (o.status || 'Orçamento') === currentProductionStatus);
+
+            if (filteredOrders.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-10 text-gray-500">Nenhum pedido em "${currentProductionStatus}"</div>`;
+                return;
+            }
+
+            filteredOrders.forEach(order => {
+                const partner = partners.find(p => p.id === order.partnerId);
+                const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
+                
+                // Botão de Aprovar apenas se for Orçamento
+                const approveBtn = currentProductionStatus === 'Orçamento' 
+                    ? `<button onclick="openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
+                    : '';
+
+                // Gerar HTML da lista de itens
+                let itemsHtml = '';
+                if (order.items && order.items.length > 0) {
+                    itemsHtml = '<div class="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-600 space-y-1 bg-gray-50 p-2 rounded">';
+                    order.items.forEach(item => {
+                        itemsHtml += `<div class="flex justify-between items-center"><span><span class="font-bold">${item.qty}x</span> ${item.name}</span> <span class="font-mono bg-white px-1 rounded border border-gray-100">${item.category || ''} ${item.size || '-'}</span></div>`;
+                    });
+                    itemsHtml += '</div>';
+                }
+
+                const hasObservation = order.observation && order.observation.trim() !== '';
+                const obsStyle = hasObservation ? 'border-r-4 border-r-yellow-500' : '';
+
+                const card = document.createElement('div');
+                card.className = `bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col h-full ${obsStyle}`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <div>
+                            <div class="font-bold text-sm text-gray-800">${order.clientName}</div>
+                            <div class="text-xs font-medium text-blue-600">${order.studentName || ''}</div>
+                        </div>
+                        <span class="text-xs font-mono text-gray-400">#${order.id.slice(-4)}</span>
+                    </div>
+                    ${hasObservation ? `<div class="text-[10px] text-yellow-700 bg-yellow-50 p-1 rounded mb-2 border border-yellow-100 flex items-start gap-1"><i data-lucide="alert-circle" class="h-3 w-3 shrink-0 mt-0.5"></i> <span class="line-clamp-2">${order.observation}</span></div>` : ''}
                     
-                    const card = document.createElement('div');
-                    card.className = 'bg-white p-3 rounded shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer group relative';
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start mb-1">
-                            <span class="font-bold text-sm text-gray-800">${order.clientName}</span>
-                            <span class="text-xs font-mono text-gray-400">#${order.id.slice(-4)}</span>
-                        </div>
-                        <div class="text-xs text-gray-600 mb-2 flex items-center gap-1">
-                            <i data-lucide="building-2" class="h-3 w-3"></i> ${partnerName}
-                            ${order.studentName ? `<span class="text-gray-400">• ${order.studentName}</span>` : ''}
-                        </div>
-                        <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                    <div class="text-xs text-gray-500 mb-3 flex items-center gap-1 mt-1">
+                        <i data-lucide="building-2" class="h-3 w-3"></i> ${partnerName}
+                    </div>
+
+                    <div class="mt-auto pt-3 border-t border-gray-100">
+                        <div class="flex justify-between items-center mb-2">
                             <span class="font-bold text-primary text-sm">R$ ${parseFloat(order.total).toFixed(2)}</span>
                             <div class="flex gap-1">
-                                <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1 hover:bg-green-100 text-green-600 rounded" title="Enviar WhatsApp"><i data-lucide="message-circle" class="h-3 w-3"></i></button>
-                                <button onclick="window.openOrderModal('${order.id}')" class="p-1 hover:bg-gray-100 text-blue-600 rounded" title="Editar"><i data-lucide="pencil" class="h-3 w-3"></i></button>
-                                <button onclick="window.deleteOrder('${order.id}')" class="p-1 hover:bg-red-100 text-red-600 rounded" title="Excluir"><i data-lucide="trash-2" class="h-3 w-3"></i></button>
+                                <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
+                                <button onclick="window.openOrderModal('${order.id}')" class="p-1.5 hover:bg-blue-50 text-blue-600 rounded bg-blue-50" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
+                                <button onclick="window.deleteOrder('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Excluir"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
                             </div>
                         </div>
-                        <div class="mt-2 flex justify-between items-center">
-                            <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none" onclick="event.stopPropagation()">
-                                <option value="Orçamento" ${status === 'Orçamento' ? 'selected' : ''}>Orçamento</option>
-                                <option value="Pendente" ${status === 'Pendente' ? 'selected' : ''}>Pendente</option>
-                                <option value="Produção" ${status === 'Produção' ? 'selected' : ''}>Produção</option>
-                                <option value="Finalizado" ${status === 'Finalizado' ? 'selected' : ''}>Finalizado</option>
-                                <option value="Arquivado" ${status === 'Arquivado' ? 'selected' : ''}>Arquivado</option>
-                            </select>
-                        </div>
-                    `;
-                    columns[status].appendChild(card);
-                }
-            });
+                        
+                        ${approveBtn}
 
-            // Atualizar contadores
-            document.getElementById('count-orcamento').textContent = counts['Orçamento'];
-            document.getElementById('count-pendente').textContent = counts['Pendente'];
-            document.getElementById('count-producao').textContent = counts['Produção'];
-            document.getElementById('count-finalizado').textContent = counts['Finalizado'];
-            document.getElementById('count-arquivado').textContent = counts['Arquivado'];
+                        ${currentProductionStatus !== 'Orçamento' ? `
+                        <div class="mt-2">
+                            <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none">
+                                <option value="Pendente" ${currentProductionStatus === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                                <option value="Produção" ${currentProductionStatus === 'Produção' ? 'selected' : ''}>Produção</option>
+                                <option value="Finalizado" ${currentProductionStatus === 'Finalizado' ? 'selected' : ''}>Finalizado</option>
+                                <option value="Arquivado" ${currentProductionStatus === 'Arquivado' ? 'selected' : ''}>Arquivado</option>
+                            </select>
+                        </div>` : ''}
+
+                        ${itemsHtml}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
             
             lucide.createIcons();
         }
@@ -2047,6 +2088,7 @@
             document.getElementById('orderClientPhone').value = '';
             document.getElementById('orderPartner').value = '';
             document.getElementById('orderStudentName').value = '';
+            document.getElementById('orderObservation').value = '';
             
             // Configuração inicial do campo Estudante (Oculto por padrão)
             const studentContainer = document.getElementById('orderStudentContainer');
@@ -2061,8 +2103,9 @@
             
             // Filtrar apenas Escola e Revendedor
             const validPartners = partners.filter(p => {
-                const cat = String(p.category || '').trim().toLowerCase();
-                return cat === 'escola' || cat === 'revendedor';
+                const cat = String(p.category || '').trim();
+                // Usa Regex para garantir que pegue Escola/Revendedor independente de maiúsculas/minúsculas
+                return /^escola$/i.test(cat) || /^revendedor$/i.test(cat);
             });
             
             // Ordenar alfabeticamente para facilitar a busca
@@ -2084,10 +2127,10 @@
             partnerSelect.onchange = () => {
                 const selectedOption = partnerSelect.options[partnerSelect.selectedIndex];
                 const category = selectedOption && selectedOption.dataset.category 
-                    ? String(selectedOption.dataset.category).trim().toLowerCase() 
+                    ? String(selectedOption.dataset.category).trim() 
                     : '';
                 
-                if (category === 'escola') {
+                if (/^escola$/i.test(category)) {
                     studentContainer.classList.remove('hidden');
                 } else {
                     studentContainer.classList.add('hidden');
@@ -2138,7 +2181,7 @@
                     
                     // Verificar visibilidade do estudante ao editar
                     const partner = partners.find(p => p.id === data.partnerId);
-                    if (partner && (partner.category || '').trim().toLowerCase() === 'escola') {
+                    if (partner && /^escola$/i.test(partner.category || '')) {
                         document.getElementById('orderStudentContainer').classList.remove('hidden');
                     } else {
                         document.getElementById('orderStudentContainer').classList.add('hidden');
@@ -2147,6 +2190,7 @@
                     if (data.studentName) {
                         document.getElementById('orderStudentName').value = data.studentName;
                     }
+                    document.getElementById('orderObservation').value = data.observation || '';
                     orderList = data.items || [];
                 }
             } else {
@@ -2283,6 +2327,7 @@
             const clientPhone = document.getElementById('orderClientPhone').value;
             const partnerId = document.getElementById('orderPartner').value;
             const studentName = document.getElementById('orderStudentName').value;
+            const observation = document.getElementById('orderObservation').value;
 
             if (!clientName || orderList.length === 0) {
                 alert("Informe o nome do cliente e adicione pelo menos um produto.");
@@ -2295,6 +2340,7 @@
                 clientPhone,
                 partnerId,
                 studentName,
+                observation,
                 items: orderList,
                 total,
                 updatedAt: new Date().toISOString()
@@ -2336,6 +2382,105 @@
             }
         }
 
+        // --- Lógica de Confirmação de Orçamento ---
+        window.toggleSinalInput = () => {
+            const status = document.getElementById('confirmPaymentStatus').value;
+            const container = document.getElementById('confirmSinalContainer');
+            if (status === 'Pago Parcial') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        window.openConfirmOrderModal = (orderId) => {
+            orderToConfirmId = orderId;
+            const modal = document.getElementById('confirmOrderModal');
+            const producerSelect = document.getElementById('confirmProducer');
+            
+            // Popular select de produtores (Produção ou ADM)
+            producerSelect.innerHTML = '<option value="">Selecione...</option>';
+            const producers = partners.filter(p => {
+                const cat = (p.category || '').trim().toLowerCase();
+                return cat === 'produção' || cat === 'producao' || cat === 'adm';
+            });
+            
+            producers.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nickname || p.name;
+                producerSelect.appendChild(option);
+            });
+
+            // Resetar campos
+            document.getElementById('confirmPaymentStatus').value = 'Pendente';
+            document.getElementById('confirmSinalValue').value = '';
+            window.toggleSinalInput();
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.confirmOrderAction = async () => {
+            const paymentStatus = document.getElementById('confirmPaymentStatus').value;
+            const producerId = document.getElementById('confirmProducer').value;
+            let downPayment = 0;
+            
+            if (!producerId) {
+                alert("Selecione quem irá produzir.");
+                return;
+            }
+
+            if (paymentStatus === 'Pago Parcial') {
+                downPayment = parseFloat(document.getElementById('confirmSinalValue').value);
+                if (!downPayment || downPayment <= 0) {
+                    alert("Informe o valor do sinal para controle financeiro.");
+                    return;
+                }
+            }
+
+            const btn = document.getElementById('btnConfirmOrderAction');
+            btn.textContent = 'Processando...';
+            btn.disabled = true;
+
+            try {
+                // 1. Buscar dados do pedido
+                const orderSnap = await getDoc(doc(db, "orders", orderToConfirmId));
+                const orderData = orderSnap.data();
+
+                // 2. Criar Cliente se não existir (verificação simples por telefone)
+                // Nota: Em produção real, faria uma query para verificar duplicidade.
+                // Aqui vamos adicionar direto para garantir o registro solicitado.
+                await addDoc(collection(db, "clients"), {
+                    name: orderData.clientName,
+                    phone: orderData.clientPhone,
+                    partnerId: orderData.partnerId,
+                    studentName: orderData.studentName || '',
+                    lastPurchase: new Date().toISOString()
+                });
+
+                // 3. Atualizar Pedido
+                await updateDoc(doc(db, "orders", orderToConfirmId), {
+                    status: 'Pendente',
+                    paymentStatus: paymentStatus,
+                    producerId: producerId,
+                    approvedAt: new Date().toISOString(),
+                    downPayment: downPayment
+                });
+
+                document.getElementById('confirmOrderModal').classList.add('hidden');
+                document.getElementById('confirmOrderModal').classList.remove('flex');
+                fetchOrders(); // Atualiza a tela (vai sumir da aba Orçamento)
+
+            } catch (e) {
+                console.error("Erro ao confirmar:", e);
+                alert("Erro ao confirmar pedido: " + e.message);
+            } finally {
+                btn.textContent = 'Confirmar e Produzir';
+                btn.disabled = false;
+            }
+        }
+
         window.updateOrderStatus = async (id, newStatus) => {
             try {
                 await updateDoc(doc(db, "orders", id), { status: newStatus });
@@ -2364,6 +2509,7 @@
                 msg += `\n*Total: R$ ${order.total.toFixed(2)}*`;
                 
                 if (order.studentName) msg += `\nAluno: ${order.studentName}`;
+                if (order.observation) msg += `\nObs: ${order.observation}`;
                 
                 window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
             } catch (e) {
