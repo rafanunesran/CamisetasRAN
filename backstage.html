@@ -165,32 +165,44 @@
             <!-- Overview Tab -->
             <div id="overview" class="tab-content active space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div class="rounded-lg border bg-white shadow-sm p-6">
+                    <div class="rounded-lg border bg-white shadow-sm p-6 col-span-1 md:col-span-2 lg:col-span-1">
                         <h3 class="text-sm font-medium text-muted-foreground">Vendas do Mês</h3>
-                        <div class="text-2xl font-bold text-primary mt-2">R$ 24.500,00</div>
-                        <p class="text-xs text-green-600 flex items-center gap-1 mt-1"><i data-lucide="trending-up" class="h-3 w-3"></i> +12%</p>
+                        <div class="text-2xl font-bold text-primary mt-2" id="dashSalesMonth">R$ 0,00</div>
+                        <p class="text-xs text-muted-foreground mt-1">Pedidos confirmados este mês</p>
                     </div>
-                    <div class="rounded-lg border bg-white shadow-sm p-6">
-                        <h3 class="text-sm font-medium text-muted-foreground">Ordens em Produção</h3>
-                        <div class="text-2xl font-bold text-primary mt-2">12</div>
+                    <div class="rounded-lg border bg-white shadow-sm p-6 col-span-1 md:col-span-2 lg:col-span-1">
+                        <h3 class="text-sm font-medium text-muted-foreground">Lucro Líquido (Est.)</h3>
+                        <div class="text-2xl font-bold text-green-600 mt-2" id="dashNetProfit">R$ 0,00</div>
+                        <p class="text-xs text-muted-foreground mt-1" title="Total - Materiais - Repasses (Escola/Prod)">Receita - Custos - Repasses Ext.</p>
+                    </div>
+                    <div class="rounded-lg border bg-white shadow-sm p-6 col-span-1 md:col-span-2 lg:col-span-1">
+                        <h3 class="text-sm font-medium text-muted-foreground">Total de Repasses</h3>
+                        <div class="text-2xl font-bold text-orange-600 mt-2" id="dashTotalTransfers">R$ 0,00</div>
+                        <p class="text-xs text-muted-foreground mt-1">Escola + Produção + ADM</p>
                     </div>
                 </div>
                 
-                <!-- Recent Orders -->
-                <div class="rounded-lg border bg-white shadow-sm">
-                    <div class="p-6 border-b">
-                        <h3 class="font-semibold">Pedidos Recentes</h3>
+                <!-- Lists Columns -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-350px)] min-h-[400px]">
+                    <!-- Orçamentos -->
+                    <div class="flex flex-col rounded-lg border bg-white shadow-sm h-full overflow-hidden">
+                        <div class="p-3 border-b bg-gray-50 font-semibold text-gray-700 flex justify-between items-center">
+                            <span>Orçamentos</span>
+                            <button onclick="openOrderModal()" class="text-xs bg-primary text-white px-2 py-1 rounded hover:bg-primary/90 flex items-center gap-1"><i data-lucide="plus" class="h-3 w-3"></i> Novo</button>
+                        </div>
+                        <div id="dashListBudget" class="p-2 overflow-y-auto flex-1 space-y-2 bg-gray-50/50"></div>
                     </div>
-                    <div class="p-6">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-muted-foreground font-medium border-b">
-                                <tr><th class="pb-3">Escola</th><th class="pb-3">Itens</th><th class="pb-3 text-right">Valor</th></tr>
-                            </thead>
-                            <tbody class="divide-y">
-                                <tr><td class="py-3">Sta. Maria</td><td>45 polos</td><td class="text-right">R$ 2.065,50</td></tr>
-                                <tr><td class="py-3">Anglo</td><td>12 jaquetas</td><td class="text-right">R$ 1.320,00</td></tr>
-                            </tbody>
-                        </table>
+                    
+                    <!-- Pendentes -->
+                    <div class="flex flex-col rounded-lg border bg-white shadow-sm h-full overflow-hidden">
+                        <div class="p-3 border-b bg-yellow-50 font-semibold text-yellow-800">Pendentes</div>
+                        <div id="dashListPending" class="p-2 overflow-y-auto flex-1 space-y-2 bg-yellow-50/30"></div>
+                    </div>
+
+                    <!-- Em Produção -->
+                    <div class="flex flex-col rounded-lg border bg-white shadow-sm h-full overflow-hidden">
+                        <div class="p-3 border-b bg-blue-50 font-semibold text-blue-800">Em Produção</div>
+                        <div id="dashListProduction" class="p-2 overflow-y-auto flex-1 space-y-2 bg-blue-50/30"></div>
                     </div>
                 </div>
             </div>
@@ -981,6 +993,7 @@
         let currentProductionStatus = 'Orçamento';
         let orderToConfirmId = null;
         let selectedOrderIds = new Set();
+        window.allOrders = []; // Global para acesso no dashboard
 
         // Função para buscar parceiros
         async function fetchPartners() {
@@ -2159,11 +2172,12 @@
         async function fetchOrders() {
             try {
                 const querySnapshot = await getDocs(collection(db, "orders"));
-                const orders = [];
+                window.allOrders = [];
                 querySnapshot.forEach((doc) => {
-                    orders.push({ id: doc.id, ...doc.data() });
+                    window.allOrders.push({ id: doc.id, ...doc.data() });
                 });
-                renderProductionList(orders);
+                renderProductionList(window.allOrders);
+                renderDashboard(); // Atualiza dashboard se estiver na aba
             } catch (error) {
                 console.error("Erro ao buscar pedidos:", error);
             }
@@ -2171,6 +2185,12 @@
 
         window.switchProductionStatus = (status) => {
             currentProductionStatus = status;
+            
+            // Se chamou via aba de produção, garante que a lista renderize
+            if(document.getElementById('production').classList.contains('active')) {
+                renderProductionList(window.allOrders);
+            }
+
             selectedOrderIds.clear(); // Limpar seleção ao mudar de aba
             updateSelectionUI();
             
@@ -3327,6 +3347,9 @@
             if (tabId === 'transfers') {
                 fetchTransfers();
             }
+            if (tabId === 'overview') {
+                fetchOrders(); // Recarrega dados para o dashboard
+            }
 
             // Hide all contents
             document.querySelectorAll('.tab-content').forEach(el => {
@@ -3352,6 +3375,118 @@
         function logout() {
             sessionStorage.removeItem('auth');
             window.location.href = 'index.html';
+        }
+
+        // --- Dashboard Logic ---
+        async function renderDashboard() {
+            const orders = window.allOrders;
+            if (!orders || orders.length === 0) return;
+
+            // 1. Métricas Financeiras (Mês Atual)
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            let salesMonth = 0;
+            let totalTransfersMonth = 0;
+            let totalMaterialCostMonth = 0;
+            let totalExternalTransfersMonth = 0; // Escola + Produção
+
+            // Garantir produtos carregados para cálculos
+            if (!window.cachedProducts) {
+                const pSnap = await getDocs(collection(db, "products"));
+                window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+            }
+
+            orders.forEach(order => {
+                const d = new Date(order.createdAt);
+                if (d.getMonth() === currentMonth && d.getFullYear() === currentYear && order.status !== 'Orçamento' && order.status !== 'Arquivado') {
+                    salesMonth += order.total || 0;
+
+                    // Calcular Repasses e Custos deste pedido
+                    if (order.items) {
+                        order.items.forEach(item => {
+                            // Custo Material (Malha)
+                            const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
+                            if (malhaItem) totalMaterialCostMonth += (parseFloat(malhaItem.cost) || 0) * item.qty;
+
+                            // Custo Material (Estampa)
+                            const prod = window.cachedProducts.find(p => p.id === item.productId);
+                            if (prod) {
+                                if (prod.printId) {
+                                    const printItem = inventory.find(i => i.id === prod.printId);
+                                    if (printItem) totalMaterialCostMonth += (parseFloat(printItem.cost) || 0) * item.qty;
+                                }
+                                // Repasses
+                                if (prod.pricing) {
+                                    const pricing = prod.pricing.find(pr => pr.category === item.category) || prod.pricing[0];
+                                    if (pricing) {
+                                        const school = (parseFloat(pricing.schoolCommission) || 0) * item.qty;
+                                        const prodCost = (parseFloat(pricing.productionCost) || 0) * item.qty;
+                                        const adm = (parseFloat(pricing.adminProfit) || 0) * item.qty;
+                                        
+                                        totalTransfersMonth += (school + prodCost + adm);
+                                        totalExternalTransfersMonth += (school + prodCost);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        // Custo Insumos (Estimativa simples unitária para dashboard)
+                        inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
+                            const r = insumo.usageRule || {type:'unit', qty:1};
+                            if(r.type==='unit') totalMaterialCostMonth += (parseFloat(insumo.cost)||0) * (order.items.reduce((a,b)=>a+b.qty,0) * r.qty);
+                        });
+                    }
+                }
+            });
+
+            const netProfit = salesMonth - totalMaterialCostMonth - totalExternalTransfersMonth;
+
+            document.getElementById('dashSalesMonth').textContent = `R$ ${salesMonth.toFixed(2)}`;
+            document.getElementById('dashNetProfit').textContent = `R$ ${netProfit.toFixed(2)}`;
+            document.getElementById('dashTotalTransfers').textContent = `R$ ${totalTransfersMonth.toFixed(2)}`;
+
+            // 2. Listas de Pedidos
+            const renderMiniCard = (order, containerId) => {
+                const container = document.getElementById(containerId);
+                const div = document.createElement('div');
+                div.className = 'bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer';
+                div.onclick = () => { 
+                    // Atalho para abrir modal ou ir para aba
+                    if(order.status === 'Orçamento') window.openOrderModal(order.id);
+                    else { switchTab('production'); switchProductionStatus(order.status); }
+                };
+                
+                const partner = partners.find(p => p.id === order.partnerId);
+                const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
+
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="font-bold text-xs text-gray-800 truncate w-2/3">${order.clientName}</span>
+                        <span class="text-[10px] text-gray-400">#${order.id.slice(-4)}</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 mb-1">${partnerName}</div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-primary">R$ ${parseFloat(order.total).toFixed(2)}</span>
+                        <span class="text-[10px] bg-gray-100 px-1 rounded">${new Date(order.createdAt).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            };
+
+            document.getElementById('dashListBudget').innerHTML = '';
+            document.getElementById('dashListPending').innerHTML = '';
+            document.getElementById('dashListProduction').innerHTML = '';
+
+            // Ordenar por data decrescente
+            const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            sortedOrders.forEach(order => {
+                if (order.status === 'Orçamento') renderMiniCard(order, 'dashListBudget');
+                else if (order.status === 'Pendente') renderMiniCard(order, 'dashListPending');
+                else if (order.status === 'Produção') renderMiniCard(order, 'dashListProduction');
+            });
         }
     </script>
 </body>
