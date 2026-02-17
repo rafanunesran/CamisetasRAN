@@ -345,6 +345,9 @@
                             <button onclick="markSelectedAsPaid()" class="text-xs bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-1">
                                 <i data-lucide="check-circle" class="h-3 w-3"></i> Efetivar Pagamentos (<span id="transfer-selected-count">0</span>)
                             </button>
+                            <button onclick="openPaymentHistoryModal()" class="text-xs border border-gray-300 bg-white text-gray-700 px-3 py-2 rounded hover:bg-gray-50 transition-colors flex items-center gap-1">
+                                <i data-lucide="history" class="h-3 w-3"></i> Histórico
+                            </button>
                         </div>
                     </div>
                     
@@ -910,6 +913,33 @@
             
             <div class="flex justify-end pt-4 border-t">
                 <button onclick="window.print()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"><i data-lucide="printer" class="h-4 w-4"></i> Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Histórico de Pagamentos -->
+    <div id="paymentHistoryModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-primary">Histórico de Repasses Realizados</h2>
+                <button onclick="document.getElementById('paymentHistoryModal').classList.add('hidden'); document.getElementById('paymentHistoryModal').classList.remove('flex');" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="border rounded-md overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-muted-foreground font-medium">
+                        <tr>
+                            <th class="px-4 py-3">Data Pagamento</th>
+                            <th class="px-4 py-3">Beneficiário</th>
+                            <th class="px-4 py-3">Tipo</th>
+                            <th class="px-4 py-3">Ref. Pedido</th>
+                            <th class="px-4 py-3 text-right">Valor Pago</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentHistoryBody" class="divide-y">
+                        <tr><td colspan="5" class="p-4 text-center text-muted-foreground">Carregando...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -3009,7 +3039,8 @@
                             partnerId: order.partnerId,
                             type: 'Escola',
                             amount: schoolTotal,
-                            status: payouts.school ? 'Pago' : baseStatus
+                            status: payouts.school ? 'Pago' : baseStatus,
+                            paymentDate: payouts.schoolDate
                         });
                     }
 
@@ -3025,7 +3056,8 @@
                             partnerId: order.producerId, // Pode ser null se não definido
                             type: 'Produção',
                             amount: prodTotal,
-                            status: payouts.producer ? 'Pago' : baseStatus
+                            status: payouts.producer ? 'Pago' : baseStatus,
+                            paymentDate: payouts.producerDate
                         });
                     }
 
@@ -3040,7 +3072,8 @@
                             partnerId: 'ADM',
                             type: 'ADM',
                             amount: admTotal,
-                            status: payouts.adm ? 'Pago' : baseStatus
+                            status: payouts.adm ? 'Pago' : baseStatus,
+                            paymentDate: payouts.admDate
                         });
                     }
                 });
@@ -3158,6 +3191,43 @@
                 console.error("Erro ao efetivar pagamentos:", e);
                 alert("Erro ao atualizar dados.");
             }
+        }
+
+        // --- Histórico de Pagamentos ---
+        window.openPaymentHistoryModal = () => {
+            const modal = document.getElementById('paymentHistoryModal');
+            const tbody = document.getElementById('paymentHistoryBody');
+            
+            // Filtrar apenas os pagos
+            const paidTransfers = transferList.filter(t => t.status === 'Pago');
+            
+            // Ordenar por data de pagamento (mais recente primeiro)
+            paidTransfers.sort((a, b) => {
+                const dateA = a.paymentDate ? new Date(a.paymentDate) : new Date(0);
+                const dateB = b.paymentDate ? new Date(b.paymentDate) : new Date(0);
+                return dateB - dateA;
+            });
+
+            tbody.innerHTML = '';
+            if (paidTransfers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-muted-foreground">Nenhum pagamento registrado no histórico.</td></tr>';
+            } else {
+                paidTransfers.forEach(t => {
+                    const dateStr = t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('pt-BR') + ' ' + new Date(t.paymentDate).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : '-';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="px-4 py-3">${dateStr}</td>
+                        <td class="px-4 py-3 font-medium">${t.beneficiary}</td>
+                        <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs bg-gray-100">${t.type}</span></td>
+                        <td class="px-4 py-3 text-xs text-gray-500">#${t.orderId.slice(-4)} - ${t.clientName}</td>
+                        <td class="px-4 py-3 text-right font-bold text-green-700">R$ ${t.amount.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         }
 
         // --- Impressão de Etiqueta (48mm) ---
