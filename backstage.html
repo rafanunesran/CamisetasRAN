@@ -297,6 +297,7 @@
                     <button onclick="switchProductionStatus('Pendente')" id="tab-prod-pendente" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Pendentes</button>
                     <button onclick="switchProductionStatus('Produção')" id="tab-prod-producao" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Em Produção</button>
                     <button onclick="switchProductionStatus('Finalizado')" id="tab-prod-finalizado" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Finalizados</button>
+                    <button onclick="switchProductionStatus('Entregue')" id="tab-prod-entregue" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Entregues</button>
                     <button onclick="switchProductionStatus('Arquivado')" id="tab-prod-arquivado" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Arquivados</button>
                 </div>
                 
@@ -894,6 +895,7 @@
                 fetchInventory();
                 fetchProducts();
                 fetchOrders();
+                checkAutoArchive(); // Verifica arquivamento automático ao iniciar
             } catch (error) {
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
@@ -2122,6 +2124,7 @@
                                 <option value="Pendente" ${currentProductionStatus === 'Pendente' ? 'selected' : ''}>Pendente</option>
                                 <option value="Produção" ${currentProductionStatus === 'Produção' ? 'selected' : ''}>Produção</option>
                                 <option value="Finalizado" ${currentProductionStatus === 'Finalizado' ? 'selected' : ''}>Finalizado</option>
+                                <option value="Entregue" ${currentProductionStatus === 'Entregue' ? 'selected' : ''}>Entregue</option>
                                 <option value="Arquivado" ${currentProductionStatus === 'Arquivado' ? 'selected' : ''}>Arquivado</option>
                             </select>
                         </div>` : ''}
@@ -2701,6 +2704,8 @@
 
         window.updateOrderStatus = async (id, newStatus) => {
             try {
+                const updateData = { status: newStatus };
+
                 // Se o status mudar para Finalizado, descontar estoque
                 if (newStatus === 'Finalizado') {
                     const orderSnap = await getDoc(doc(db, "orders", id));
@@ -2748,7 +2753,12 @@
                     await fetchInventory();
                 }
 
-                await updateDoc(doc(db, "orders", id), { status: newStatus });
+                // Se mudar para Entregue, salva a data de entrega para contar os 30 dias
+                if (newStatus === 'Entregue') {
+                    updateData.deliveredAt = new Date().toISOString();
+                }
+
+                await updateDoc(doc(db, "orders", id), updateData);
                 fetchOrders(); 
             } catch (e) {
                 console.error("Erro ao atualizar status:", e);
@@ -2785,6 +2795,34 @@
                 window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
             } catch (e) {
                 console.error("Erro ao gerar link:", e);
+            }
+        }
+
+        // --- Automação de Arquivamento (30 dias após Entregue) ---
+        async function checkAutoArchive() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "orders"));
+                const now = new Date();
+                const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+                
+                querySnapshot.forEach(async (docSnap) => {
+                    const order = docSnap.data();
+                    
+                    if (order.status === 'Entregue') {
+                        // Usa deliveredAt se existir, senão usa updatedAt como fallback
+                        const dateRef = order.deliveredAt ? new Date(order.deliveredAt) : (order.updatedAt ? new Date(order.updatedAt) : null);
+                        
+                        if (dateRef) {
+                            const diff = now - dateRef;
+                            if (diff > thirtyDaysInMs) {
+                                console.log(`Arquivando pedido ${docSnap.id} automaticamente.`);
+                                await updateDoc(doc(db, "orders", docSnap.id), { status: 'Arquivado' });
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error("Erro na automação de arquivamento:", e);
             }
         }
 
