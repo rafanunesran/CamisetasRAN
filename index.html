@@ -239,8 +239,8 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">Seu WhatsApp</label>
                             <input type="text" id="checkoutPhone" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 px-3" placeholder="(11) 99999-9999">
                         </div>
-                        <div id="checkoutStudentContainer" class="hidden md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Estudante</label>
+                        <div id="checkoutStudentContainer" class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Estudante (Opcional)</label>
                             <input type="text" id="checkoutStudent" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 px-3" placeholder="Nome do aluno (para identificação na escola)">
                         </div>
                     </div>
@@ -615,22 +615,6 @@
 
             document.getElementById('cartTotal').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
             
-            // Verificar se precisa de nome do estudante
-            const hasSchoolItem = cart.some(item => {
-                const prod = products.find(p => p.id === item.productId);
-                if (!prod) return false;
-                const partner = partners.find(p => p.id === prod.partnerId);
-                // Verifica se a categoria é Escola (case insensitive para garantir)
-                return partner && /^escola$/i.test(String(partner.category || '').trim());
-            });
-
-            const studentContainer = document.getElementById('checkoutStudentContainer');
-            if (hasSchoolItem) {
-                studentContainer.classList.remove('hidden');
-            } else {
-                studentContainer.classList.add('hidden');
-            }
-
             lucide.createIcons();
         }
 
@@ -640,15 +624,9 @@
             const name = document.getElementById('checkoutName').value;
             const phone = document.getElementById('checkoutPhone').value;
             const student = document.getElementById('checkoutStudent').value;
-            const studentContainer = document.getElementById('checkoutStudentContainer');
             
             if (!name || !phone) {
                 alert("Por favor, preencha seu Nome e WhatsApp para contato.");
-                return;
-            }
-            
-            if (!studentContainer.classList.contains('hidden') && !student) {
-                alert("Por favor, informe o Nome do Estudante para identificação na escola.");
                 return;
             }
 
