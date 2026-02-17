@@ -241,7 +241,12 @@
                 <div class="rounded-lg border bg-white shadow-sm">
                     <div class="p-6 border-b flex justify-between items-center">
                         <h3 class="font-semibold">Catálogo de Produtos</h3>
-                        <button onclick="openProductModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors">Novo Produto</button>
+                        <div class="flex gap-2">
+                            <select id="productFilterPartner" onchange="fetchProducts()" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary max-w-[150px]">
+                                <option value="">Todas as Escolas</option>
+                            </select>
+                            <button onclick="openProductModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors">Novo Produto</button>
+                        </div>
                     </div>
                     <div class="p-6">
                         <table class="w-full text-sm text-left">
@@ -264,6 +269,12 @@
                     <div class="p-6 border-b flex justify-between items-center">
                         <h3 class="font-semibold">Gestão de Estoque</h3>
                         <div class="flex gap-2">
+                            <select id="inventoryFilterType" onchange="renderInventory()" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary">
+                                <option value="">Todos os Tipos</option>
+                                <option value="Malha">Malha</option>
+                                <option value="Estampa">Estampa</option>
+                                <option value="Insumo">Insumo</option>
+                            </select>
                             <button onclick="openMovementsModal()" class="text-xs border border-gray-300 bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-50 transition-colors flex items-center gap-1"><i data-lucide="history" class="h-3 w-3"></i> Movimentações</button>
                             <button onclick="openPurchaseModal()" class="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors flex items-center gap-1"><i data-lucide="shopping-cart" class="h-3 w-3"></i> Nova Compra</button>
                             <button onclick="openInventoryModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors flex items-center gap-1"><i data-lucide="plus" class="h-3 w-3"></i> Novo Item</button>
@@ -301,6 +312,16 @@
                     <button onclick="switchProductionStatus('Arquivado')" id="tab-prod-arquivado" class="prod-tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Arquivados</button>
                 </div>
                 
+                <div class="flex items-center gap-2 py-2 px-1">
+                    <span class="text-xs font-medium text-gray-500">Filtrar:</span>
+                    <select id="productionFilterPayment" onchange="fetchOrders()" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary">
+                        <option value="">Todos Pagamentos</option>
+                        <option value="Pendente">Pagamento Pendente</option>
+                        <option value="Pago Parcial">Pago Parcial</option>
+                        <option value="Pago Total">Pago Total</option>
+                    </select>
+                </div>
+
                 <div id="production-actions" class="hidden bg-blue-50 p-2 rounded border border-blue-100 flex justify-between items-center">
                     <span class="text-sm text-blue-800 font-medium"><span id="selected-count">0</span> pedidos selecionados</span>
                     <button onclick="generateMaterialReport()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="clipboard-list" class="h-3 w-3"></i> Gerar Relatório de Materiais</button>
@@ -891,6 +912,7 @@
                     partners.push({ id: doc.id, ...doc.data() });
                 });
                 renderPartners();
+                populateProductFilter(); // Popula o filtro de produtos
                 fetchClients(); // Busca clientes depois de ter os parceiros para mapear nomes
                 fetchInventory();
                 fetchProducts();
@@ -900,6 +922,19 @@
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
             }
+        }
+
+        // Popula o filtro de parceiros na aba de produtos
+        function populateProductFilter() {
+            const select = document.getElementById('productFilterPartner');
+            if(!select) return;
+            select.innerHTML = '<option value="">Todas as Escolas</option>';
+            partners.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nickname || p.name;
+                select.appendChild(option);
+            });
         }
 
         // Função para renderizar a tabela
@@ -1007,7 +1042,12 @@
             }
 
             tbody.innerHTML = '';
-            inventory.forEach(item => {
+            
+            // Filtro de Estoque
+            const filterType = document.getElementById('inventoryFilterType')?.value;
+            const filteredInventory = filterType ? inventory.filter(i => i.type === filterType) : inventory;
+
+            filteredInventory.forEach(item => {
                 const isPrint = item.type === 'Estampa';
                 const isInsumo = item.type === 'Insumo';
                 const displayUrl = getDisplayUrl(item.image);
@@ -1066,7 +1106,12 @@
             }
 
             tbody.innerHTML = '';
-            products.forEach(prod => {
+            
+            // Filtro de Produtos por Parceiro
+            const filterPartner = document.getElementById('productFilterPartner')?.value;
+            const filteredProducts = filterPartner ? products.filter(p => p.partnerId === filterPartner) : products;
+
+            filteredProducts.forEach(prod => {
                 // Pega a primeira categoria para exibir preço base ou range
                 const prices = prod.pricing || [];
                 const priceDisplay = prices.length > 0 ? `R$ ${parseFloat(prices[0].salePrice).toFixed(2)}` : '-';
@@ -2054,7 +2099,15 @@
             const container = document.getElementById('production-list-container');
             container.innerHTML = '';
 
-            const filteredOrders = orders.filter(o => (o.status || 'Orçamento') === currentProductionStatus);
+            // Filtro de Status
+            let filteredOrders = orders.filter(o => (o.status || 'Orçamento') === currentProductionStatus);
+
+            // Filtro de Pagamento
+            const filterPayment = document.getElementById('productionFilterPayment')?.value;
+            if (filterPayment) {
+                // Se o filtro for "Pendente", pega tanto "Pendente" quanto vazio/null
+                filteredOrders = filteredOrders.filter(o => (o.paymentStatus || 'Pendente') === filterPayment);
+            }
 
             if (filteredOrders.length === 0) {
                 container.innerHTML = `<div class="col-span-full text-center py-10 text-gray-500">Nenhum pedido em "${currentProductionStatus}"</div>`;
@@ -2069,6 +2122,11 @@
                 const approveBtn = currentProductionStatus === 'Orçamento' 
                     ? `<button onclick="openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
                     : '';
+
+                // Botão de Etiqueta (Produção em diante)
+                const showLabelBtn = ['Produção', 'Finalizado', 'Entregue'].includes(currentProductionStatus);
+                const labelBtn = showLabelBtn
+                    ? `<button onclick="printOrderLabel('${order.id}')" class="p-1.5 hover:bg-purple-50 text-purple-600 rounded bg-purple-50" title="Imprimir Etiqueta"><i data-lucide="tag" class="h-3.5 w-3.5"></i></button>` : '';
                 
                 // Checkbox de seleção (apenas para Pendente e Produção)
                 const showCheckbox = currentProductionStatus === 'Pendente' || currentProductionStatus === 'Produção';
@@ -2090,7 +2148,8 @@
                 const obsStyle = hasObservation ? 'border-r-4 border-r-yellow-500' : '';
 
                 const card = document.createElement('div');
-                card.className = `bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col h-full ${obsStyle}`;
+                // Adicionado 'relative' para que o checkbox absolute funcione corretamente
+                card.className = `bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col h-full ${obsStyle} relative`;
                 card.innerHTML = `
                     ${checkboxHtml}
                     <div class="flex justify-between items-start mb-1">
@@ -2111,6 +2170,7 @@
                             <span class="font-bold text-primary text-sm">R$ ${parseFloat(order.total).toFixed(2)}</span>
                             <div class="flex gap-1">
                                 <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
+                                ${labelBtn}
                                 <button onclick="window.openOrderModal('${order.id}')" class="p-1.5 hover:bg-blue-50 text-blue-600 rounded bg-blue-50" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
                                 <button onclick="window.deleteOrder('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Excluir"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
                             </div>
@@ -2276,14 +2336,14 @@
 
                 // Linha de Necessidade
                 const trNeed = document.createElement('tr');
-                trNeed.innerHTML = `<td class="p-2 border-b">${item.name} <span class="text-xs text-gray-500">(${item.type})</span></td><td class="p-2 border-b text-right font-bold">${qtyNeeded}</td>`;
+                trNeed.innerHTML = `<td class="p-2 border-b">${item.name} <span class="text-xs text-gray-500">(${item.category || item.type})</span></td><td class="p-2 border-b text-right font-bold">${qtyNeeded}</td>`;
                 needsBody.appendChild(trNeed);
 
                 // Linha de Falta (se houver)
                 if (missing > 0) {
                     const trMiss = document.createElement('tr');
                     trMiss.innerHTML = `
-                        <td class="p-2 border-b text-red-700 font-medium">${item.name}</td>
+                        <td class="p-2 border-b text-red-700 font-medium">${item.name} <span class="text-xs text-red-400">(${item.category || item.type})</span></td>
                         <td class="p-2 border-b text-right text-red-700 font-bold">${missing}</td>
                         <td class="p-2 border-b text-right text-gray-500">${currentStock} (Disp: ${netStock})</td>
                     `;
@@ -2705,31 +2765,40 @@
         window.updateOrderStatus = async (id, newStatus) => {
             try {
                 const updateData = { status: newStatus };
+                
+                // Buscar pedido atual para saber o status anterior
+                const orderSnap = await getDoc(doc(db, "orders", id));
+                const order = orderSnap.data();
+                const oldStatus = order.status || 'Orçamento';
 
-                // Se o status mudar para Finalizado, descontar estoque
-                if (newStatus === 'Finalizado') {
-                    const orderSnap = await getDoc(doc(db, "orders", id));
-                    const order = orderSnap.data();
-                    
-                    // Carregar produtos para ver estampas
-                    if (!window.cachedProducts) {
-                        const pSnap = await getDocs(collection(db, "products"));
-                        window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                    }
+                // Definir quais status consideram o estoque "baixado"
+                const deductedStatuses = ['Finalizado', 'Entregue'];
+                
+                const wasDeducted = deductedStatuses.includes(oldStatus);
+                const willBeDeducted = deductedStatuses.includes(newStatus);
 
-                    // Calcular materiais para ESTE pedido
-                    const materialsToDeduct = {};
+                // Carregar produtos para referência de estampas (se necessário)
+                if (!window.cachedProducts) {
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
+                // Função auxiliar para calcular materiais e atualizar estoque
+                const adjustStock = async (multiplier) => {
+                    const materialsMap = {};
                     
-                    // Lógica idêntica ao relatório
                     if (order.items) {
                         order.items.forEach(item => {
+                            // Malha
                             const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
-                            if (malhaItem) materialsToDeduct[malhaItem.id] = (materialsToDeduct[malhaItem.id] || 0) + item.qty;
+                            if (malhaItem) materialsMap[malhaItem.id] = (materialsMap[malhaItem.id] || 0) + item.qty;
 
+                            // Estampa
                             const prod = window.cachedProducts.find(p => p.id === item.productId);
-                            if (prod && prod.printId) materialsToDeduct[prod.printId] = (materialsToDeduct[prod.printId] || 0) + item.qty;
+                            if (prod && prod.printId) materialsMap[prod.printId] = (materialsMap[prod.printId] || 0) + item.qty;
                         });
 
+                        // Insumos
                         inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
                             let q = 0;
                             const r = insumo.usageRule || {type:'unit', qty:1};
@@ -2737,21 +2806,31 @@
                             if(r.type==='unit') q = total * r.qty;
                             if(r.type==='order') q = parseFloat(r.qty);
                             if(r.type==='batch') q = Math.ceil(total/r.limit)*r.qty;
-                            if(q>0) materialsToDeduct[insumo.id] = (materialsToDeduct[insumo.id]||0)+q;
+                            if(q>0) materialsMap[insumo.id] = (materialsMap[insumo.id]||0)+q;
                         });
                     }
 
-                    // Atualizar Estoque no Firebase
-                    for (const [itemId, qty] of Object.entries(materialsToDeduct)) {
+                    for (const [itemId, qty] of Object.entries(materialsMap)) {
                         const invItem = inventory.find(i => i.id === itemId);
                         if (invItem) {
-                            const newQty = (parseFloat(invItem.quantity) || 0) - qty;
+                            // Multiplier -1 para baixar, +1 para devolver
+                            const newQty = (parseFloat(invItem.quantity) || 0) + (qty * multiplier);
                             await updateDoc(doc(db, "inventory", itemId), { quantity: newQty });
                         }
                     }
-                    // Recarregar estoque localmente
                     await fetchInventory();
+                };
+
+                // Lógica de Transição
+                if (!wasDeducted && willBeDeducted) {
+                    // Baixar Estoque (Multiplicador -1)
+                    await adjustStock(-1);
+                } else if (wasDeducted && !willBeDeducted) {
+                    // Devolver Estoque (Multiplicador +1)
+                    await adjustStock(1);
                 }
+                // Se ambos forem deducted (ex: Finalizado -> Entregue), não faz nada.
+                // Se ambos não forem deducted (ex: Pendente -> Produção), não faz nada.
 
                 // Se mudar para Entregue, salva a data de entrega para contar os 30 dias
                 if (newStatus === 'Entregue') {
@@ -2795,6 +2874,64 @@
                 window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
             } catch (e) {
                 console.error("Erro ao gerar link:", e);
+            }
+        }
+
+        // --- Impressão de Etiqueta (48mm) ---
+        window.printOrderLabel = async (id) => {
+            try {
+                // Buscar dados atualizados do pedido
+                const docSnap = await getDoc(doc(db, "orders", id));
+                if (!docSnap.exists()) return;
+                const order = docSnap.data();
+
+                // Buscar nome da escola
+                const partner = partners.find(p => p.id === order.partnerId);
+                const schoolName = partner ? (partner.nickname || partner.name) : 'Geral';
+
+                // Construir HTML da etiqueta
+                const printWindow = window.open('', '', 'width=400,height=600');
+                printWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>Etiqueta Pedido #${id.slice(-4)}</title>
+                        <style>
+                            @page { size: 48mm auto; margin: 0; }
+                            body { 
+                                width: 48mm; 
+                                font-family: sans-serif; 
+                                font-size: 12px; 
+                                margin: 0; 
+                                padding: 2mm; 
+                                color: black;
+                            }
+                            .header { font-weight: bold; font-size: 14px; text-align: center; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 5px; text-transform: uppercase; }
+                            .row { margin-bottom: 4px; line-height: 1.2; }
+                            .label { font-weight: bold; font-size: 10px; text-transform: uppercase; }
+                            .value { font-size: 12px; font-weight: bold; }
+                            .items-container { margin-top: 8px; border-top: 1px dashed black; padding-top: 5px; }
+                            .item { font-size: 11px; margin-bottom: 3px; }
+                            .item-meta { font-size: 9px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">${schoolName}</div>
+                        
+                        <div class="row"><div class="label">Cliente:</div><div class="value">${order.clientName}</div></div>
+                        ${order.studentName ? `<div class="row"><div class="label">Estudante:</div><div class="value">${order.studentName}</div></div>` : ''}
+                        
+                        <div class="items-container">
+                            ${order.items.map(i => `<div class="item"><strong>${i.qty}x</strong> ${i.name}<br><span class="item-meta">${i.category || ''} - ${i.size}</span></div>`).join('')}
+                        </div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+            } catch (e) {
+                console.error("Erro ao imprimir etiqueta:", e);
+                alert("Erro ao gerar etiqueta.");
             }
         }
 
