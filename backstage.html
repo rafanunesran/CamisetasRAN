@@ -269,6 +269,9 @@
                     <div class="p-6 border-b flex justify-between items-center">
                         <h3 class="font-semibold">Gestão de Estoque</h3>
                         <div class="flex gap-2">
+                            <select id="inventoryFilterPartner" onchange="renderInventory()" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary max-w-[150px]">
+                                <option value="">Todas as Escolas</option>
+                            </select>
                             <select id="inventoryFilterType" onchange="renderInventory()" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary">
                                 <option value="">Todos os Tipos</option>
                                 <option value="Malha">Malha</option>
@@ -336,18 +339,67 @@
             <!-- Transfers Tab (Repasses) -->
             <div id="transfers" class="tab-content space-y-6">
                 <div class="rounded-lg border bg-white shadow-sm">
-                    <div class="p-6 border-b">
-                        <h3 class="font-semibold">Repasses e Comissões</h3>
+                    <div class="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h3 class="font-semibold">Central de Repasses</h3>
+                            <p class="text-sm text-muted-foreground">Gerencie comissões de escolas, pagamentos de produção e lucro administrativo.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="markSelectedAsPaid()" class="text-xs bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-1">
+                                <i data-lucide="check-circle" class="h-3 w-3"></i> Efetivar Pagamentos (<span id="transfer-selected-count">0</span>)
+                            </button>
+                        </div>
                     </div>
+                    
+                    <!-- Filtros e Resumo -->
+                    <div class="p-6 bg-gray-50 border-b grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-xs font-medium text-gray-500">Filtrar por Parceiro</label>
+                            <select id="transferFilterPartner" onchange="fetchTransfers()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-medium text-gray-500">Filtrar por Tipo</label>
+                            <select id="transferFilterType" onchange="fetchTransfers()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                <option value="">Todos</option>
+                                <option value="Escola">Escola/Revendedor</option>
+                                <option value="Produção">Produção</option>
+                                <option value="ADM">ADM (Lucro)</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-medium text-gray-500">Filtrar por Status</label>
+                            <select id="transferFilterStatus" onchange="fetchTransfers()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                                <option value="">Todos</option>
+                                <option value="Aberto">Aberto (Em andamento)</option>
+                                <option value="Pendente">Pendente (Pronto p/ Pagar)</option>
+                                <option value="Pago">Pago (Efetivado)</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end justify-end">
+                            <div class="text-right">
+                                <span class="text-xs text-gray-500">Total Filtrado</span>
+                                <div class="text-xl font-bold text-primary" id="transferTotalDisplay">R$ 0,00</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="p-6">
                         <table class="w-full text-sm text-left">
                             <thead class="text-muted-foreground font-medium border-b">
-                                <tr><th class="pb-3">Beneficiário</th><th class="pb-3">Tipo</th><th class="pb-3">Valor</th><th class="pb-3 text-right">Status</th></tr>
+                                <tr>
+                                    <th class="pb-3 w-8"><input type="checkbox" onchange="toggleAllTransfers(this)"></th>
+                                    <th class="pb-3">Data Pedido</th>
+                                    <th class="pb-3">Pedido / Cliente</th>
+                                    <th class="pb-3">Beneficiário</th>
+                                    <th class="pb-3">Tipo</th>
+                                    <th class="pb-3">Valor</th>
+                                    <th class="pb-3 text-right">Status</th>
+                                </tr>
                             </thead>
-                            <tbody class="divide-y">
-                                <tr><td class="py-3">Colégio Santa Maria</td><td>Comissão</td><td>R$ 1.250,00</td><td class="text-right"><span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Aberto</span></td></tr>
-                                <tr><td class="py-3">Ricardo Santos</td><td>Representante</td><td>R$ 850,00</td><td class="text-right"><span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Pago</span></td></tr>
-                                <tr><td class="py-3">Maria Oliveira</td><td>Produção</td><td>R$ 2.100,00</td><td class="text-right"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Processando</span></td></tr>
+                            <tbody id="transfers-table-body" class="divide-y">
+                                <tr><td colspan="7" class="py-4 text-center text-muted-foreground">Carregando repasses...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -917,6 +969,7 @@
                 fetchInventory();
                 fetchProducts();
                 fetchOrders();
+                // fetchTransfers será chamado ao clicar na aba ou manualmente se necessário, mas vamos popular o filtro de parceiros dele
                 checkAutoArchive(); // Verifica arquivamento automático ao iniciar
             } catch (error) {
                 console.error("Erro ao buscar parceiros:", error);
@@ -927,13 +980,28 @@
         // Popula o filtro de parceiros na aba de produtos
         function populateProductFilter() {
             const select = document.getElementById('productFilterPartner');
-            if(!select) return;
-            select.innerHTML = '<option value="">Todas as Escolas</option>';
+            const transferSelect = document.getElementById('transferFilterPartner');
+            const inventorySelect = document.getElementById('inventoryFilterPartner');
+            
+            if(select) select.innerHTML = '<option value="">Todas as Escolas</option>';
+            if(transferSelect) transferSelect.innerHTML = '<option value="">Todos</option>';
+            if(inventorySelect) inventorySelect.innerHTML = '<option value="">Todas as Escolas</option>';
+
             partners.forEach(p => {
                 const option = document.createElement('option');
                 option.value = p.id;
                 option.textContent = p.nickname || p.name;
-                select.appendChild(option);
+                
+                if(select) select.appendChild(option);
+                
+                if(transferSelect) {
+                    const opt2 = option.cloneNode(true);
+                    transferSelect.appendChild(opt2);
+                }
+                if(inventorySelect) {
+                    const opt3 = option.cloneNode(true);
+                    inventorySelect.appendChild(opt3);
+                }
             });
         }
 
@@ -1043,9 +1111,21 @@
 
             tbody.innerHTML = '';
             
-            // Filtro de Estoque
+            // Filtros de Estoque
             const filterType = document.getElementById('inventoryFilterType')?.value;
-            const filteredInventory = filterType ? inventory.filter(i => i.type === filterType) : inventory;
+            const filterPartner = document.getElementById('inventoryFilterPartner')?.value;
+
+            const filteredInventory = inventory.filter(i => {
+                // Filtro de Tipo (Case insensitive para compatibilidade com itens antigos)
+                if (filterType && String(i.type || '').trim().toLowerCase() !== filterType.trim().toLowerCase()) {
+                    return false;
+                }
+                // Filtro de Parceiro
+                if (filterPartner && i.partnerId !== filterPartner) {
+                    return false;
+                }
+                return true;
+            });
 
             filteredInventory.forEach(item => {
                 const isPrint = item.type === 'Estampa';
@@ -2877,6 +2957,223 @@
             }
         }
 
+        // --- Lógica de Repasses (Transfers) ---
+        let transferList = [];
+        let selectedTransferIds = new Set();
+
+        window.fetchTransfers = async () => {
+            const tbody = document.getElementById('transfers-table-body');
+            tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-muted-foreground">Calculando repasses...</td></tr>';
+            
+            try {
+                // Garantir dados atualizados
+                const ordersSnap = await getDocs(collection(db, "orders"));
+                const orders = [];
+                ordersSnap.forEach(doc => orders.push({id: doc.id, ...doc.data()}));
+
+                if (!window.cachedProducts) {
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
+                transferList = [];
+
+                // Processar cada pedido para gerar as linhas de repasse
+                orders.forEach(order => {
+                    if (!order.items) return;
+
+                    // Calcular totais por tipo
+                    let schoolTotal = 0;
+                    let prodTotal = 0;
+                    let admTotal = 0;
+
+                    order.items.forEach(item => {
+                        const prod = window.cachedProducts.find(p => p.id === item.productId);
+                        if (prod && prod.pricing) {
+                            // Tenta achar o preço da categoria específica
+                            const pricing = prod.pricing.find(pr => pr.category === item.category) || prod.pricing[0];
+                            if (pricing) {
+                                schoolTotal += (parseFloat(pricing.schoolCommission) || 0) * item.qty;
+                                prodTotal += (parseFloat(pricing.productionCost) || 0) * item.qty;
+                                admTotal += (parseFloat(pricing.adminProfit) || 0) * item.qty;
+                            }
+                        }
+                    });
+
+                    // Determinar Status Base do Repasse
+                    // Aberto: Pedido não finalizado OU Cliente não pagou tudo
+                    // Pendente: Pedido Finalizado/Entregue E Cliente Pagou Tudo (Pronto para pagar parceiro)
+                    // Pago: Marcado explicitamente no objeto payouts do pedido
+
+                    const isOrderDone = ['Finalizado', 'Entregue'].includes(order.status);
+                    const isClientPaid = order.paymentStatus === 'Pago Total';
+                    const payouts = order.payouts || {};
+
+                    const baseStatus = (isOrderDone && isClientPaid) ? 'Pendente' : 'Aberto';
+
+                    // 1. Repasse Escola
+                    if (schoolTotal > 0) {
+                        const partner = partners.find(p => p.id === order.partnerId);
+                        transferList.push({
+                            id: `${order.id}_school`,
+                            orderId: order.id,
+                            date: order.createdAt,
+                            clientName: order.clientName,
+                            beneficiary: partner ? (partner.nickname || partner.name) : 'Escola Indefinida',
+                            partnerId: order.partnerId,
+                            type: 'Escola',
+                            amount: schoolTotal,
+                            status: payouts.school ? 'Pago' : baseStatus
+                        });
+                    }
+
+                    // 2. Repasse Produção
+                    if (prodTotal > 0) {
+                        const producer = partners.find(p => p.id === order.producerId);
+                        transferList.push({
+                            id: `${order.id}_producer`,
+                            orderId: order.id,
+                            date: order.createdAt,
+                            clientName: order.clientName,
+                            beneficiary: producer ? (producer.nickname || producer.name) : 'Produção Geral',
+                            partnerId: order.producerId, // Pode ser null se não definido
+                            type: 'Produção',
+                            amount: prodTotal,
+                            status: payouts.producer ? 'Pago' : baseStatus
+                        });
+                    }
+
+                    // 3. Repasse ADM
+                    if (admTotal > 0) {
+                        transferList.push({
+                            id: `${order.id}_adm`,
+                            orderId: order.id,
+                            date: order.createdAt,
+                            clientName: order.clientName,
+                            beneficiary: 'Caixa Interno',
+                            partnerId: 'ADM',
+                            type: 'ADM',
+                            amount: admTotal,
+                            status: payouts.adm ? 'Pago' : baseStatus
+                        });
+                    }
+                });
+
+                renderTransfers();
+
+            } catch (e) {
+                console.error("Erro ao calcular repasses:", e);
+                tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
+            }
+        }
+
+        function renderTransfers() {
+            const tbody = document.getElementById('transfers-table-body');
+            const filterPartner = document.getElementById('transferFilterPartner').value;
+            const filterType = document.getElementById('transferFilterType').value;
+            const filterStatus = document.getElementById('transferFilterStatus').value;
+
+            let filtered = transferList.filter(t => {
+                if (filterPartner && t.partnerId !== filterPartner) return false;
+                if (filterType && t.type !== filterType) return false;
+                if (filterStatus && t.status !== filterStatus) return false;
+                return true;
+            });
+
+            // Ordenar: Pendente primeiro, depois Aberto, depois Pago
+            const statusOrder = { 'Pendente': 1, 'Aberto': 2, 'Pago': 3 };
+            filtered.sort((a, b) => statusOrder[a.status] - statusOrder[b.status] || new Date(b.date) - new Date(a.date));
+
+            tbody.innerHTML = '';
+            let totalVal = 0;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-muted-foreground">Nenhum repasse encontrado com os filtros atuais.</td></tr>';
+            } else {
+                filtered.forEach(t => {
+                    totalVal += t.amount;
+                    const dateStr = new Date(t.date).toLocaleDateString('pt-BR');
+                    
+                    let statusBadge = '';
+                    if (t.status === 'Aberto') statusBadge = '<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Aberto</span>';
+                    if (t.status === 'Pendente') statusBadge = '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-bold">Pendente</span>';
+                    if (t.status === 'Pago') statusBadge = '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Pago</span>';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-3"><input type="checkbox" value="${t.id}" class="transfer-check" onchange="updateTransferSelection()"></td>
+                        <td>${dateStr}</td>
+                        <td>
+                            <div class="font-medium text-gray-800">#${t.orderId.slice(-4)}</div>
+                            <div class="text-xs text-gray-500">${t.clientName}</div>
+                        </td>
+                        <td>${t.beneficiary}</td>
+                        <td>${t.type}</td>
+                        <td class="font-bold">R$ ${t.amount.toFixed(2)}</td>
+                        <td class="text-right">${statusBadge}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            document.getElementById('transferTotalDisplay').textContent = `R$ ${totalVal.toFixed(2)}`;
+            document.getElementById('transfer-selected-count').textContent = '0';
+            selectedTransferIds.clear();
+            
+            // Desmarcar checkbox geral
+            const masterCheck = document.querySelector('input[onchange="toggleAllTransfers(this)"]');
+            if(masterCheck) masterCheck.checked = false;
+        }
+
+        window.toggleAllTransfers = (source) => {
+            const checkboxes = document.querySelectorAll('.transfer-check');
+            checkboxes.forEach(cb => {
+                cb.checked = source.checked;
+            });
+            updateTransferSelection();
+        }
+
+        window.updateTransferSelection = () => {
+            const checkboxes = document.querySelectorAll('.transfer-check:checked');
+            selectedTransferIds.clear();
+            checkboxes.forEach(cb => selectedTransferIds.add(cb.value));
+            document.getElementById('transfer-selected-count').textContent = selectedTransferIds.size;
+        }
+
+        window.markSelectedAsPaid = async () => {
+            if (selectedTransferIds.size === 0) {
+                alert("Selecione pelo menos um repasse para efetivar.");
+                return;
+            }
+
+            if (!confirm(`Deseja marcar ${selectedTransferIds.size} repasses como PAGOS?`)) return;
+
+            // Agrupar atualizações por Pedido para economizar escritas
+            const updatesByOrder = {};
+
+            selectedTransferIds.forEach(compositeId => {
+                // compositeId ex: "order123_school"
+                const [orderId, typeKey] = compositeId.split('_'); // typeKey será 'school', 'producer', ou 'adm'
+                
+                if (!updatesByOrder[orderId]) updatesByOrder[orderId] = {};
+                updatesByOrder[orderId][`payouts.${typeKey}`] = true;
+                updatesByOrder[orderId][`payouts.${typeKey}Date`] = new Date().toISOString();
+            });
+
+            try {
+                const promises = Object.keys(updatesByOrder).map(orderId => {
+                    return updateDoc(doc(db, "orders", orderId), updatesByOrder[orderId]);
+                });
+
+                await Promise.all(promises);
+                alert("Pagamentos efetivados com sucesso!");
+                fetchTransfers();
+            } catch (e) {
+                console.error("Erro ao efetivar pagamentos:", e);
+                alert("Erro ao atualizar dados.");
+            }
+        }
+
         // --- Impressão de Etiqueta (48mm) ---
         window.printOrderLabel = async (id) => {
             try {
@@ -2971,8 +3268,59 @@
         lucide.createIcons();
 
         function switchTab(tabId) {
+            if (tabId === 'transfers') {
+                fetchTransfers();
+            }
+
             // Hide all contents
             document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            // Deactivate all buttons
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('text-muted-foreground');
+            });
+
+            // Show selected content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Activate selected button
+            const btn = document.getElementById('btn-' + tabId);
+            if(btn) {
+                btn.classList.add('active');
+                btn.classList.remove('text-muted-foreground');
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('auth');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>         el.classList.remove('active');
+                el.classList.add('text-muted-foreground');
+            });
+
+            // Show selected content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Activate selected button
+            const btn = document.getElementById('btn-' + tabId);
+            if(btn) {
+                btn.classList.add('active');
+                btn.classList.remove('text-muted-foreground');
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('auth');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>     document.querySelectorAll('.tab-content').forEach(el => {
                 el.classList.remove('active');
             });
             // Deactivate all buttons
