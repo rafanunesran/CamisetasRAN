@@ -269,9 +269,6 @@
                     <div class="p-6 border-b flex justify-between items-center">
                         <h3 class="font-semibold">Gestão de Estoque</h3>
                         <div class="flex gap-2">
-                            <select id="inventoryFilterPartner" onchange="renderInventory()" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary max-w-[150px]">
-                                <option value="">Todas as Escolas</option>
-                            </select>
                             <select id="inventoryFilterType" onchange="renderInventory()" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary">
                                 <option value="">Todos os Tipos</option>
                                 <option value="Malha">Malha</option>
@@ -981,11 +978,9 @@
         function populateProductFilter() {
             const select = document.getElementById('productFilterPartner');
             const transferSelect = document.getElementById('transferFilterPartner');
-            const inventorySelect = document.getElementById('inventoryFilterPartner');
             
             if(select) select.innerHTML = '<option value="">Todas as Escolas</option>';
             if(transferSelect) transferSelect.innerHTML = '<option value="">Todos</option>';
-            if(inventorySelect) inventorySelect.innerHTML = '<option value="">Todas as Escolas</option>';
 
             partners.forEach(p => {
                 const option = document.createElement('option');
@@ -997,10 +992,6 @@
                 if(transferSelect) {
                     const opt2 = option.cloneNode(true);
                     transferSelect.appendChild(opt2);
-                }
-                if(inventorySelect) {
-                    const opt3 = option.cloneNode(true);
-                    inventorySelect.appendChild(opt3);
                 }
             });
         }
@@ -1113,15 +1104,10 @@
             
             // Filtros de Estoque
             const filterType = document.getElementById('inventoryFilterType')?.value;
-            const filterPartner = document.getElementById('inventoryFilterPartner')?.value;
 
             const filteredInventory = inventory.filter(i => {
                 // Filtro de Tipo (Case insensitive para compatibilidade com itens antigos)
                 if (filterType && String(i.type || '').trim().toLowerCase() !== filterType.trim().toLowerCase()) {
-                    return false;
-                }
-                // Filtro de Parceiro
-                if (filterPartner && i.partnerId !== filterPartner) {
                     return false;
                 }
                 return true;
@@ -3274,53 +3260,6 @@
 
             // Hide all contents
             document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.remove('active');
-            });
-            // Deactivate all buttons
-            document.querySelectorAll('.tab-btn').forEach(el => {
-                el.classList.remove('active');
-                el.classList.add('text-muted-foreground');
-            });
-
-            // Show selected content
-            document.getElementById(tabId).classList.add('active');
-            
-            // Activate selected button
-            const btn = document.getElementById('btn-' + tabId);
-            if(btn) {
-                btn.classList.add('active');
-                btn.classList.remove('text-muted-foreground');
-            }
-        }
-
-        function logout() {
-            sessionStorage.removeItem('auth');
-            window.location.href = 'index.html';
-        }
-    </script>
-</body>
-</html>         el.classList.remove('active');
-                el.classList.add('text-muted-foreground');
-            });
-
-            // Show selected content
-            document.getElementById(tabId).classList.add('active');
-            
-            // Activate selected button
-            const btn = document.getElementById('btn-' + tabId);
-            if(btn) {
-                btn.classList.add('active');
-                btn.classList.remove('text-muted-foreground');
-            }
-        }
-
-        function logout() {
-            sessionStorage.removeItem('auth');
-            window.location.href = 'index.html';
-        }
-    </script>
-</body>
-</html>     document.querySelectorAll('.tab-content').forEach(el => {
                 el.classList.remove('active');
             });
             // Deactivate all buttons
