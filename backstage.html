@@ -368,6 +368,7 @@
                                     <th class="pb-3">Produto</th>
                                     <th class="pb-3">Qtd. Perdida</th>
                                     <th class="pb-3">Motivo</th>
+                                    <th class="pb-3 text-right">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="errors-table-body" class="divide-y">
@@ -960,6 +961,38 @@
         </div>
     </div>
 
+    <!-- Modal de Edição de Erro -->
+    <div id="editErrorModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-lg space-y-4 shadow-xl border border-gray-200">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 class="text-xl font-bold text-primary">Editar Registro de Erro</h2>
+                <button onclick="closeEditErrorModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="bg-gray-50 p-3 rounded border">
+                <div id="editErrorProductInfo" class="font-medium"></div>
+                <div id="editErrorOrderInfo" class="text-xs text-gray-500"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Qtd. com Erro</label>
+                    <input id="editErrorQty" type="number" min="1" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Motivo do Erro</label>
+                <textarea id="editErrorReason" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" rows="2"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t">
+                <button onclick="closeEditErrorModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="saveEditedErrorBtn" onclick="saveEditedError()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Relatório de Materiais -->
     <div id="materialReportModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
@@ -1065,6 +1098,7 @@
         let currentProductionStatus = 'Orçamento';
         let orderToConfirmId = null;
         let selectedOrderIds = new Set();
+        let currentErrorId = null;
         let errorToReportId = null;
         let productionErrors = [];
         window.allOrders = []; // Global para acesso no dashboard
@@ -1133,10 +1167,17 @@
                         <div class="text-xs text-muted-foreground">${error.category} / ${error.size}</div>
                     </td>
                     <td class="font-bold text-destructive">${error.errorQty}</td>
-                    <td class="text-sm text-muted-foreground">${error.reason}</td>
+                    <td class="text-sm text-muted-foreground max-w-xs truncate" title="${error.reason}">${error.reason}</td>
+                    <td class="text-right">
+                        <div class="flex justify-end gap-1">
+                            <button onclick="window.openEditErrorModal('${error.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-primary" title="Editar"><i data-lucide="pencil" class="h-4 w-4"></i></button>
+                            <button onclick="window.deleteProductionError('${error.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-red-500" title="Excluir"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                        </div>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
+            lucide.createIcons();
         }
 
         // Popula o filtro de parceiros na aba de produtos
@@ -3094,6 +3135,32 @@
             }
         }
 
+        // Helper function to calculate materials for a given item and quantity
+        const getMaterialsForErrorItem = (item, qty) => {
+            const updates = {};
+            // 1. Malha
+            const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
+            if (malhaItem) {
+                updates[malhaItem.id] = (updates[malhaItem.id] || 0) + qty;
+            }
+
+            // 2. Estampa
+            const prod = window.cachedProducts.find(p => p.id === item.productId);
+            if (prod && prod.printId) {
+                updates[prod.printId] = (updates[prod.printId] || 0) + qty;
+            }
+
+            // 3. Insumos (unitários)
+            inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
+                const r = insumo.usageRule || {type:'unit', qty:1};
+                if(r.type === 'unit') {
+                    const q = qty * (parseFloat(r.qty) || 1);
+                    if(q > 0) updates[insumo.id] = (updates[insumo.id] || 0) + q;
+                }
+            });
+            return updates;
+        }
+
         // --- Lógica de Erros de Produção ---
         window.openErrorModal = (orderId) => {
             errorToReportId = orderId;
@@ -3178,29 +3245,10 @@
                         };
                         errorPromises.push(addDoc(collection(db, "productionErrors"), errorData));
 
-                        // Calcular materiais para baixa imediata (Perda)
-                        // 1. Malha
-                        const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
-                        if (malhaItem) {
-                            inventoryUpdates[malhaItem.id] = (inventoryUpdates[malhaItem.id] || 0) + errorQty;
+                        const materialsToDeduct = getMaterialsForErrorItem(item, errorQty);
+                        for (const [itemId, qty] of Object.entries(materialsToDeduct)) {
+                            inventoryUpdates[itemId] = (inventoryUpdates[itemId] || 0) + qty;
                         }
-
-                        // 2. Estampa
-                        const prod = window.cachedProducts.find(p => p.id === item.productId);
-                        if (prod && prod.printId) {
-                            inventoryUpdates[prod.printId] = (inventoryUpdates[prod.printId] || 0) + errorQty;
-                        }
-
-                        // 3. Insumos (Considerando apenas regras unitárias para erros parciais)
-                        inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
-                            const r = insumo.usageRule || {type:'unit', qty:1};
-                            if(r.type === 'unit') {
-                                const q = errorQty * (parseFloat(r.qty) || 1);
-                                if(q > 0) inventoryUpdates[insumo.id] = (inventoryUpdates[insumo.id] || 0) + q;
-                            }
-                            // Regras de lote/pedido (batch/order) geralmente não se aplicam a perdas unitárias, 
-                            // então ignoramos para evitar baixa excessiva.
-                        });
                     }
                 });
 
@@ -3252,6 +3300,145 @@
             } finally {
                 btn.textContent = 'Registrar Perda';
                 btn.disabled = false;
+            }
+        }
+
+        // --- Lógica de Edição e Exclusão de Erros ---
+        window.openEditErrorModal = (id) => {
+            currentErrorId = id;
+            const error = productionErrors.find(e => e.id === id);
+            if (!error) return;
+
+            document.getElementById('editErrorProductInfo').textContent = `${error.productName} (${error.category} / ${error.size})`;
+            document.getElementById('editErrorOrderInfo').textContent = `Pedido #${error.orderId.slice(-4)} - ${error.clientName}`;
+            document.getElementById('editErrorQty').value = error.errorQty;
+            document.getElementById('editErrorReason').value = error.reason;
+            
+            // Store original quantity to calculate diff on save
+            document.getElementById('editErrorQty').dataset.originalQty = error.errorQty;
+
+            const modal = document.getElementById('editErrorModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeEditErrorModal = () => {
+            document.getElementById('editErrorModal').classList.add('hidden');
+            document.getElementById('editErrorModal').classList.remove('flex');
+            currentErrorId = null;
+        }
+
+        window.saveEditedError = async () => {
+            if (!currentErrorId) return;
+
+            const originalError = productionErrors.find(e => e.id === currentErrorId);
+            if (!originalError) return;
+
+            const newQty = parseInt(document.getElementById('editErrorQty').value);
+            const newReason = document.getElementById('editErrorReason').value;
+            const originalQty = parseInt(document.getElementById('editErrorQty').dataset.originalQty);
+
+            if (isNaN(newQty) || newQty <= 0) {
+                alert("A quantidade com erro deve ser um número maior que zero.");
+                return;
+            }
+
+            const btn = document.getElementById('saveEditedErrorBtn');
+            btn.textContent = 'Salvando...';
+            btn.disabled = true;
+
+            try {
+                const updatePromises = [];
+                const qtyDifference = newQty - originalQty;
+
+                // Se a quantidade mudou, ajustar o estoque
+                if (qtyDifference !== 0) {
+                    const order = window.allOrders.find(o => o.id === originalError.orderId);
+                    const errorItem = order.items.find(i => i.name === originalError.productName && i.category === originalError.category && i.size === originalError.size);
+
+                    if (errorItem) {
+                        // Multiplier é -1. Se a diferença for positiva (2->5), precisamos deduzir mais 3. Se for negativa (5->2), precisamos devolver 3.
+                        const multiplier = -1; 
+                        const materialsToAdjust = getMaterialsForErrorItem(errorItem, qtyDifference);
+                        
+                        for (const [itemId, qty] of Object.entries(materialsToAdjust)) {
+                            const invItem = inventory.find(i => i.id === itemId);
+                            if (invItem) {
+                                const currentInvQty = parseFloat(invItem.quantity) || 0;
+                                const adjustedQty = currentInvQty + (qty * multiplier);
+                                
+                                updatePromises.push(updateDoc(doc(db, "inventory", itemId), { quantity: adjustedQty }));
+                                
+                                const movementType = qtyDifference > 0 ? 'Saída' : 'Entrada';
+                                const movementDetails = qtyDifference > 0 ? `Ajuste de erro no pedido #${order.id.slice(-4)}` : `Correção de erro no pedido #${order.id.slice(-4)}`;
+
+                                updatePromises.push(addDoc(collection(db, "movements"), {
+                                    date: new Date().toISOString(),
+                                    type: movementType,
+                                    itemId: itemId,
+                                    itemName: invItem.name,
+                                    quantity: Math.abs(qty),
+                                    unitValue: invItem.cost || 0,
+                                    entity: 'Produção (Ajuste)',
+                                    details: movementDetails
+                                }));
+                            }
+                        }
+                    }
+                }
+
+                updatePromises.push(updateDoc(doc(db, "productionErrors", currentErrorId), { errorQty: newQty, reason: newReason }));
+                await Promise.all(updatePromises);
+
+                alert("Registro de erro atualizado com sucesso.");
+                closeEditErrorModal();
+                fetchErrors();
+                fetchInventory();
+
+            } catch (e) {
+                console.error("Erro ao editar registro de erro:", e);
+                alert("Erro ao salvar: " + e.message);
+            } finally {
+                btn.textContent = 'Salvar Alterações';
+                btn.disabled = false;
+            }
+        }
+
+        window.deleteProductionError = async (id) => {
+            if (!confirm("Tem certeza que deseja excluir este registro de erro? Os materiais serão devolvidos ao estoque.")) return;
+
+            const errorToDelete = productionErrors.find(e => e.id === id);
+            if (!errorToDelete) return;
+
+            try {
+                const deletePromises = [];
+                const order = window.allOrders.find(o => o.id === errorToDelete.orderId);
+                const errorItem = order.items.find(i => i.name === errorToDelete.productName && i.category === errorToDelete.category && i.size === errorToDelete.size);
+
+                if (errorItem) {
+                    const materialsToReturn = getMaterialsForErrorItem(errorItem, errorToDelete.errorQty);
+                    for (const [itemId, qty] of Object.entries(materialsToReturn)) {
+                        const invItem = inventory.find(i => i.id === itemId);
+                        if (invItem) {
+                            const newQty = (parseFloat(invItem.quantity) || 0) + qty;
+                            deletePromises.push(updateDoc(doc(db, "inventory", itemId), { quantity: newQty }));
+                            deletePromises.push(addDoc(collection(db, "movements"), { date: new Date().toISOString(), type: 'Entrada', itemId: itemId, itemName: invItem.name, quantity: qty, unitValue: invItem.cost || 0, entity: 'Produção (Correção)', details: `Exclusão de erro no pedido #${order.id.slice(-4)}` }));
+                        }
+                    }
+                }
+
+                deletePromises.push(deleteDoc(doc(db, "productionErrors", id)));
+                const remainingErrors = productionErrors.filter(e => e.orderId === errorToDelete.orderId && e.id !== id);
+                if (remainingErrors.length === 0) {
+                    deletePromises.push(updateDoc(doc(db, "orders", errorToDelete.orderId), { hasError: false }));
+                }
+
+                await Promise.all(deletePromises);
+                alert("Registro de erro excluído e estoque corrigido.");
+                fetchErrors(); fetchInventory(); fetchOrders();
+            } catch (e) {
+                console.error("Erro ao excluir registro de erro:", e);
+                alert("Erro ao excluir: " + e.message);
             }
         }
 
@@ -3378,13 +3565,14 @@
 
                     // 3. Repasse ADM
                     if (admTotal > 0) {
+                        const admPartner = partners.find(p => (p.category || '').trim().toUpperCase() === 'ADM');
                         transferList.push({
                             id: `${order.id}_adm`,
                             orderId: order.id,
                             date: order.createdAt,
                             clientName: order.clientName,
-                            beneficiary: 'Caixa Interno',
-                            partnerId: 'ADM',
+                            beneficiary: admPartner ? (admPartner.nickname || admPartner.name) : 'Caixa Interno',
+                            partnerId: admPartner ? admPartner.id : 'ADM',
                             type: 'ADM',
                             amount: admTotal,
                             status: payouts.adm ? 'Pago' : baseStatus,
