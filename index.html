@@ -226,6 +226,25 @@
                     <!-- Itens do carrinho renderizados via JS -->
                     <div class="text-center text-gray-500 py-10">Seu carrinho está vazio.</div>
                 </div>
+
+                <!-- Formulário de Checkout -->
+                <div id="checkoutForm" class="max-w-4xl mx-auto mt-8 p-6 bg-gray-50 rounded-lg border hidden">
+                    <h3 class="font-bold text-lg mb-4 text-primary flex items-center gap-2"><i data-lucide="user" class="h-5 w-5"></i> Dados para o Pedido</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Seu Nome</label>
+                            <input type="text" id="checkoutName" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 px-3" placeholder="Nome completo">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Seu WhatsApp</label>
+                            <input type="text" id="checkoutPhone" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 px-3" placeholder="(11) 99999-9999">
+                        </div>
+                        <div id="checkoutStudentContainer" class="hidden md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Estudante</label>
+                            <input type="text" id="checkoutStudent" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 px-3" placeholder="Nome do aluno (para identificação na escola)">
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Footer do Carrinho -->
@@ -236,8 +255,8 @@
                     </div>
                     <div class="flex gap-4 w-full md:w-auto">
                         <button onclick="closeCart()" class="flex-1 md:flex-none px-6 py-3 border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-white">Continuar Comprando</button>
-                        <button onclick="checkout()" class="flex-1 md:flex-none px-8 py-3 bg-green-600 text-white rounded-md font-bold hover:bg-green-700 shadow-lg flex items-center justify-center gap-2">
-                            Finalizar Pedido <i data-lucide="arrow-right" class="h-5 w-5"></i>
+                        <button id="btnCheckout" onclick="checkout()" class="flex-1 md:flex-none px-8 py-3 bg-green-600 text-white rounded-md font-bold hover:bg-green-700 shadow-lg flex items-center justify-center gap-2">
+                            Solicitar Orçamento <i data-lucide="send" class="h-5 w-5"></i>
                         </button>
                     </div>
                 </div>
@@ -248,7 +267,7 @@
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAWZEZskuEMIby9dr5iWfH2G3nsXj14gr4",
@@ -545,6 +564,7 @@
 
         function renderCartItems() {
             const container = document.getElementById('cartItemsContainer');
+            const checkoutForm = document.getElementById('checkoutForm');
             container.innerHTML = '';
             let total = 0;
 
@@ -552,12 +572,19 @@
                 container.innerHTML = '<div class="text-center text-gray-500 py-10 flex flex-col items-center"><i data-lucide="shopping-cart" class="h-12 w-12 mb-4 opacity-20"></i>Seu carrinho está vazio.</div>';
                 document.getElementById('cartTotal').textContent = 'R$ 0,00';
                 lucide.createIcons();
+                checkoutForm.classList.add('hidden');
                 return;
             }
+            checkoutForm.classList.remove('hidden');
 
             cart.forEach((item, index) => {
                 const itemTotal = item.price * item.qty;
                 total += itemTotal;
+
+                // Resolver nome da escola para exibir
+                const prod = products.find(p => p.id === item.productId);
+                const partner = prod ? partners.find(p => p.id === prod.partnerId) : null;
+                const schoolName = partner ? (partner.nickname || partner.name) : '';
 
                 const div = document.createElement('div');
                 div.className = 'flex items-center gap-4 border-b pb-4';
@@ -565,6 +592,7 @@
                     <img src="${item.image}" class="h-20 w-20 object-contain rounded border bg-gray-50">
                     <div class="flex-grow">
                         <h3 class="font-bold text-gray-900">${item.name}</h3>
+                        ${schoolName ? `<p class="text-xs text-primary font-semibold mb-0.5">${schoolName}</p>` : ''}
                         <p class="text-sm text-gray-600">Tecido: ${item.variation} | Tam: ${item.size}</p>
                         <div class="flex items-center gap-3 mt-2">
                             <div class="flex items-center border rounded-md">
@@ -586,20 +614,116 @@
             });
 
             document.getElementById('cartTotal').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+            
+            // Verificar se precisa de nome do estudante
+            const hasSchoolItem = cart.some(item => {
+                const prod = products.find(p => p.id === item.productId);
+                if (!prod) return false;
+                const partner = partners.find(p => p.id === prod.partnerId);
+                // Verifica se a categoria é Escola (case insensitive para garantir)
+                return partner && /^escola$/i.test(String(partner.category || '').trim());
+            });
+
+            const studentContainer = document.getElementById('checkoutStudentContainer');
+            if (hasSchoolItem) {
+                studentContainer.classList.remove('hidden');
+            } else {
+                studentContainer.classList.add('hidden');
+            }
+
             lucide.createIcons();
         }
 
-        window.checkout = () => {
+        window.checkout = async () => {
             if (cart.length === 0) return;
-            // Aqui você pode implementar a lógica de salvar o pedido no Firebase
-            // Por enquanto, vamos apenas simular
-            const msg = "Olá! Gostaria de finalizar meu pedido:\n\n" + 
-                cart.map(i => `- ${i.qty}x ${i.name} (${i.variation}, Tam: ${i.size})`).join('\n') +
-                `\n\nTotal: ${document.getElementById('cartTotal').textContent}`;
             
-            // Exemplo: Redirecionar para WhatsApp
-            // window.open(`https://wa.me/55SEUNUMERO?text=${encodeURIComponent(msg)}`, '_blank');
-            alert("Funcionalidade de checkout será implementada em breve!\n\n" + msg);
+            const name = document.getElementById('checkoutName').value;
+            const phone = document.getElementById('checkoutPhone').value;
+            const student = document.getElementById('checkoutStudent').value;
+            const studentContainer = document.getElementById('checkoutStudentContainer');
+            
+            if (!name || !phone) {
+                alert("Por favor, preencha seu Nome e WhatsApp para contato.");
+                return;
+            }
+            
+            if (!studentContainer.classList.contains('hidden') && !student) {
+                alert("Por favor, informe o Nome do Estudante para identificação na escola.");
+                return;
+            }
+
+            const btn = document.getElementById('btnCheckout');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.textContent = "Enviando...";
+
+            try {
+                // Determinar Parceiro Principal (Prioridade para Escola)
+                let partnerId = null;
+                for (const item of cart) {
+                    const prod = products.find(p => p.id === item.productId);
+                    if (prod) {
+                        const partner = partners.find(p => p.id === prod.partnerId);
+                        if (partner && /^escola$/i.test(String(partner.category || '').trim())) {
+                            partnerId = partner.id;
+                            break;
+                        }
+                        if (!partnerId) partnerId = prod.partnerId; // Fallback
+                    }
+                }
+
+                const orderData = {
+                    clientName: name,
+                    clientPhone: phone,
+                    studentName: student || '',
+                    items: cart.map(i => ({
+                        productId: i.productId,
+                        name: i.name,
+                        category: i.variation,
+                        size: i.size,
+                        qty: i.qty,
+                        price: i.price,
+                        total: i.price * i.qty
+                    })),
+                    total: cart.reduce((acc, i) => acc + (i.price * i.qty), 0),
+                    status: 'Orçamento',
+                    createdAt: new Date().toISOString(),
+                    partnerId: partnerId || 'Geral'
+                };
+
+                await addDoc(collection(db, "orders"), orderData);
+
+                // WhatsApp
+                let msg = `*Novo Pedido - UniformeGestor*\n`;
+                msg += `Cliente: ${name}\n`;
+                if(student) msg += `Estudante: ${student}\n`;
+                msg += `Tel: ${phone}\n\n`;
+                msg += `*Itens:*\n`;
+                cart.forEach(i => {
+                    msg += `- ${i.qty}x ${i.name} (${i.variation} - ${i.size})\n`;
+                });
+                msg += `\n*Total: ${document.getElementById('cartTotal').textContent}*`;
+                msg += `\n\n_Aguardando confirmação._`;
+
+                const targetPhone = "5511986705134";
+                window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+
+                // Limpar Carrinho
+                cart = [];
+                saveCart();
+                closeCart();
+                // Limpar campos
+                document.getElementById('checkoutName').value = '';
+                document.getElementById('checkoutPhone').value = '';
+                document.getElementById('checkoutStudent').value = '';
+
+            } catch (e) {
+                console.error("Erro ao enviar pedido:", e);
+                alert("Ocorreu um erro ao enviar o pedido. Tente novamente.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
         }
 
         // Iniciar
