@@ -642,7 +642,7 @@
                     const prod = products.find(p => p.id === item.productId);
                     if (prod) {
                         const partner = partners.find(p => p.id === prod.partnerId);
-                        if (partner && /^escola$/i.test(String(partner.category || '').trim())) {
+                        if (partner && (/^escola$/i.test(String(partner.category || '').trim()) || /^revendedor$/i.test(String(partner.category || '').trim()))) {
                             partnerId = partner.id;
                             break;
                         }
@@ -671,11 +671,26 @@
 
                 await addDoc(collection(db, "orders"), orderData);
 
+                // Identificar escolas para o relatório do WhatsApp
+                const schoolsSet = new Set();
+                cart.forEach(item => {
+                    const prod = products.find(p => p.id === item.productId);
+                    if (prod) {
+                        const partner = partners.find(p => p.id === prod.partnerId);
+                        if (partner) {
+                            schoolsSet.add(partner.nickname || partner.name);
+                        }
+                    }
+                });
+                const schoolsStr = Array.from(schoolsSet).join(', ');
+
                 // WhatsApp
                 let msg = `*Novo Pedido - UniformeGestor*\n`;
                 msg += `Cliente: ${name}\n`;
                 if(student) msg += `Estudante: ${student}\n`;
-                msg += `Tel: ${phone}\n\n`;
+                msg += `Tel: ${phone}\n`;
+                if(schoolsStr) msg += `Escola: ${schoolsStr}\n`;
+                msg += `\n`;
                 msg += `*Itens:*\n`;
                 cart.forEach(i => {
                     msg += `- ${i.qty}x ${i.name} (${i.variation} - ${i.size})\n`;
