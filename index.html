@@ -55,12 +55,13 @@
             </div>
             
             <nav class="hidden md:flex items-center gap-8">
-                <a href="#products" class="text-sm font-medium hover:text-primary transition-colors">Produtos</a>
-                <a href="#schools" class="text-sm font-medium hover:text-primary transition-colors">Escolas</a>
-                <a href="#about" class="text-sm font-medium hover:text-primary transition-colors">Sobre</a>
             </nav>
 
             <div class="flex items-center gap-4">
+                <button onclick="openSizeChartModal()" class="flex items-center gap-2 text-gray-600 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors border border-transparent hover:border-gray-200">
+                    <i data-lucide="ruler" class="h-4 w-4"></i>
+                    Tabela de Medidas
+                </button>
                 <button onclick="openCart()" class="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors relative">
                     <i data-lucide="shopping-cart" class="h-4 w-4"></i>
                     Ver Carrinho
@@ -93,8 +94,9 @@
                 <p class="text-muted-foreground">Selecione o uniforme da sua instituição abaixo.</p>
             </div>
             <div class="flex items-center gap-4">
-                <span class="border px-4 py-1 rounded-full text-xs font-semibold bg-white">Filtre por Escola</span>
-                <span class="border px-4 py-1 rounded-full text-xs font-semibold bg-white">Todos os Tamanhos</span>
+                <select id="schoolFilter" onchange="renderProductsGrid()" class="border px-4 py-1 rounded-full text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer">
+                    <option value="">Todas as Escolas</option>
+                </select>
             </div>
         </div>
 
@@ -206,6 +208,42 @@
         </div>
     </div>
 
+    <!-- Modal de Tabela de Medidas -->
+    <div id="sizeChartModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-lg w-full max-w-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                <h2 class="text-lg font-bold text-primary flex items-center gap-2">
+                    <i data-lucide="ruler" class="h-5 w-5"></i> Tabela de Medidas
+                </h2>
+                <button onclick="closeSizeChartModal()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="h-6 w-6"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Selecione o tipo de malha:</label>
+                    <select id="publicSizeChartSelect" onchange="renderPublicSizeTable()" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-10 px-3 border">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+
+                <div id="publicSizeTableContainer" class="border rounded-lg overflow-hidden hidden">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-primary text-white">
+                            <tr><th class="px-4 py-3">Tamanho</th><th class="px-4 py-3">Largura (cm)</th><th class="px-4 py-3">Comprimento (cm)</th></tr>
+                        </thead>
+                        <tbody id="publicSizeTableBody" class="divide-y bg-white"></tbody>
+                    </table>
+                    <div class="p-3 bg-gray-50 text-xs text-gray-500 text-center">
+                        * Medidas aproximadas, podendo haver pequena variação.
+                    </div>
+                </div>
+                <div id="publicSizeEmpty" class="text-center text-gray-500 py-8">Selecione uma categoria acima para ver as medidas.</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Página/Modal de Carrinho -->
     <div id="cartModal" class="fixed inset-0 z-[100] hidden bg-white flex-col">
         <div class="container mx-auto px-4 h-full flex flex-col">
@@ -273,7 +311,7 @@
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAWZEZskuEMIby9dr5iWfH2G3nsXj14gr4",
@@ -291,6 +329,7 @@
         let products = [];
         let partners = [];
         let inventory = [];
+        let sizeCharts = {}; // Cache de tabelas de medidas
         let cart = JSON.parse(localStorage.getItem('cart')) || [];
         let currentProduct = null;
 
@@ -308,9 +347,11 @@
                 partners = partSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 inventory = invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+                populateSchoolFilter();
                 renderProductsGrid();
                 updateCartUI();
                 populateCheckoutPartners();
+                populateSizeChartSelect(); // Prepara o modal de tamanhos
             } catch (error) {
                 console.error("Erro ao carregar loja:", error);
                 document.getElementById('products-grid').innerHTML = '<div class="col-span-full text-center text-red-500">Erro ao carregar produtos. Tente novamente mais tarde.</div>';
@@ -325,6 +366,101 @@
                 if (match && match[1]) return `https://lh3.googleusercontent.com/d/${match[1]}`;
             }
             return url;
+        }
+
+        function populateSchoolFilter() {
+            const select = document.getElementById('schoolFilter');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">Todas as Escolas</option>';
+            
+            const validPartners = partners.filter(p => {
+                const cat = String(p.category || '').trim();
+                return /^escola$/i.test(cat) || /^revendedor$/i.test(cat);
+            });
+            
+            validPartners.sort((a, b) => (a.nickname || a.name || '').localeCompare(b.nickname || b.name || ''));
+
+            validPartners.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nickname || p.name;
+                select.appendChild(option);
+            });
+        }
+
+        // --- Lógica da Tabela de Medidas (Público) ---
+        function populateSizeChartSelect() {
+            const select = document.getElementById('publicSizeChartSelect');
+            if (!select) return;
+            
+            // Categorias únicas de Malha do estoque
+            const categories = [...new Set(inventory.filter(i => i.type === 'Malha' && i.category).map(i => i.category))].sort();
+            
+            select.innerHTML = '<option value="">Selecione...</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                select.appendChild(option);
+            });
+        }
+
+        window.openSizeChartModal = () => {
+            document.getElementById('sizeChartModal').classList.remove('hidden');
+            document.getElementById('sizeChartModal').classList.add('flex');
+        }
+
+        window.closeSizeChartModal = () => {
+            document.getElementById('sizeChartModal').classList.add('hidden');
+            document.getElementById('sizeChartModal').classList.remove('flex');
+        }
+
+        window.renderPublicSizeTable = async () => {
+            const category = document.getElementById('publicSizeChartSelect').value;
+            const container = document.getElementById('publicSizeTableContainer');
+            const empty = document.getElementById('publicSizeEmpty');
+            const tbody = document.getElementById('publicSizeTableBody');
+
+            if (!category) {
+                container.classList.add('hidden');
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4">Carregando...</td></tr>';
+            container.classList.remove('hidden');
+            empty.classList.add('hidden');
+
+            try {
+                // Verifica cache ou busca
+                if (!sizeCharts[category]) {
+                    const docId = category.replace(/\//g, '_');
+                    const docSnap = await getDoc(doc(db, "size_charts", docId));
+                    if (docSnap.exists()) {
+                        sizeCharts[category] = docSnap.data().sizes || [];
+                    } else {
+                        sizeCharts[category] = [];
+                    }
+                }
+
+                const sizes = sizeCharts[category];
+                tbody.innerHTML = '';
+                
+                if (sizes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted-foreground">Medidas não cadastradas para esta categoria.</td></tr>';
+                    return;
+                }
+
+                sizes.forEach(s => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td class="px-4 py-3 font-bold">${s.label}</td><td class="px-4 py-3">${s.width} cm</td><td class="px-4 py-3">${s.length} cm</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error("Erro ao buscar medidas:", e);
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-red-500">Erro ao carregar.</td></tr>';
+            }
         }
 
         function populateCheckoutPartners() {
@@ -354,8 +490,14 @@
             const grid = document.getElementById('products-grid');
             grid.innerHTML = '';
 
-            // Filtrar apenas produtos ativos
-            const activeProducts = products.filter(p => !p.status || p.status === 'Ativo');
+            const filterValue = document.getElementById('schoolFilter')?.value;
+
+            // Filtrar apenas produtos ativos e por escola se selecionada
+            const activeProducts = products.filter(p => {
+                if (p.status && p.status !== 'Ativo') return false;
+                if (filterValue && p.partnerId !== filterValue) return false;
+                return true;
+            });
 
             if (activeProducts.length === 0) {
                 grid.innerHTML = '<div class="col-span-full text-center text-muted-foreground">Nenhum produto disponível no momento.</div>';
@@ -409,6 +551,7 @@
             });
             lucide.createIcons();
         }
+        window.renderProductsGrid = renderProductsGrid;
 
         // --- Lógica do Modal de Produto ---
         window.openProductDetails = (id) => {

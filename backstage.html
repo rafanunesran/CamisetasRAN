@@ -82,6 +82,10 @@
                 <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="package" class="h-5 w-5"></i></div>
                 <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Estoque</span>
             </button>
+            <button onclick="switchTab('sizes')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="ruler" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Tamanhos</span>
+            </button>
             <button onclick="switchTab('production')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
                 <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="factory" class="h-5 w-5"></i></div>
                 <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Produção</span>
@@ -154,6 +158,9 @@
                 </button>
                 <button onclick="switchTab('inventory')" id="btn-inventory" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
                     <i data-lucide="package" class="h-4 w-4"></i> Estoque
+                </button>
+                <button onclick="switchTab('sizes')" id="btn-sizes" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="ruler" class="h-4 w-4"></i> Tamanhos
                 </button>
                 <button onclick="switchTab('production')" id="btn-production" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
                     <i data-lucide="factory" class="h-4 w-4"></i> Produção
@@ -337,6 +344,55 @@
                                 <tr><td colspan="6" class="py-4 text-center text-muted-foreground">Carregando estoque...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sizes Tab (Tabela de Medidas) -->
+            <div id="sizes" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h3 class="font-semibold">Tabela de Medidas</h3>
+                            <p class="text-sm text-muted-foreground">Defina as dimensões (Comprimento x Largura) para cada categoria de malha.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select id="sizeChartCategorySelect" onchange="loadSizeChartForCategory()" class="flex h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary min-w-[200px]">
+                                <option value="">Selecione uma Categoria...</option>
+                            </select>
+                            <button onclick="saveSizeChart()" class="text-xs bg-primary text-white px-3 py-2 rounded hover:bg-primary/90 transition-colors flex items-center gap-1">
+                                <i data-lucide="save" class="h-3 w-3"></i> Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div id="sizeChartContainer" class="hidden space-y-4">
+                            <div class="flex justify-between items-center bg-gray-50 p-3 rounded border">
+                                <span class="text-sm font-medium text-gray-700">Categoria Selecionada: <span id="selectedCategoryDisplay" class="font-bold text-primary"></span></span>
+                                <button onclick="addSizeRow()" class="text-xs bg-white border border-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-100 flex items-center gap-1">
+                                    <i data-lucide="plus" class="h-3 w-3"></i> Adicionar Tamanho
+                                </button>
+                            </div>
+
+                            <table class="w-full text-sm text-left border rounded-md overflow-hidden">
+                                <thead class="bg-gray-100 text-muted-foreground font-medium border-b">
+                                    <tr>
+                                        <th class="px-4 py-3 w-1/4">Tamanho (Etiqueta)</th>
+                                        <th class="px-4 py-3 w-1/4">Largura (cm)</th>
+                                        <th class="px-4 py-3 w-1/4">Comprimento (cm)</th>
+                                        <th class="px-4 py-3 w-1/4 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sizeChartBody" class="divide-y bg-white">
+                                    <!-- Linhas geradas via JS -->
+                                </tbody>
+                            </table>
+                            <p class="text-xs text-muted-foreground mt-2">* Utilize ponto para decimais (ex: 68.5). As medidas serão exibidas no site público.</p>
+                        </div>
+                        <div id="sizeChartEmptyState" class="text-center py-10 text-muted-foreground">
+                            Selecione uma categoria acima para editar as medidas.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1122,7 +1178,7 @@
     <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
         const firebaseConfig = {
@@ -1159,6 +1215,7 @@
         let currentErrorId = null;
         let errorToReportId = null;
         let productionErrors = [];
+        let currentSizeChart = [];
         window.allOrders = []; // Global para acesso no dashboard
 
         // Função para buscar parceiros
@@ -1349,6 +1406,7 @@
                     inventory.push({ id: doc.id, ...doc.data() });
                 });
                 renderInventory();
+                populateSizeChartCategories(); // Popula o select da aba Tamanhos
             } catch (error) {
                 console.error("Erro ao buscar estoque:", error);
                 document.getElementById('inventory-table-body').innerHTML = '<tr><td colspan="6" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
@@ -3917,6 +3975,142 @@
             } catch (e) {
                 console.error("Erro ao imprimir etiqueta:", e);
                 alert("Erro ao gerar etiqueta.");
+            }
+        }
+
+        // --- Lógica de Tabela de Medidas (Sizes) ---
+        
+        function populateSizeChartCategories() {
+            const select = document.getElementById('sizeChartCategorySelect');
+            if (!select) return;
+            
+            // Pegar categorias únicas do estoque (apenas Malha)
+            const categories = [...new Set(inventory.filter(i => i.type === 'Malha' && i.category).map(i => i.category))].sort();
+            
+            // Manter a seleção atual se possível
+            const currentVal = select.value;
+            
+            select.innerHTML = '<option value="">Selecione uma Categoria...</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                select.appendChild(option);
+            });
+            
+            if (currentVal && categories.includes(currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        window.loadSizeChartForCategory = async () => {
+            const category = document.getElementById('sizeChartCategorySelect').value;
+            const container = document.getElementById('sizeChartContainer');
+            const emptyState = document.getElementById('sizeChartEmptyState');
+            const tbody = document.getElementById('sizeChartBody');
+            const display = document.getElementById('selectedCategoryDisplay');
+
+            if (!category) {
+                container.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            display.textContent = category;
+            container.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Carregando...</td></tr>';
+
+            try {
+                // Tenta buscar documento existente na coleção size_charts com ID = Nome da Categoria
+                // Nota: Firestore IDs não podem ter barras, então vamos codificar ou usar query se necessário.
+                // Para simplificar, vamos assumir nomes simples ou usar setDoc com ID customizado.
+                const docId = category.replace(/\//g, '_'); // Sanitizar barras simples
+                const docSnap = await getDoc(doc(db, "size_charts", docId));
+                
+                currentSizeChart = [];
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    currentSizeChart = data.sizes || [];
+                }
+
+                renderSizeChartRows();
+            } catch (e) {
+                console.error("Erro ao carregar medidas:", e);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-red-500">Erro ao carregar.</td></tr>';
+            }
+        }
+
+        function renderSizeChartRows() {
+            const tbody = document.getElementById('sizeChartBody');
+            tbody.innerHTML = '';
+
+            // Ordenar tamanhos (lógica simples: números depois letras)
+            // Para uma ordenação perfeita de tamanhos (P, M, G, 2, 4, 6) seria necessário um mapa de pesos, 
+            // mas vamos manter a ordem de inserção ou alfabética por enquanto.
+            
+            currentSizeChart.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-2"><input type="text" class="w-full border rounded px-2 py-1 size-label" value="${item.label}" placeholder="Ex: P"></td>
+                    <td class="px-4 py-2"><input type="number" step="0.1" class="w-full border rounded px-2 py-1 size-width" value="${item.width}" placeholder="0"></td>
+                    <td class="px-4 py-2"><input type="number" step="0.1" class="w-full border rounded px-2 py-1 size-length" value="${item.length}" placeholder="0"></td>
+                    <td class="px-4 py-2 text-right"><button onclick="removeSizeRow(this)" class="text-red-500 hover:bg-red-50 p-1 rounded"><i data-lucide="trash-2" class="h-4 w-4"></i></button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        window.addSizeRow = () => {
+            const tbody = document.getElementById('sizeChartBody');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-4 py-2"><input type="text" class="w-full border rounded px-2 py-1 size-label" placeholder="Ex: G"></td>
+                <td class="px-4 py-2"><input type="number" step="0.1" class="w-full border rounded px-2 py-1 size-width" placeholder="0"></td>
+                <td class="px-4 py-2"><input type="number" step="0.1" class="w-full border rounded px-2 py-1 size-length" placeholder="0"></td>
+                <td class="px-4 py-2 text-right"><button onclick="removeSizeRow(this)" class="text-red-500 hover:bg-red-50 p-1 rounded"><i data-lucide="trash-2" class="h-4 w-4"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+            lucide.createIcons();
+        }
+
+        window.removeSizeRow = (btn) => {
+            btn.closest('tr').remove();
+        }
+
+        window.saveSizeChart = async () => {
+            const category = document.getElementById('sizeChartCategorySelect').value;
+            if (!category) return;
+
+            const rows = document.querySelectorAll('#sizeChartBody tr');
+            const sizes = [];
+            
+            rows.forEach(row => {
+                const label = row.querySelector('.size-label').value.trim();
+                const width = row.querySelector('.size-width').value;
+                const length = row.querySelector('.size-length').value;
+
+                if (label) {
+                    sizes.push({
+                        label: label,
+                        width: parseFloat(width) || 0,
+                        length: parseFloat(length) || 0
+                    });
+                }
+            });
+
+            try {
+                const docId = category.replace(/\//g, '_');
+                await setDoc(doc(db, "size_charts", docId), {
+                    category: category,
+                    sizes: sizes,
+                    updatedAt: new Date().toISOString()
+                });
+                alert("Tabela de medidas salva com sucesso!");
+            } catch (e) {
+                console.error("Erro ao salvar medidas:", e);
+                alert("Erro ao salvar: " + e.message);
             }
         }
 
