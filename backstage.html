@@ -433,7 +433,10 @@
 
                 <div id="production-actions" class="hidden bg-blue-50 p-2 rounded border border-blue-100 flex justify-between items-center">
                     <span class="text-sm text-blue-800 font-medium"><span id="selected-count">0</span> pedidos selecionados</span>
-                    <button onclick="generateMaterialReport()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="clipboard-list" class="h-3 w-3"></i> Gerar Relatório de Materiais</button>
+                    <div class="flex gap-2">
+                        <button onclick="generateProductionReport()" class="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 flex items-center gap-1"><i data-lucide="list" class="h-3 w-3"></i> Relatório de Produção</button>
+                        <button onclick="generateMaterialReport()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="clipboard-list" class="h-3 w-3"></i> Relatório de Materiais</button>
+                    </div>
                 </div>
 
                 <!-- Container da Lista -->
@@ -1146,6 +1149,26 @@
             
             <div class="text-xs text-gray-500 mt-4">
                 * O cálculo de "Falta" considera o estoque atual menos os itens reservados para outros pedidos em andamento (Pendente/Produção) não selecionados.
+            </div>
+            
+            <div class="flex justify-end pt-4 border-t">
+                <button onclick="window.print()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"><i data-lucide="printer" class="h-4 w-4"></i> Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Relatório de Produção (Quantitativo) -->
+    <div id="productionReportModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-3xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 class="text-xl font-bold text-primary">Relatório de Produção (Quantitativo)</h2>
+                <button onclick="document.getElementById('productionReportModal').classList.add('hidden'); document.getElementById('productionReportModal').classList.remove('flex');" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            
+            <div class="border rounded-md overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <tbody id="productionReportBody" class="divide-y bg-white"></tbody>
+                </table>
             </div>
             
             <div class="flex justify-end pt-4 border-t">
@@ -2636,6 +2659,58 @@
             }
         }
 
+        window.generateProductionReport = async () => {
+            // Usar window.allOrders que já contém os pedidos carregados
+            const selectedOrders = window.allOrders.filter(o => selectedOrderIds.has(o.id));
+            
+            if (selectedOrders.length === 0) {
+                alert("Selecione pelo menos um pedido para gerar o relatório.");
+                return;
+            }
+
+            // Agrupar Itens: { "Malha": { "Tamanho": { total: 0, variations: { "Produto": count } } } }
+            const reportData = {};
+
+            selectedOrders.forEach(order => {
+                if (!order.items) return;
+                order.items.forEach(item => {
+                    const fabric = item.category || 'Malha Padrão'; // Ex: 'Algodão'
+                    const size = item.size || 'U'; // Ex: 'P'
+                    const productName = item.name || 'Sem Nome'; // Ex: 'Camiseta Gato'
+                    const qty = parseInt(item.qty) || 0;
+
+                    if (!reportData[fabric]) reportData[fabric] = {};
+                    if (!reportData[fabric][size]) reportData[fabric][size] = { total: 0, variations: {} };
+
+                    reportData[fabric][size].total += qty;
+                    reportData[fabric][size].variations[productName] = (reportData[fabric][size].variations[productName] || 0) + qty;
+                });
+            });
+
+            // Renderizar
+            const container = document.getElementById('productionReportBody');
+            container.innerHTML = '';
+
+            Object.keys(reportData).sort().forEach(fabric => {
+                // Cabeçalho da Malha
+                const trFabric = document.createElement('tr');
+                trFabric.innerHTML = `<td colspan="2" class="bg-gray-100 font-bold text-sm p-2 border-b uppercase tracking-wider text-gray-700">${fabric}</td>`;
+                container.appendChild(trFabric);
+
+                const sizes = reportData[fabric];
+                Object.keys(sizes).sort().forEach(size => {
+                    const data = sizes[size];
+                    const varText = Object.entries(data.variations).map(([key, val]) => `<span class="font-bold text-gray-900">${val}</span> ${key}`).join(', ');
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td class="p-2 border-b align-top w-1/4 font-bold text-primary text-base">${size} <span class="text-xs font-normal text-gray-500 ml-1">(${data.total} un)</span></td><td class="p-2 border-b text-gray-600">sendo ${varText}</td>`;
+                    container.appendChild(tr);
+                });
+            });
+
+            document.getElementById('productionReportModal').classList.remove('hidden');
+            document.getElementById('productionReportModal').classList.add('flex');
+        }
+
         window.generateMaterialReport = async () => {
             // 1. Buscar todos os pedidos ativos para calcular reserva
             const allOrdersSnap = await getDocs(collection(db, "orders"));
@@ -2741,6 +2816,9 @@
             needsBody.innerHTML = '';
             missingBody.innerHTML = '';
 
+            const needsByType = { 'Malha': [], 'Estampa': [], 'Insumo': [] };
+            const missingByType = { 'Malha': [], 'Estampa': [], 'Insumo': [] };
+
             Object.keys(needs).forEach(itemId => {
                 const item = inventory.find(i => i.id === itemId);
                 if (!item) return;
@@ -2751,21 +2829,46 @@
                 const netStock = currentStock - qtyReserved;
                 const missing = Math.max(0, qtyNeeded - netStock);
 
-                // Linha de Necessidade
-                const trNeed = document.createElement('tr');
-                trNeed.innerHTML = `<td class="p-2 border-b">${item.name} <span class="text-xs text-gray-500">(${item.category || item.type})</span></td><td class="p-2 border-b text-right font-bold">${qtyNeeded}</td>`;
-                needsBody.appendChild(trNeed);
+                // Agrupar por tipo
+                const type = item.type || 'Outros';
+                if (!needsByType[type]) needsByType[type] = [];
+                needsByType[type].push({ item, qtyNeeded });
 
-                // Linha de Falta (se houver)
                 if (missing > 0) {
-                    const trMiss = document.createElement('tr');
-                    trMiss.innerHTML = `
-                        <td class="p-2 border-b text-red-700 font-medium">${item.name} <span class="text-xs text-red-400">(${item.category || item.type})</span></td>
-                        <td class="p-2 border-b text-right text-red-700 font-bold">${missing}</td>
-                        <td class="p-2 border-b text-right text-gray-500">${currentStock} (Disp: ${netStock})</td>
-                    `;
-                    missingBody.appendChild(trMiss);
+                    if (!missingByType[type]) missingByType[type] = [];
+                    missingByType[type].push({ item, missing, currentStock, netStock });
                 }
+            });
+
+            const renderGroup = (container, type, items, isMissing) => {
+                if (!items || items.length === 0) return;
+                
+                // Cabeçalho do Grupo
+                const trHead = document.createElement('tr');
+                trHead.innerHTML = `<td colspan="${isMissing ? 3 : 2}" class="bg-gray-100 font-bold text-xs uppercase tracking-wider p-2 text-gray-700">${type}s</td>`;
+                container.appendChild(trHead);
+
+                items.forEach(data => {
+                    const tr = document.createElement('tr');
+                    if (isMissing) {
+                        tr.innerHTML = `
+                            <td class="p-2 border-b text-red-700 font-medium pl-4">${data.item.name} <span class="text-xs text-red-400">(${data.item.category || data.item.type})</span></td>
+                            <td class="p-2 border-b text-right text-red-700 font-bold">${data.missing}</td>
+                            <td class="p-2 border-b text-right text-gray-500">${data.currentStock} (Disp: ${data.netStock})</td>
+                        `;
+                    } else {
+                        tr.innerHTML = `
+                            <td class="p-2 border-b pl-4">${data.item.name} <span class="text-xs text-gray-500">(${data.item.category || data.item.type})</span></td>
+                            <td class="p-2 border-b text-right font-bold">${data.qtyNeeded}</td>
+                        `;
+                    }
+                    container.appendChild(tr);
+                });
+            };
+
+            ['Malha', 'Estampa', 'Insumo', 'Outros'].forEach(type => {
+                renderGroup(needsBody, type, needsByType[type], false);
+                renderGroup(missingBody, type, missingByType[type], true);
             });
 
             if (missingBody.children.length === 0) {
