@@ -401,9 +401,14 @@
             <div id="production" class="tab-content space-y-6">
                 <div class="flex justify-between items-center">
                     <h3 class="font-semibold text-lg">Gestão de Pedidos</h3>
-                    <button onclick="openOrderModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors flex items-center gap-1">
-                        <i data-lucide="plus" class="h-3 w-3"></i> Novo Orçamento
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="openOrderModal('new_order')" class="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors flex items-center gap-1">
+                            <i data-lucide="check-circle" class="h-3 w-3"></i> Novo Pedido
+                        </button>
+                        <button onclick="openOrderModal()" class="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors flex items-center gap-1">
+                            <i data-lucide="plus" class="h-3 w-3"></i> Novo Orçamento
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Sub-navegação de Status -->
@@ -926,7 +931,8 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-gray-700">Nome do Cliente</label>
-                    <input id="orderClientName" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nome do Cliente">
+                    <input id="orderClientName" list="clientSuggestions" onchange="fillClientData()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nome do Cliente">
+                    <datalist id="clientSuggestions"></datalist>
                 </div>
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-gray-700">Telefone / WhatsApp</label>
@@ -2771,8 +2777,30 @@
             modal.classList.add('flex');
         }
 
+        window.fillClientData = () => {
+            const nameInput = document.getElementById('orderClientName');
+            const val = nameInput.value;
+            const client = clients.find(c => c.name === val);
+            if (client) {
+                document.getElementById('orderClientPhone').value = client.phone || '';
+                if (client.partnerId) {
+                    const partnerSelect = document.getElementById('orderPartner');
+                    partnerSelect.value = client.partnerId;
+                    // Trigger change to update student field visibility
+                    partnerSelect.dispatchEvent(new Event('change'));
+                }
+                if (client.studentName) {
+                    setTimeout(() => {
+                        const studentInput = document.getElementById('orderStudentName');
+                        if(studentInput) studentInput.value = client.studentName;
+                    }, 0);
+                }
+            }
+        }
+
         window.openOrderModal = async (id = null) => {
-            currentOrderId = id;
+            const isDirectOrder = id === 'new_order';
+            currentOrderId = isDirectOrder ? null : id;
             orderList = [];
             
             // Resetar campos
@@ -2830,6 +2858,15 @@
                 }
             };
 
+            // Popular sugestões de clientes
+            const dl = document.getElementById('clientSuggestions');
+            dl.innerHTML = '';
+            clients.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                dl.appendChild(opt);
+            });
+
             // Popular Select de Produtos (Carregar produtos do banco)
             const productSelect = document.getElementById('orderProductSelect');
             productSelect.innerHTML = '<option value="">Selecione...</option>';
@@ -2862,7 +2899,15 @@
                 window.onOrderProductChange();
             };
 
-            if (id) {
+            const saveBtn = document.getElementById('saveOrderBtn');
+
+            if (isDirectOrder) {
+                document.getElementById('orderModalTitle').textContent = 'Novo Pedido (Direto)';
+                saveBtn.textContent = 'Criar Pedido';
+                saveBtn.dataset.status = 'Pendente';
+                saveBtn.classList.remove('bg-primary', 'hover:bg-primary/90');
+                saveBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            } else if (id) {
                 document.getElementById('orderModalTitle').textContent = 'Editar Orçamento';
                 const docSnap = await getDoc(doc(db, "orders", id));
                 if (docSnap.exists()) {
@@ -2884,9 +2929,17 @@
                     }
                     document.getElementById('orderObservation').value = data.observation || '';
                     orderList = data.items || [];
-                }
+                } 
+                saveBtn.textContent = 'Salvar Alterações';
+                saveBtn.dataset.status = ''; 
+                saveBtn.classList.add('bg-primary', 'hover:bg-primary/90');
+                saveBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
             } else {
                 document.getElementById('orderModalTitle').textContent = 'Novo Orçamento';
+                saveBtn.textContent = 'Salvar Orçamento';
+                saveBtn.dataset.status = 'Orçamento';
+                saveBtn.classList.add('bg-primary', 'hover:bg-primary/90');
+                saveBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
             }
 
             renderOrderItems();
@@ -3039,6 +3092,7 @@
             };
 
             const btn = document.getElementById('saveOrderBtn');
+            const targetStatus = btn.dataset.status;
             btn.textContent = 'Salvando...';
             btn.disabled = true;
 
@@ -3046,10 +3100,18 @@
                 if (currentOrderId) {
                     await updateDoc(doc(db, "orders", currentOrderId), orderData);
                 } else {
-                    await addDoc(collection(db, "orders"), { 
+                    const statusToSave = targetStatus || 'Orçamento';
+                    const newOrder = { 
                         ...orderData, 
-                        status: 'Orçamento', 
+                        status: statusToSave, 
                         createdAt: new Date().toISOString() 
+                    };
+                    if (statusToSave === 'Pendente') {
+                        newOrder.paymentStatus = 'Pendente';
+                        newOrder.approvedAt = new Date().toISOString();
+                    }
+                    await addDoc(collection(db, "orders"), { 
+                        ...newOrder
                     });
                 }
                 closeOrderModal();
