@@ -238,7 +238,10 @@
                     
                     <!-- Pendentes -->
                     <div class="flex flex-col rounded-lg border bg-white shadow-sm h-full overflow-hidden">
-                        <div class="p-3 border-b bg-yellow-50 font-semibold text-yellow-800">Pendentes</div>
+                        <div class="p-3 border-b bg-yellow-50 font-semibold text-yellow-800 flex justify-between items-center">
+                            <span>Pendentes</span>
+                            <button onclick="openOrderModal('new_order')" class="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 flex items-center gap-1"><i data-lucide="check-circle" class="h-3 w-3"></i> Novo Pedido</button>
+                        </div>
                         <div id="dashListPending" class="p-2 overflow-y-auto flex-1 space-y-2 bg-yellow-50/30"></div>
                     </div>
 
@@ -1566,6 +1569,11 @@
                     : '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Inativo</span>';
                 
                 const opacityClass = status === 'Inativo' ? 'opacity-60' : '';
+                
+                const isHidden = prod.isHidden || false;
+                const visibilityIcon = isHidden ? 'eye-off' : 'eye';
+                const visibilityTitle = isHidden ? 'Produto Oculto na Loja (Clique para exibir)' : 'Visível na Loja (Clique para ocultar)';
+                const visibilityClass = isHidden ? 'text-gray-400' : 'text-blue-500';
 
                 const tr = document.createElement('tr');
                 tr.className = opacityClass;
@@ -1578,6 +1586,7 @@
                     <td>${statusBadge}</td>
                     <td class="text-right">
                         <div class="flex justify-end gap-2">
+                            <button onclick="window.toggleProductVisibility('${prod.id}', ${isHidden})" class="p-2 hover:bg-gray-100 rounded-md transition-colors ${visibilityClass}" title="${visibilityTitle}"><i data-lucide="${visibilityIcon}" class="h-4 w-4"></i></button>
                             <button onclick="window.toggleProductStatus('${prod.id}', '${status}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors ${status === 'Ativo' ? 'text-orange-500' : 'text-green-600'}" title="${status === 'Ativo' ? 'Inativar' : 'Ativar'}"><i data-lucide="${status === 'Ativo' ? 'power-off' : 'power'}" class="h-4 w-4"></i></button>
                             <button onclick="window.openProductModal('${prod.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-primary" title="Editar"><i data-lucide="pencil" class="h-4 w-4"></i></button>
                             <button onclick="window.deleteProduct('${prod.id}')" class="p-2 hover:bg-gray-100 rounded-md transition-colors text-red-500" title="Excluir"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
@@ -2352,7 +2361,8 @@
             const sale = data ? data.salePrice : '';
             const cost = data ? data.productionCost : '';
             const school = data ? data.schoolCommission : '';
-            const admin = data ? (data.salePrice - data.productionCost - data.schoolCommission).toFixed(2) : '0.00';
+            // Usa o valor salvo se existir, caso contrário calcula
+            const admin = (data && data.adminProfit !== undefined) ? parseFloat(data.adminProfit).toFixed(2) : (data ? (data.salePrice - data.productionCost - data.schoolCommission).toFixed(2) : '0.00');
 
             // Obter categorias de Malha do estoque
             const malhaCategories = [...new Set(inventory.filter(i => i.type === 'Malha' && i.category).map(i => i.category))].sort();
@@ -2475,6 +2485,17 @@
                     console.error("Erro ao alterar status:", e);
                     alert("Erro ao alterar status: " + e.message);
                 }
+            }
+        }
+
+        window.toggleProductVisibility = async (id, currentHiddenState) => {
+            const newHiddenState = !currentHiddenState;
+            try {
+                await updateDoc(doc(db, "products", id), { isHidden: newHiddenState });
+                fetchProducts();
+            } catch (e) {
+                console.error("Erro ao alterar visibilidade:", e);
+                alert("Erro ao alterar visibilidade: " + e.message);
             }
         }
 
@@ -2980,19 +3001,20 @@
             const prodSnap = await getDocs(collection(db, "products"));
             prodSnap.forEach(doc => {
                 const p = doc.data();
-                // Filtrar apenas produtos ativos se necessário, ou mostrar todos
-                if (p.status !== 'Inativo') {
-                    const option = document.createElement('option');
-                    option.value = doc.id;
-                    option.textContent = p.name;
-                    // Guardar preço base no dataset para facilitar
-                    const price = p.pricing && p.pricing.length > 0 ? p.pricing[0].salePrice : 0;
-                    option.dataset.price = price;
-                    if (p.pricing) {
-                        option.dataset.pricing = JSON.stringify(p.pricing);
-                    }
-                    productSelect.appendChild(option);
+                // Mostrar todos os produtos (Ativos, Inativos, Ocultos) para permitir pedidos manuais de itens descontinuados
+                const option = document.createElement('option');
+                option.value = doc.id;
+                
+                const statusSuffix = (p.status === 'Inativo' || p.isHidden) ? ' (Oculto/Inativo)' : '';
+                option.textContent = p.name + statusSuffix;
+                
+                // Guardar preço base no dataset para facilitar
+                const price = p.pricing && p.pricing.length > 0 ? p.pricing[0].salePrice : 0;
+                option.dataset.price = price;
+                if (p.pricing) {
+                    option.dataset.pricing = JSON.stringify(p.pricing);
                 }
+                productSelect.appendChild(option);
             });
 
             // Evento para atualizar preço ao selecionar produto
@@ -4508,22 +4530,15 @@
             document.getElementById('dashListPending').innerHTML = '';
             document.getElementById('dashListProduction').innerHTML = '';
 
-            // 3. Filtragem das Listas
-            // Se houver filtro customizado, as listas obedecem as datas.
-            // Se NÃO houver (padrão), as listas mostram TUDO (visão operacional de backlog).
+            // As listas do dashboard mostram a visão operacional completa, independente do filtro de data.
             const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            
-            const listOrders = isCustomFilter 
-                ? sortedOrders.filter(o => {
-                    const d = new Date(o.createdAt);
-                    return d >= filterStart && d <= filterEnd;
-                })
-                : sortedOrders;
+            const listOrders = sortedOrders;
 
             listOrders.forEach(order => {
-                if (order.status === 'Orçamento') renderMiniCard(order, 'dashListBudget');
-                else if (order.status === 'Pendente') renderMiniCard(order, 'dashListPending');
-                else if (order.status === 'Produção') renderMiniCard(order, 'dashListProduction');
+                const status = order.status || 'Orçamento'; // Trata pedidos antigos sem status como Orçamento
+                if (status === 'Orçamento') renderMiniCard(order, 'dashListBudget');
+                else if (status === 'Pendente') renderMiniCard(order, 'dashListPending');
+                else if (status === 'Produção') renderMiniCard(order, 'dashListProduction');
             });
         }
         window.renderDashboard = renderDashboard;

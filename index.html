@@ -495,6 +495,7 @@
             // Filtrar apenas produtos ativos e por escola se selecionada
             const activeProducts = products.filter(p => {
                 if (p.status && p.status !== 'Ativo') return false;
+                if (p.isHidden) return false; // Ocultar produtos marcados como ocultos
                 if (filterValue && p.partnerId !== filterValue) return false;
                 return true;
             });
