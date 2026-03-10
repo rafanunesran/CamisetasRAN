@@ -1048,6 +1048,26 @@
         </div>
     </div>
 
+    <!-- Modal de Alteração de Produtor -->
+    <div id="changeProducerModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
+            <h2 class="text-xl font-bold text-primary">Alterar Responsável pela Produção</h2>
+            <p class="text-sm text-gray-600">Isso irá reatribuir o repasse de produção para o novo parceiro selecionado.</p>
+            
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">Novo Produtor</label>
+                <select id="changeProducerSelect" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4">
+                <button onclick="document.getElementById('changeProducerModal').classList.add('hidden'); document.getElementById('changeProducerModal').classList.remove('flex');" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btnChangeProducerAction" onclick="changeProducerAction()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Alteração</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Erro de Produção -->
     <div id="errorModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
@@ -1242,6 +1262,7 @@
         let orderList = []; // Itens do pedido atual
         let currentOrderId = null;
         let currentProductionStatus = 'Orçamento';
+        let orderToChangeProducerId = null;
         let orderToConfirmId = null;
         let selectedOrderIds = new Set();
         let currentErrorId = null;
@@ -2585,6 +2606,11 @@
                 const errorBtn = showErrorBtn
                     ? `<button onclick="openErrorModal('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Reportar Erro de Produção"><i data-lucide="alert-triangle" class="h-3.5 w-3.5"></i></button>` : '';
                 
+                // Botão de Alterar Produtor
+                const showChangeProducerBtn = ['Pendente', 'Produção'].includes(currentProductionStatus);
+                const changeProducerBtn = showChangeProducerBtn
+                    ? `<button onclick="openChangeProducerModal('${order.id}')" class="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded bg-yellow-50" title="Alterar Produtor"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button>` : '';
+                
                 // Checkbox de seleção (apenas para Pendente e Produção)
                 const showCheckbox = currentProductionStatus === 'Pendente' || currentProductionStatus === 'Produção';
                 const checkboxHtml = showCheckbox 
@@ -2632,6 +2658,7 @@
                                 <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
                                 ${labelBtn}
                                 ${errorBtn}
+                                ${changeProducerBtn}
                                 <button onclick="window.openOrderModal('${order.id}')" class="p-1.5 hover:bg-blue-50 text-blue-600 rounded bg-blue-50" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
                                 <button onclick="window.deleteOrder('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Excluir"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
                             </div>
@@ -2640,13 +2667,18 @@
                         ${approveBtn}
 
                         ${currentProductionStatus !== 'Orçamento' ? `
-                        <div class="mt-2">
+                        <div class="mt-2 grid grid-cols-2 gap-2">
                             <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none">
                                 <option value="Pendente" ${currentProductionStatus === 'Pendente' ? 'selected' : ''}>Pendente</option>
                                 <option value="Produção" ${currentProductionStatus === 'Produção' ? 'selected' : ''}>Produção</option>
                                 <option value="Finalizado" ${currentProductionStatus === 'Finalizado' ? 'selected' : ''}>Finalizado</option>
                                 <option value="Entregue" ${currentProductionStatus === 'Entregue' ? 'selected' : ''}>Entregue</option>
                                 <option value="Arquivado" ${currentProductionStatus === 'Arquivado' ? 'selected' : ''}>Arquivado</option>
+                            </select> 
+                            <select onchange="updatePaymentStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none">
+                                <option value="Pendente" ${(order.paymentStatus || 'Pendente') === 'Pendente' ? 'selected' : ''}>Pgto Pendente</option>
+                                <option value="Pago Parcial" ${order.paymentStatus === 'Pago Parcial' ? 'selected' : ''}>Pgto Parcial</option>
+                                <option value="Pago Total" ${order.paymentStatus === 'Pago Total' ? 'selected' : ''}>Pgto Total</option>
                             </select>
                         </div>` : ''}
 
@@ -3360,6 +3392,70 @@
             }
         }
 
+        window.openChangeProducerModal = (orderId) => {
+            orderToChangeProducerId = orderId;
+            const modal = document.getElementById('changeProducerModal');
+            const producerSelect = document.getElementById('changeProducerSelect');
+            
+            producerSelect.innerHTML = '<option value="">Selecione...</option>';
+            const producers = partners.filter(p => {
+                const cat = (p.category || '').trim().toLowerCase();
+                return cat === 'produção' || cat === 'producao' || cat === 'adm';
+            });
+            
+            producers.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nickname || p.name;
+                producerSelect.appendChild(option);
+            });
+
+            // Pre-select current producer
+            const order = window.allOrders.find(o => o.id === orderId);
+            if (order && order.producerId) {
+                producerSelect.value = order.producerId;
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.changeProducerAction = async () => {
+            const newProducerId = document.getElementById('changeProducerSelect').value;
+            if (!newProducerId) {
+                alert("Selecione um novo produtor.");
+                return;
+            }
+
+            if (!orderToChangeProducerId) return;
+
+            const btn = document.getElementById('btnChangeProducerAction');
+            btn.textContent = 'Salvando...';
+            btn.disabled = true;
+
+            try {
+                await updateDoc(doc(db, "orders", orderToChangeProducerId), {
+                    producerId: newProducerId
+                });
+
+                document.getElementById('changeProducerModal').classList.add('hidden');
+                document.getElementById('changeProducerModal').classList.remove('flex');
+                fetchOrders(); // Refresh UI
+                // If on transfers tab, it will be updated on next render
+                if (document.getElementById('transfers').classList.contains('active')) {
+                    fetchTransfers();
+                }
+
+            } catch (e) {
+                console.error("Erro ao alterar produtor:", e);
+                alert("Erro ao alterar produtor: " + e.message);
+            } finally {
+                btn.textContent = 'Salvar Alteração';
+                btn.disabled = false;
+                orderToChangeProducerId = null;
+            }
+        }
+
         window.updateOrderStatus = async (id, newStatus) => {
             try {
                 const updateData = { status: newStatus };
@@ -3439,6 +3535,33 @@
                 fetchOrders(); 
             } catch (e) {
                 console.error("Erro ao atualizar status:", e);
+            }
+        }
+
+        window.updatePaymentStatus = async (id, newStatus) => {
+            try {
+                const updateData = { paymentStatus: newStatus };
+                let downPayment = 0;
+
+                if (newStatus === 'Pago Parcial') {
+                    const order = window.allOrders.find(o => o.id === id);
+                    const currentSinal = order ? (order.downPayment || 0) : 0;
+                    const sinalValue = prompt("Informe o valor do sinal (entrada):", currentSinal);
+                    downPayment = parseFloat(sinalValue);
+                    if (isNaN(downPayment)) {
+                        alert("Valor do sinal inválido. A alteração foi cancelada.");
+                        fetchOrders(); // Re-render to reset dropdown
+                        return;
+                    }
+                    updateData.downPayment = downPayment;
+                }
+
+                await updateDoc(doc(db, "orders", id), updateData);
+                fetchOrders(); 
+            } catch (e) {
+                console.error("Erro ao atualizar status de pagamento:", e);
+                alert("Erro ao atualizar status de pagamento.");
+                fetchOrders(); // Re-render to reset dropdown
             }
         }
 
