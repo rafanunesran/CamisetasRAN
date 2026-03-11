@@ -102,6 +102,10 @@
                 <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="file-bar-chart" class="h-5 w-5"></i></div>
                 <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Relatórios</span>
             </button>
+            <button onclick="switchTab('settings')" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium transition-colors duration-200 relative">
+                <div class="w-16 flex justify-center items-center shrink-0 h-full"><i data-lucide="settings" class="h-5 w-5"></i></div>
+                <span class="whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 absolute left-16">Configurações</span>
+            </button>
             
             <div class="mt-auto pt-4 border-t border-white/10 px-0 pb-4">
                 <a href="index.html" class="w-full flex items-center justify-start h-12 px-0 hover:bg-white/10 text-sm font-medium text-accent transition-colors duration-200 relative">
@@ -173,6 +177,9 @@
                 </button>
                 <button onclick="switchTab('reports')" id="btn-reports" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
                     <i data-lucide="file-bar-chart" class="h-4 w-4"></i> Relatórios
+                </button>
+                <button onclick="switchTab('settings')" id="btn-settings" class="tab-btn h-full px-4 flex items-center gap-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <i data-lucide="settings" class="h-4 w-4"></i> Configurações
                 </button>
             </div>
 
@@ -597,6 +604,38 @@
                         <h3 class="font-semibold mb-2">Relatório Financeiro</h3>
                         <p class="text-sm text-muted-foreground mb-4">Balanço de repasses e lucros.</p>
                         <button class="text-sm bg-secondary hover:bg-secondary/80 px-4 py-2 rounded w-full">Baixar Excel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content space-y-6">
+                <div class="rounded-lg border bg-white shadow-sm">
+                    <div class="p-6 border-b">
+                        <h3 class="font-semibold">Mensagens de WhatsApp</h3>
+                        <p class="text-sm text-muted-foreground">Personalize os textos enviados aos clientes.</p>
+                    </div>
+                    <div class="p-6 space-y-6">
+                        <div class="space-y-2">
+                            <label for="whatsappMsgFinalizado" class="text-sm font-medium text-gray-700">Mensagem para Pedido Finalizado</label>
+                            <textarea id="whatsappMsgFinalizado" rows="4" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Olá, seu pedido está pronto para retirada..."></textarea>
+                            <p class="text-xs text-muted-foreground">Esta mensagem é usada quando o status do pedido é "Finalizado".</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="whatsappMsgOrcamento" class="text-sm font-medium text-gray-700">Mensagem Padrão (Orçamento, etc.)</label>
+                            <textarea id="whatsappMsgOrcamento" rows="6" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Olá {cliente}, segue detalhes do seu pedido..."></textarea>
+                            <p class="text-xs text-muted-foreground">
+                                Use as variáveis para preenchimento automático:
+                                <code class="bg-gray-100 px-1 rounded text-xs">{cliente}</code>, 
+                                <code class="bg-gray-100 px-1 rounded text-xs">{itens}</code>, 
+                                <code class="bg-gray-100 px-1 rounded text-xs">{total}</code>, 
+                                <code class="bg-gray-100 px-1 rounded text-xs">{aluno}</code>, 
+                                <code class="bg-gray-100 px-1 rounded text-xs">{obs}</code>.
+                            </p>
+                        </div>
+                        
+                        <div class="flex justify-end"><button onclick="saveSettings()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Mensagens</button></div>
                     </div>
                 </div>
             </div>
@@ -1268,6 +1307,7 @@
         let currentErrorId = null;
         let errorToReportId = null;
         let productionErrors = [];
+        let appSettings = {}; // Para guardar as configurações
         let currentSizeChart = [];
         window.allOrders = []; // Global para acesso no dashboard
 
@@ -1285,6 +1325,7 @@
                 fetchInventory();
                 fetchProducts();
                 fetchOrders();
+                fetchSettings();
                 fetchErrors();
                 // fetchTransfers será chamado ao clicar na aba ou manualmente se necessário, mas vamos popular o filtro de parceiros dele
                 checkAutoArchive(); // Verifica arquivamento automático ao iniciar
@@ -1292,6 +1333,27 @@
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
             }
+        }
+
+        // Função para buscar configurações
+        async function fetchSettings() {
+            try {
+                const docSnap = await getDoc(doc(db, "settings", "whatsapp"));
+                if (docSnap.exists()) {
+                    appSettings = docSnap.data();
+                } else {
+                    // Valores padrão se não estiver configurado
+                    appSettings = {
+                        finalizado: `Olá, tudo bem? Seu pedido já está disponível para retirada na secretaria! Importante! No momento da retirada, verifique o nome do responsável e do estudante na etiqueta. Muito Obrigado.`,
+                        orcamento: `*Olá {cliente}, segue detalhes do seu pedido:*\n\n{itens}\n*Total: {total}*\n\n{aluno}\n{obs}`
+                    };
+                }
+                // Popular campos na aba de configurações
+                const finalizadoInput = document.getElementById('whatsappMsgFinalizado');
+                const orcamentoInput = document.getElementById('whatsappMsgOrcamento');
+                if (finalizadoInput) finalizadoInput.value = appSettings.finalizado || '';
+                if (orcamentoInput) orcamentoInput.value = appSettings.orcamento || '';
+            } catch (error) { console.error("Erro ao buscar configurações:", error); }
         }
 
         // Função para buscar erros de produção
@@ -2585,106 +2647,7 @@
             }
 
             filteredOrders.forEach(order => {
-                const partner = partners.find(p => p.id === order.partnerId);
-                const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
-                
-                const hasError = order.hasError;
-                const errorIndicator = hasError ? `<i data-lucide="alert-triangle" class="h-3.5 w-3.5 text-destructive" title="Este pedido teve um erro de produção registrado."></i>` : '';
-
-                // Botão de Aprovar apenas se for Orçamento
-                const approveBtn = currentProductionStatus === 'Orçamento' 
-                    ? `<button onclick="openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
-                    : '';
-
-                // Botão de Etiqueta (Produção em diante)
-                const showLabelBtn = ['Produção', 'Finalizado', 'Entregue'].includes(currentProductionStatus);
-                const labelBtn = showLabelBtn
-                    ? `<button onclick="printOrderLabel('${order.id}')" class="p-1.5 hover:bg-purple-50 text-purple-600 rounded bg-purple-50" title="Imprimir Etiqueta"><i data-lucide="tag" class="h-3.5 w-3.5"></i></button>` : '';
-
-                // Botão de Erro
-                const showErrorBtn = ['Produção', 'Finalizado'].includes(currentProductionStatus);
-                const errorBtn = showErrorBtn
-                    ? `<button onclick="openErrorModal('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Reportar Erro de Produção"><i data-lucide="alert-triangle" class="h-3.5 w-3.5"></i></button>` : '';
-                
-                // Botão de Alterar Produtor
-                const showChangeProducerBtn = ['Pendente', 'Produção'].includes(currentProductionStatus);
-                const changeProducerBtn = showChangeProducerBtn
-                    ? `<button onclick="openChangeProducerModal('${order.id}')" class="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded bg-yellow-50" title="Alterar Produtor"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button>` : '';
-                
-                // Checkbox de seleção (apenas para Pendente e Produção)
-                const showCheckbox = currentProductionStatus === 'Pendente' || currentProductionStatus === 'Produção';
-                const checkboxHtml = showCheckbox 
-                    ? `<input type="checkbox" onchange="toggleOrderSelection('${order.id}')" class="absolute top-4 right-4 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary z-10" ${selectedOrderIds.has(order.id) ? 'checked' : ''}>` 
-                    : '';
-
-                // Gerar HTML da lista de itens
-                let itemsHtml = '';
-                if (order.items && order.items.length > 0) {
-                    itemsHtml = '<div class="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-600 space-y-1 bg-gray-50 p-2 rounded">';
-                    order.items.forEach(item => {
-                        itemsHtml += `<div class="flex justify-between items-center"><span><span class="font-bold">${item.qty}x</span> ${item.name}</span> <span class="font-mono bg-white px-1 rounded border border-gray-100">${item.category || ''} ${item.size || '-'}</span></div>`;
-                    });
-                    itemsHtml += '</div>';
-                }
-
-                const hasObservation = order.observation && order.observation.trim() !== '';
-                const obsStyle = hasObservation ? 'border-r-4 border-r-yellow-500' : '';
-
-                const card = document.createElement('div');
-                // Adicionado 'relative' para que o checkbox absolute funcione corretamente
-                card.className = `bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col h-full ${obsStyle} relative`;
-                card.innerHTML = `
-                    ${checkboxHtml}
-                    <div class="flex justify-between items-start mb-1">
-                        <div>
-                            <div class="font-bold text-sm text-gray-800">${order.clientName}</div>
-                            <div class="text-xs font-medium text-blue-600">${order.studentName || ''}</div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            ${errorIndicator}
-                            <span class="text-xs font-mono text-gray-400">#${order.id.slice(-4)}</span>
-                        </div>
-                    </div>
-                    ${hasObservation ? `<div class="text-[10px] text-yellow-700 bg-yellow-50 p-1 rounded mb-2 border border-yellow-100 flex items-start gap-1"><i data-lucide="alert-circle" class="h-3 w-3 shrink-0 mt-0.5"></i> <span class="line-clamp-2">${order.observation}</span></div>` : ''}
-                    
-                    <div class="text-xs text-gray-500 mb-3 flex items-center gap-1 mt-1">
-                        <i data-lucide="building-2" class="h-3 w-3"></i> ${partnerName}
-                    </div>
-
-                    <div class="mt-auto pt-3 border-t border-gray-100">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="font-bold text-primary text-sm">R$ ${parseFloat(order.total).toFixed(2)}</span>
-                            <div class="flex gap-1">
-                                <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
-                                ${labelBtn}
-                                ${errorBtn}
-                                ${changeProducerBtn}
-                                <button onclick="window.openOrderModal('${order.id}')" class="p-1.5 hover:bg-blue-50 text-blue-600 rounded bg-blue-50" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
-                                <button onclick="window.deleteOrder('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Excluir"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
-                            </div>
-                        </div>
-                        
-                        ${approveBtn}
-
-                        ${currentProductionStatus !== 'Orçamento' ? `
-                        <div class="mt-2 grid grid-cols-2 gap-2">
-                            <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none">
-                                <option value="Pendente" ${currentProductionStatus === 'Pendente' ? 'selected' : ''}>Pendente</option>
-                                <option value="Produção" ${currentProductionStatus === 'Produção' ? 'selected' : ''}>Produção</option>
-                                <option value="Finalizado" ${currentProductionStatus === 'Finalizado' ? 'selected' : ''}>Finalizado</option>
-                                <option value="Entregue" ${currentProductionStatus === 'Entregue' ? 'selected' : ''}>Entregue</option>
-                                <option value="Arquivado" ${currentProductionStatus === 'Arquivado' ? 'selected' : ''}>Arquivado</option>
-                            </select> 
-                            <select onchange="updatePaymentStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none">
-                                <option value="Pendente" ${(order.paymentStatus || 'Pendente') === 'Pendente' ? 'selected' : ''}>Pgto Pendente</option>
-                                <option value="Pago Parcial" ${order.paymentStatus === 'Pago Parcial' ? 'selected' : ''}>Pgto Parcial</option>
-                                <option value="Pago Total" ${order.paymentStatus === 'Pago Total' ? 'selected' : ''}>Pgto Total</option>
-                            </select>
-                        </div>` : ''}
-
-                        ${itemsHtml}
-                    </div>
-                `;
+                const card = createOrderCardElement(order, currentProductionStatus);
                 container.appendChild(card);
             });
             
@@ -3897,22 +3860,32 @@
                     return;
                 }
 
-                let msg = "";
+                let msg;
                 if (order.status === 'Finalizado') {
-                    msg = `Olá, tudo bem? Seu pedido já está disponível para retirada na secretaria! Importante! No momento da retirada, verifique o nome do responsável e do estudante na etiqueta. Muito Obrigado.`;
+                    msg = appSettings.finalizado || `Olá, tudo bem? Seu pedido já está disponível para retirada na secretaria! Importante! No momento da retirada, verifique o nome do responsável e do estudante na etiqueta. Muito Obrigado.`;
                 } else {
                     // Mensagem padrão de orçamento/acompanhamento
-                    msg = `*Olá ${order.clientName}, segue detalhes do seu pedido:*\n\n`;
+                    let itemsStr = "";
                     order.items.forEach(item => {
-                        msg += `- ${item.qty}x ${item.name} (${item.category || ''} ${item.size || ''}): R$ ${item.total.toFixed(2)}\n`;
+                        itemsStr += `- ${item.qty}x ${item.name} (${item.category || ''} ${item.size || ''}): R$ ${item.total.toFixed(2)}\n`;
                     });
-                    msg += `\n*Total: R$ ${order.total.toFixed(2)}*`;
-                    
-                    if (order.studentName) msg += `\nAluno: ${order.studentName}`;
-                    if (order.observation) msg += `\nObs: ${order.observation}`;
+
+                    const defaultTemplate = `*Olá {cliente}, segue detalhes do seu pedido:*\n\n{itens}\n*Total: {total}*`;
+                    let msgTemplate = appSettings.orcamento || defaultTemplate;
+
+                    msg = msgTemplate
+                        .replace('{cliente}', order.clientName || '')
+                        .replace('{itens}', itemsStr.trim())
+                        .replace('{total}', `R$ ${order.total.toFixed(2)}`)
+                        .replace('{aluno}', order.studentName || '')
+                        .replace('{obs}', order.observation || '');
+
+                    // Remove linhas que contenham placeholders que não foram substituídos (porque o valor era nulo)
+                    msg = msg.split('\n').filter(line => {
+                        return !((line.includes('{aluno}') && !order.studentName) || (line.includes('{obs}') && !order.observation));
+                    }).join('\n');
                 }
-                
-                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg.trim())}`, '_blank');
             } catch (e) {
                 console.error("Erro ao gerar link:", e);
             }
@@ -4424,6 +4397,25 @@
             }
         }
 
+        window.saveSettings = async () => {
+            const finalizado = document.getElementById('whatsappMsgFinalizado').value;
+            const orcamento = document.getElementById('whatsappMsgOrcamento').value;
+
+            try {
+                await setDoc(doc(db, "settings", "whatsapp"), {
+                    finalizado,
+                    orcamento
+                });
+                alert("Mensagens salvas com sucesso!");
+                // Atualiza o objeto local
+                appSettings.finalizado = finalizado;
+                appSettings.orcamento = orcamento;
+            } catch (e) {
+                console.error("Erro ao salvar mensagens:", e);
+                alert("Erro ao salvar: " + e.message);
+            }
+        }
+
         // --- Automação de Arquivamento (30 dias após Entregue) ---
         async function checkAutoArchive() {
             try {
@@ -4465,6 +4457,9 @@
             }
             if (tabId === 'errors') {
                 fetchErrors();
+            }
+            if (tabId === 'settings') {
+                fetchSettings(); // Garante que os dados estão atualizados ao abrir a aba
             }
             if (tabId === 'overview') {
                 fetchOrders(); // Recarrega dados para o dashboard
@@ -4622,33 +4617,6 @@
             document.getElementById('dashTotalTransfers').textContent = `R$ ${totalTransfersMonth.toFixed(2)}`;
 
             // 2. Listas de Pedidos
-            const renderMiniCard = (order, containerId) => {
-                const container = document.getElementById(containerId);
-                const div = document.createElement('div');
-                div.className = 'bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer';
-                div.onclick = () => { 
-                    // Atalho para abrir modal ou ir para aba
-                    if(order.status === 'Orçamento') window.openOrderModal(order.id);
-                    else { switchTab('production'); switchProductionStatus(order.status); }
-                };
-                
-                const partner = partners.find(p => p.id === order.partnerId);
-                const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
-
-                div.innerHTML = `
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="font-bold text-xs text-gray-800 truncate w-2/3">${order.clientName}</span>
-                        <span class="text-[10px] text-gray-400">#${order.id.slice(-4)}</span>
-                    </div>
-                    <div class="text-[10px] text-gray-500 mb-1">${partnerName}</div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-primary">R$ ${parseFloat(order.total).toFixed(2)}</span>
-                        <span class="text-[10px] bg-gray-100 px-1 rounded">${new Date(order.createdAt).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                `;
-                container.appendChild(div);
-            };
-
             document.getElementById('dashListBudget').innerHTML = '';
             document.getElementById('dashListPending').innerHTML = '';
             document.getElementById('dashListProduction').innerHTML = '';
@@ -4659,10 +4627,18 @@
 
             listOrders.forEach(order => {
                 const status = order.status || 'Orçamento'; // Trata pedidos antigos sem status como Orçamento
-                if (status === 'Orçamento') renderMiniCard(order, 'dashListBudget');
-                else if (status === 'Pendente') renderMiniCard(order, 'dashListPending');
-                else if (status === 'Produção') renderMiniCard(order, 'dashListProduction');
+                if (status === 'Orçamento') {
+                    const card = createOrderCardElement(order, 'Orçamento');
+                    budgetContainer.appendChild(card);
+                } else if (status === 'Pendente') {
+                    const card = createOrderCardElement(order, 'Pendente');
+                    pendingContainer.appendChild(card);
+                } else if (status === 'Produção') {
+                    const card = createOrderCardElement(order, 'Produção');
+                    productionContainer.appendChild(card);
+                }
             });
+            lucide.createIcons();
         }
         window.renderDashboard = renderDashboard;
     </script>
