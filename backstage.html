@@ -1043,9 +1043,17 @@
                 </table>
             </div>
 
-            <div class="flex justify-between items-center pt-2 border-t">
-                <div class="text-lg font-bold">Total: <span id="orderTotalDisplay" class="text-primary">R$ 0,00</span></div>
-                <div class="flex gap-2">
+            <div class="flex justify-between items-end pt-4 border-t">
+                <div>
+                    <label for="orderDiscount" class="text-sm font-medium text-gray-700">Desconto (R$)</label>
+                    <input id="orderDiscount" oninput="renderOrderItems()" type="number" step="0.01" class="flex h-9 w-32 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary" placeholder="0.00">
+                </div>
+                <div class="flex items-end gap-6">
+                    <div class="text-right">
+                        <div class="text-sm text-muted-foreground">Subtotal: <span id="orderSubtotalDisplay">R$ 0,00</span></div>
+                        <div class="text-xl font-bold">Total: <span id="orderTotalDisplay" class="text-primary">R$ 0,00</span></div>
+                    </div>
+                    <div class="flex gap-2">
                     <button onclick="closeOrderModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                     <button id="saveOrderBtn" onclick="saveOrder()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Orçamento</button>
                 </div>
@@ -3024,6 +3032,7 @@
             // Resetar campos
             document.getElementById('orderClientName').value = '';
             document.getElementById('orderClientPhone').value = '';
+            document.getElementById('orderDiscount').value = '';
             document.getElementById('orderPartner').value = '';
             document.getElementById('orderStudentName').value = '';
             document.getElementById('orderObservation').value = '';
@@ -3134,6 +3143,7 @@
                     document.getElementById('orderClientName').value = data.clientName;
                     document.getElementById('orderClientPhone').value = data.clientPhone;
                     document.getElementById('orderPartner').value = data.partnerId;
+                    document.getElementById('orderDiscount').value = data.discount || '';
                     
                     // Verificar visibilidade do estudante ao editar
                     const partner = partners.find(p => p.id === data.partnerId);
@@ -3265,10 +3275,10 @@
         function renderOrderItems() {
             const tbody = document.getElementById('orderItemsList');
             tbody.innerHTML = '';
-            let total = 0;
+            let subtotal = 0;
 
             orderList.forEach((item, index) => {
-                total += item.total;
+                subtotal += item.total;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="px-4 py-2">${item.name}</td>
@@ -3282,7 +3292,11 @@
                 tbody.appendChild(tr);
             });
 
-            document.getElementById('orderTotalDisplay').textContent = `R$ ${total.toFixed(2)}`;
+            const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
+            const finalTotal = subtotal - discount;
+
+            document.getElementById('orderSubtotalDisplay').textContent = `R$ ${subtotal.toFixed(2)}`;
+            document.getElementById('orderTotalDisplay').textContent = `R$ ${finalTotal.toFixed(2)}`;
             lucide.createIcons();
         }
 
@@ -3298,7 +3312,10 @@
                 return;
             }
 
-            const total = orderList.reduce((acc, item) => acc + item.total, 0);
+            const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
+            const subtotal = orderList.reduce((acc, item) => acc + item.total, 0);
+            const total = subtotal - discount;
+
             const orderData = {
                 clientName,
                 clientPhone,
@@ -3306,6 +3323,8 @@
                 studentName,
                 observation,
                 items: orderList,
+                subtotal,
+                discount,
                 total,
                 updatedAt: new Date().toISOString()
             };
@@ -3990,6 +4009,43 @@
             }
         }
 
+        function calculateCommissions(order) {
+            if (!order || !order.items) {
+                return { school: 0, prod: 0, adm: 0 };
+            }
+
+            if (!window.cachedProducts) {
+                console.warn("calculateCommissions chamado antes do cache de produtos.");
+                return { school: 0, prod: 0, adm: 0 };
+            }
+
+            let schoolTotal = 0;
+            let prodTotal = 0;
+            let admTotal = 0;
+
+            order.items.forEach(item => {
+                const prod = window.cachedProducts.find(p => p.id === item.productId);
+                if (prod && prod.pricing && prod.pricing.length > 0) {
+                    const pricing = prod.pricing.find(pr => pr.category === item.category) || prod.pricing[0];
+                    if (pricing) {
+                        schoolTotal += (parseFloat(pricing.schoolCommission) || 0) * item.qty;
+                        prodTotal += (parseFloat(pricing.productionCost) || 0) * item.qty;
+                        admTotal += (parseFloat(pricing.adminProfit) || 0) * item.qty;
+                    }
+                }
+            });
+
+            const subtotal = order.subtotal !== undefined ? order.subtotal : order.total;
+            const discount = order.discount || 0;
+            const discountRatio = subtotal > 0 ? (subtotal - discount) / subtotal : 1;
+
+            return {
+                school: schoolTotal * discountRatio,
+                prod: prodTotal * discountRatio,
+                adm: admTotal * discountRatio
+            };
+        }
+
         // --- Lógica de Repasses (Transfers) ---
         let transferList = [];
         let selectedTransferIds = new Set();
@@ -4049,23 +4105,9 @@
                 orders.forEach(order => {
                     if (!order.items) return;
 
-                    // Calcular totais por tipo
-                    let schoolTotal = 0;
-                    let prodTotal = 0;
-                    let admTotal = 0;
-
-                    order.items.forEach(item => {
-                        const prod = window.cachedProducts.find(p => p.id === item.productId);
-                        if (prod && prod.pricing) {
-                            // Tenta achar o preço da categoria específica
-                            const pricing = prod.pricing.find(pr => pr.category === item.category) || prod.pricing[0];
-                            if (pricing) {
-                                schoolTotal += (parseFloat(pricing.schoolCommission) || 0) * item.qty;
-                                prodTotal += (parseFloat(pricing.productionCost) || 0) * item.qty;
-                                admTotal += (parseFloat(pricing.adminProfit) || 0) * item.qty;
-                            }
-                        }
-                    });
+                    // Calcular comissões já com desconto
+                    const commissions = calculateCommissions(order);
+                    const { school: finalSchoolTotal, prod: finalProdTotal, adm: finalAdmTotal } = commissions;
 
                     // Determinar Status Base do Repasse
                     // Aberto: Pedido não finalizado OU Cliente não pagou tudo
@@ -4079,7 +4121,7 @@
                     const baseStatus = (isOrderDone && isClientPaid) ? 'Pendente' : 'Aberto';
 
                     // 1. Repasse Escola
-                    if (schoolTotal > 0) {
+                    if (finalSchoolTotal > 0) {
                         const partner = partners.find(p => p.id === order.partnerId);
                         transferList.push({
                             id: `${order.id}_school`,
@@ -4089,14 +4131,14 @@
                             beneficiary: partner ? (partner.nickname || partner.name) : 'Escola Indefinida',
                             partnerId: order.partnerId,
                             type: 'Escola',
-                            amount: schoolTotal,
+                            amount: finalSchoolTotal,
                             status: payouts.school ? 'Pago' : baseStatus,
                             paymentDate: payouts.schoolDate
                         });
                     }
 
                     // 2. Repasse Produção
-                    if (prodTotal > 0) {
+                    if (finalProdTotal > 0) {
                         const producer = partners.find(p => p.id === order.producerId);
                         transferList.push({
                             id: `${order.id}_producer`,
@@ -4106,14 +4148,14 @@
                             beneficiary: producer ? (producer.nickname || producer.name) : 'Produção Geral',
                             partnerId: order.producerId, // Pode ser null se não definido
                             type: 'Produção',
-                            amount: prodTotal,
+                            amount: finalProdTotal,
                             status: payouts.producer ? 'Pago' : baseStatus,
                             paymentDate: payouts.producerDate
                         });
                     }
 
                     // 3. Repasse ADM
-                    if (admTotal > 0) {
+                    if (finalAdmTotal > 0) {
                         const admPartner = partners.find(p => (p.category || '').trim().toUpperCase() === 'ADM');
                         transferList.push({
                             id: `${order.id}_adm`,
@@ -4123,7 +4165,7 @@
                             beneficiary: admPartner ? (admPartner.nickname || admPartner.name) : 'Caixa Interno',
                             partnerId: admPartner ? admPartner.id : 'ADM',
                             type: 'ADM',
-                            amount: admTotal,
+                            amount: finalAdmTotal,
                             status: payouts.adm ? 'Pago' : baseStatus,
                             paymentDate: payouts.admDate
                         });
@@ -4648,10 +4690,10 @@
                 filterEnd = new Date(endDateInput); filterEnd.setHours(23,59,59,999);
                 isCustomFilter = true;
             } else {
-                // Padrão: Mês Atual para métricas
-                const now = new Date();
-                filterStart = new Date(now.getFullYear(), now.getMonth(), 1);
-                filterEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+                // Padrão: Tudo
+                filterStart = new Date('2023-01-01'); // Início do sistema
+                filterEnd = new Date();
+                filterEnd.setFullYear(filterEnd.getFullYear() + 1); // Futuro para garantir
             }
 
             let salesMonth = 0;
@@ -4672,6 +4714,10 @@
                     salesMonth += order.total || 0;
 
                     // Calcular Repasses e Custos deste pedido
+                    const commissions = calculateCommissions(order);
+                    totalTransfersMonth += (commissions.school + commissions.prod + commissions.adm);
+                    totalExternalTransfersMonth += (commissions.school + commissions.prod);
+
                     if (order.items) {
                         order.items.forEach(item => {
                             // Custo Material (Malha)
@@ -4680,23 +4726,9 @@
 
                             // Custo Material (Estampa)
                             const prod = window.cachedProducts.find(p => p.id === item.productId);
-                            if (prod) {
-                                if (prod.printId) {
-                                    const printItem = inventory.find(i => i.id === prod.printId);
-                                    if (printItem) totalMaterialCostMonth += (parseFloat(printItem.cost) || 0) * item.qty;
-                                }
-                                // Repasses
-                                if (prod.pricing) {
-                                    const pricing = prod.pricing.find(pr => pr.category === item.category) || prod.pricing[0];
-                                    if (pricing) {
-                                        const school = (parseFloat(pricing.schoolCommission) || 0) * item.qty;
-                                        const prodCost = (parseFloat(pricing.productionCost) || 0) * item.qty;
-                                        const adm = (parseFloat(pricing.adminProfit) || 0) * item.qty;
-                                        
-                                        totalTransfersMonth += (school + prodCost + adm);
-                                        totalExternalTransfersMonth += (school + prodCost);
-                                    }
-                                }
+                            if (prod && prod.printId) {
+                                const printItem = inventory.find(i => i.id === prod.printId);
+                                if (printItem) totalMaterialCostMonth += (parseFloat(printItem.cost) || 0) * item.qty;
                             }
                         });
                         
@@ -4716,33 +4748,6 @@
             document.getElementById('dashTotalTransfers').textContent = `R$ ${totalTransfersMonth.toFixed(2)}`;
 
             // 2. Listas de Pedidos
-            const renderMiniCard = (order, containerId) => {
-                const container = document.getElementById(containerId);
-                const div = document.createElement('div');
-                div.className = 'bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer';
-                div.onclick = () => { 
-                    // Atalho para abrir modal ou ir para aba
-                    if(order.status === 'Orçamento') window.openOrderModal(order.id);
-                    else { switchTab('production'); switchProductionStatus(order.status); }
-                };
-                
-                const partner = partners.find(p => p.id === order.partnerId);
-                const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
-
-                div.innerHTML = `
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="font-bold text-xs text-gray-800 truncate w-2/3">${order.clientName}</span>
-                        <span class="text-[10px] text-gray-400">#${order.id.slice(-4)}</span>
-                    </div>
-                    <div class="text-[10px] text-gray-500 mb-1">${partnerName}</div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-primary">R$ ${parseFloat(order.total).toFixed(2)}</span>
-                        <span class="text-[10px] bg-gray-100 px-1 rounded">${new Date(order.createdAt).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                `;
-                container.appendChild(div);
-            };
-
             document.getElementById('dashListBudget').innerHTML = '';
             document.getElementById('dashListPending').innerHTML = '';
             document.getElementById('dashListProduction').innerHTML = '';
@@ -4751,17 +4756,24 @@
             const pendingContainer = document.getElementById('dashListPending');
             const productionContainer = document.getElementById('dashListProduction');
 
-
             // As listas do dashboard mostram a visão operacional completa, independente do filtro de data.
             const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             const listOrders = sortedOrders;
 
             listOrders.forEach(order => {
                 const status = order.status || 'Orçamento'; // Trata pedidos antigos sem status como Orçamento
-                if (status === 'Orçamento') renderMiniCard(order, 'dashListBudget');
-                else if (status === 'Pendente') renderMiniCard(order, 'dashListPending');
-                else if (status === 'Produção') renderMiniCard(order, 'dashListProduction');
+                if (status === 'Orçamento') {
+                    const card = createOrderCardElement(order, 'Orçamento');
+                    budgetContainer.appendChild(card);
+                } else if (status === 'Pendente') {
+                    const card = createOrderCardElement(order, 'Pendente');
+                    pendingContainer.appendChild(card);
+                } else if (status === 'Produção') {
+                    const card = createOrderCardElement(order, 'Produção');
+                    productionContainer.appendChild(card);
+                }
             });
+            lucide.createIcons();
         }
         window.renderDashboard = renderDashboard;
     </script>
