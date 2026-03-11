@@ -2647,7 +2647,106 @@
             }
 
             filteredOrders.forEach(order => {
-                const card = createOrderCardElement(order, currentProductionStatus);
+                const partner = partners.find(p => p.id === order.partnerId);
+                const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
+                
+                const hasError = order.hasError;
+                const errorIndicator = hasError ? `<i data-lucide="alert-triangle" class="h-3.5 w-3.5 text-destructive" title="Este pedido teve um erro de produção registrado."></i>` : '';
+
+                // Botão de Aprovar apenas se for Orçamento
+                const approveBtn = currentProductionStatus === 'Orçamento' 
+                    ? `<button onclick="openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
+                    : '';
+
+                // Botão de Etiqueta (Produção em diante)
+                const showLabelBtn = ['Produção', 'Finalizado', 'Entregue'].includes(currentProductionStatus);
+                const labelBtn = showLabelBtn
+                    ? `<button onclick="printOrderLabel('${order.id}')" class="p-1.5 hover:bg-purple-50 text-purple-600 rounded bg-purple-50" title="Imprimir Etiqueta"><i data-lucide="tag" class="h-3.5 w-3.5"></i></button>` : '';
+
+                // Botão de Erro
+                const showErrorBtn = ['Produção', 'Finalizado'].includes(currentProductionStatus);
+                const errorBtn = showErrorBtn
+                    ? `<button onclick="openErrorModal('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Reportar Erro de Produção"><i data-lucide="alert-triangle" class="h-3.5 w-3.5"></i></button>` : '';
+                
+                // Botão de Alterar Produtor
+                const showChangeProducerBtn = ['Pendente', 'Produção'].includes(currentProductionStatus);
+                const changeProducerBtn = showChangeProducerBtn
+                    ? `<button onclick="openChangeProducerModal('${order.id}')" class="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded bg-yellow-50" title="Alterar Produtor"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button>` : '';
+                
+                // Checkbox de seleção (Orçamento, Pendente e Produção)
+                const showCheckbox = ['Orçamento', 'Pendente', 'Produção'].includes(currentProductionStatus);
+                const checkboxHtml = showCheckbox 
+                    ? `<input type="checkbox" onchange="toggleOrderSelection('${order.id}')" class="absolute top-4 right-4 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary z-10" ${selectedOrderIds.has(order.id) ? 'checked' : ''}>` 
+                    : '';
+
+                // Gerar HTML da lista de itens
+                let itemsHtml = '';
+                if (order.items && order.items.length > 0) {
+                    itemsHtml = '<div class="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-600 space-y-1 bg-gray-50 p-2 rounded">';
+                    order.items.forEach(item => {
+                        itemsHtml += `<div class="flex justify-between items-center"><span><span class="font-bold">${item.qty}x</span> ${item.name}</span> <span class="font-mono bg-white px-1 rounded border border-gray-100">${item.category || ''} ${item.size || '-'}</span></div>`;
+                    });
+                    itemsHtml += '</div>';
+                }
+
+                const hasObservation = order.observation && order.observation.trim() !== '';
+                const obsStyle = hasObservation ? 'border-r-4 border-r-yellow-500' : '';
+
+                const card = document.createElement('div');
+                // Adicionado 'relative' para que o checkbox absolute funcione corretamente
+                card.className = `bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col h-full ${obsStyle} relative`;
+                card.innerHTML = `
+                    ${checkboxHtml}
+                    <div class="flex justify-between items-start mb-1">
+                        <div>
+                            <div class="font-bold text-sm text-gray-800">${order.clientName}</div>
+                            <div class="text-xs font-medium text-blue-600">${order.studentName || ''}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${errorIndicator}
+                            <span class="text-xs font-mono text-gray-400">#${order.id.slice(-4)}</span>
+                        </div>
+                    </div>
+                    ${hasObservation ? `<div class="text-[10px] text-yellow-700 bg-yellow-50 p-1 rounded mb-2 border border-yellow-100 flex items-start gap-1"><i data-lucide="alert-circle" class="h-3 w-3 shrink-0 mt-0.5"></i> <span class="line-clamp-2">${order.observation}</span></div>` : ''}
+                    
+                    <div class="text-xs text-gray-500 mb-3 flex items-center gap-1 mt-1">
+                        <i data-lucide="building-2" class="h-3 w-3"></i> ${partnerName}
+                    </div>
+
+                    <div class="mt-auto pt-3 border-t border-gray-100">
+                        <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-primary text-sm">R$ ${parseFloat(order.total || 0).toFixed(2)}</span>
+                            <div class="flex gap-1">
+                                <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
+                                ${labelBtn}
+                                ${errorBtn}
+                                ${changeProducerBtn}
+                                <button onclick="window.openOrderModal('${order.id}')" class="p-1.5 hover:bg-blue-50 text-blue-600 rounded bg-blue-50" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
+                                <button onclick="window.deleteOrder('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Excluir"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+                            </div>
+                        </div>
+                        
+                        ${approveBtn}
+
+                        ${currentProductionStatus !== 'Orçamento' ? `
+                        <div class="mt-2 grid grid-cols-2 gap-2">
+                            <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none">
+                                <option value="Pendente" ${currentProductionStatus === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                                <option value="Produção" ${currentProductionStatus === 'Produção' ? 'selected' : ''}>Produção</option>
+                                <option value="Finalizado" ${currentProductionStatus === 'Finalizado' ? 'selected' : ''}>Finalizado</option>
+                                <option value="Entregue" ${currentProductionStatus === 'Entregue' ? 'selected' : ''}>Entregue</option>
+                                <option value="Arquivado" ${currentProductionStatus === 'Arquivado' ? 'selected' : ''}>Arquivado</option>
+                            </select> 
+                            <select onchange="updatePaymentStatus('${order.id}', this.value)" class="text-[10px] border rounded bg-gray-50 p-1 w-full cursor-pointer focus:ring-1 focus:ring-primary outline-none">
+                                <option value="Pendente" ${(order.paymentStatus || 'Pendente') === 'Pendente' ? 'selected' : ''}>Pgto Pendente</option>
+                                <option value="Pago Parcial" ${order.paymentStatus === 'Pago Parcial' ? 'selected' : ''}>Pgto Parcial</option>
+                                <option value="Pago Total" ${order.paymentStatus === 'Pago Total' ? 'selected' : ''}>Pgto Total</option>
+                            </select>
+                        </div>` : ''}
+
+                        ${itemsHtml}
+                    </div>
+                `;
                 container.appendChild(card);
             });
             
@@ -4617,9 +4716,41 @@
             document.getElementById('dashTotalTransfers').textContent = `R$ ${totalTransfersMonth.toFixed(2)}`;
 
             // 2. Listas de Pedidos
+            const renderMiniCard = (order, containerId) => {
+                const container = document.getElementById(containerId);
+                const div = document.createElement('div');
+                div.className = 'bg-white p-3 rounded border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer';
+                div.onclick = () => { 
+                    // Atalho para abrir modal ou ir para aba
+                    if(order.status === 'Orçamento') window.openOrderModal(order.id);
+                    else { switchTab('production'); switchProductionStatus(order.status); }
+                };
+                
+                const partner = partners.find(p => p.id === order.partnerId);
+                const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
+
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="font-bold text-xs text-gray-800 truncate w-2/3">${order.clientName}</span>
+                        <span class="text-[10px] text-gray-400">#${order.id.slice(-4)}</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 mb-1">${partnerName}</div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-primary">R$ ${parseFloat(order.total).toFixed(2)}</span>
+                        <span class="text-[10px] bg-gray-100 px-1 rounded">${new Date(order.createdAt).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            };
+
             document.getElementById('dashListBudget').innerHTML = '';
             document.getElementById('dashListPending').innerHTML = '';
             document.getElementById('dashListProduction').innerHTML = '';
+
+            const budgetContainer = document.getElementById('dashListBudget');
+            const pendingContainer = document.getElementById('dashListPending');
+            const productionContainer = document.getElementById('dashListProduction');
+
 
             // As listas do dashboard mostram a visão operacional completa, independente do filtro de data.
             const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -4627,18 +4758,10 @@
 
             listOrders.forEach(order => {
                 const status = order.status || 'Orçamento'; // Trata pedidos antigos sem status como Orçamento
-                if (status === 'Orçamento') {
-                    const card = createOrderCardElement(order, 'Orçamento');
-                    budgetContainer.appendChild(card);
-                } else if (status === 'Pendente') {
-                    const card = createOrderCardElement(order, 'Pendente');
-                    pendingContainer.appendChild(card);
-                } else if (status === 'Produção') {
-                    const card = createOrderCardElement(order, 'Produção');
-                    productionContainer.appendChild(card);
-                }
+                if (status === 'Orçamento') renderMiniCard(order, 'dashListBudget');
+                else if (status === 'Pendente') renderMiniCard(order, 'dashListPending');
+                else if (status === 'Produção') renderMiniCard(order, 'dashListProduction');
             });
-            lucide.createIcons();
         }
         window.renderDashboard = renderDashboard;
     </script>
