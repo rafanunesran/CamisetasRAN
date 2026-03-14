@@ -1090,7 +1090,7 @@
 
             <div class="flex justify-end gap-2 pt-4">
                 <button onclick="document.getElementById('confirmOrderModal').classList.add('hidden'); document.getElementById('confirmOrderModal').classList.remove('flex');" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
-                <button id="btnConfirmOrderAction" onclick="confirmOrderAction()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Confirmar e Produzir</button>
+                <button id="btnConfirmOrderAction" onclick="window.confirmOrderAction()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Confirmar e Produzir</button>
             </div>
         </div>
     </div>
@@ -2663,23 +2663,23 @@
 
                 // Botão de Aprovar apenas se for Orçamento
                 const approveBtn = currentProductionStatus === 'Orçamento' 
-                    ? `<button onclick="openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
+                    ? `<button onclick="window.openConfirmOrderModal('${order.id}')" class="w-full mt-2 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 flex items-center justify-center gap-1"><i data-lucide="check" class="h-3 w-3"></i> Aprovar</button>` 
                     : '';
 
                 // Botão de Etiqueta (Produção em diante)
                 const showLabelBtn = ['Produção', 'Finalizado', 'Entregue'].includes(currentProductionStatus);
                 const labelBtn = showLabelBtn
-                    ? `<button onclick="printOrderLabel('${order.id}')" class="p-1.5 hover:bg-purple-50 text-purple-600 rounded bg-purple-50" title="Imprimir Etiqueta"><i data-lucide="tag" class="h-3.5 w-3.5"></i></button>` : '';
+                    ? `<button onclick="window.printOrderLabel('${order.id}')" class="p-1.5 hover:bg-purple-50 text-purple-600 rounded bg-purple-50" title="Imprimir Etiqueta"><i data-lucide="tag" class="h-3.5 w-3.5"></i></button>` : '';
 
                 // Botão de Erro
                 const showErrorBtn = ['Produção', 'Finalizado'].includes(currentProductionStatus);
                 const errorBtn = showErrorBtn
-                    ? `<button onclick="openErrorModal('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Reportar Erro de Produção"><i data-lucide="alert-triangle" class="h-3.5 w-3.5"></i></button>` : '';
+                    ? `<button onclick="window.openErrorModal('${order.id}')" class="p-1.5 hover:bg-red-50 text-red-600 rounded bg-red-50" title="Reportar Erro de Produção"><i data-lucide="alert-triangle" class="h-3.5 w-3.5"></i></button>` : '';
                 
                 // Botão de Alterar Produtor
                 const showChangeProducerBtn = ['Pendente', 'Produção'].includes(currentProductionStatus);
                 const changeProducerBtn = showChangeProducerBtn
-                    ? `<button onclick="openChangeProducerModal('${order.id}')" class="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded bg-yellow-50" title="Alterar Produtor"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button>` : '';
+                    ? `<button onclick="window.openChangeProducerModal('${order.id}')" class="p-1.5 hover:bg-yellow-50 text-yellow-600 rounded bg-yellow-50" title="Alterar Produtor"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button>` : '';
                 
                 // Checkbox de seleção (Orçamento, Pendente e Produção)
                 const showCheckbox = ['Orçamento', 'Pendente', 'Produção'].includes(currentProductionStatus);
@@ -2725,7 +2725,7 @@
                         <div class="flex justify-between items-center mb-2">
                         <span class="font-bold text-primary text-sm">R$ ${parseFloat(order.total || 0).toFixed(2)}</span>
                             <div class="flex gap-1">
-                                <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
+                                <button onclick="window.sendOrderToWhatsapp('${order.id}')" class="p-1.5 hover:bg-green-50 text-green-600 rounded bg-green-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
                                 ${labelBtn}
                                 ${errorBtn}
                                 ${changeProducerBtn}
