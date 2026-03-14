@@ -1069,7 +1069,7 @@
             
             <div class="space-y-2">
                 <label class="text-sm font-medium text-gray-700">Status do Pagamento</label>
-                <select id="confirmPaymentStatus" onchange="toggleSinalInput()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                <select id="confirmPaymentStatus" onchange="window.toggleSinalInput()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                     <option value="Pendente">Pendente</option>
                     <option value="Pago Parcial">Pago Parcial (Sinal)</option>
                     <option value="Pago Total">Pago Total</option>
@@ -4585,68 +4585,37 @@
             }
         }
 
-        // Inicializar
-        fetchPartners();
-    </script>
+        // --- Dashboard & Navigation Logic (Movidos para o módulo para acesso ao Firebase) ---
+        
+        window.switchTab = (tabId) => {
+            if (tabId === 'transfers') fetchTransfers();
+            if (tabId === 'errors') fetchErrors();
+            if (tabId === 'settings') fetchSettings();
+            if (tabId === 'overview') fetchOrders();
 
-    <script>
-        lucide.createIcons();
-
-        function switchTab(tabId) {
-            if (tabId === 'transfers') {
-                fetchTransfers();
-            }
-            if (tabId === 'errors') {
-                fetchErrors();
-            }
-            if (tabId === 'settings') {
-                fetchSettings(); // Garante que os dados estão atualizados ao abrir a aba
-            }
-            if (tabId === 'overview') {
-                fetchOrders(); // Recarrega dados para o dashboard
-            }
-
-            // Hide all contents
-            document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.remove('active');
-            });
-            // Deactivate all buttons
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => {
                 el.classList.remove('active');
                 el.classList.add('text-muted-foreground');
             });
 
-            // Show selected content
             document.getElementById(tabId).classList.add('active');
-            
-            // Activate selected button
             const btn = document.getElementById('btn-' + tabId);
             if(btn) {
                 btn.classList.add('active');
                 btn.classList.remove('text-muted-foreground');
             }
+            lucide.createIcons();
         }
 
-        function logout() {
+        window.logout = () => {
             sessionStorage.removeItem('auth');
             window.location.href = 'index.html';
-        }
-
-        // --- Filtros do Dashboard ---
-        window.applyDashboardFilter = () => {
-            renderDashboard();
-        }
-
-        window.resetDashboardFilter = () => {
-            document.getElementById('dashStartDate').value = '';
-            document.getElementById('dashEndDate').value = '';
-            renderDashboard();
         }
 
         window.setQuickFilter = (type, value) => {
             const now = new Date();
             let start, end;
-
             if (type === 'current') {
                 start = new Date(now.getFullYear(), now.getMonth(), 1);
                 end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -4654,9 +4623,8 @@
                 start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                 end = new Date(now.getFullYear(), now.getMonth(), 0);
             } else if (type === 'all') {
-                start = new Date('2023-01-01'); // Início do sistema
-                end = new Date();
-                end.setFullYear(end.getFullYear() + 1); // Futuro para garantir
+                start = new Date('2023-01-01');
+                end = new Date(); end.setFullYear(end.getFullYear() + 1);
             } else if (type === 'specific' && value) {
                 const [year, month] = value.split('-');
                 start = new Date(parseInt(year), parseInt(month) - 1, 1);
@@ -4664,7 +4632,6 @@
             }
 
             if (start && end) {
-                // Ajustar fuso horário para input date (YYYY-MM-DD)
                 const formatDate = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
                 document.getElementById('dashStartDate').value = formatDate(start);
                 document.getElementById('dashEndDate').value = formatDate(end);
@@ -4672,7 +4639,6 @@
             }
         }
 
-        // Função auxiliar para criar cards de pedido no Dashboard
         function createOrderCardElement(order, type) {
             const card = document.createElement('div');
             card.className = 'bg-white p-3 rounded border shadow-sm space-y-2 text-sm relative';
@@ -4680,10 +4646,8 @@
             const partner = partners.find(p => p.id === order.partnerId);
             const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
             
-            // Verifica se tem observação para destacar
             const hasObs = order.observation && order.observation.trim() !== '';
-            const obsClass = hasObs ? 'border-l-4 border-l-yellow-400' : '';
-            if(hasObs) card.className += ' ' + obsClass;
+            if(hasObs) card.className += ' border-l-4 border-l-yellow-400';
 
             card.innerHTML = `
                 <div class="flex justify-between items-start">
@@ -4697,7 +4661,7 @@
                 <div class="flex justify-between items-center pt-1 border-t">
                     <span class="font-bold text-primary">R$ ${parseFloat(order.total || 0).toFixed(2)}</span>
                     <div class="flex gap-1">
-                        <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1 hover:bg-green-50 text-green-600 rounded" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
+                        <button onclick="window.sendOrderToWhatsapp('${order.id}')" class="p-1 hover:bg-green-50 text-green-600 rounded" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
                         <button onclick="window.openOrderModal('${order.id}')" class="p-1 hover:bg-blue-50 text-blue-600 rounded" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
                         ${type === 'Orçamento' ? `
                             <button onclick="window.openConfirmOrderModal('${order.id}')" class="p-1 hover:bg-green-50 text-green-600 rounded" title="Aprovar Orçamento"><i data-lucide="check-circle" class="h-3.5 w-3.5"></i></button>
@@ -4708,110 +4672,42 @@
             return card;
         }
 
-        // --- Dashboard Logic ---
         async function renderDashboard() {
             const orders = window.allOrders;
             if (!orders || orders.length === 0) return;
-
-            // Configuração do Filtro de Data
             const startDateInput = document.getElementById('dashStartDate')?.value;
             const endDateInput = document.getElementById('dashEndDate')?.value;
-            
-            let filterStart, filterEnd;
-            let isCustomFilter = false;
-
-            if (startDateInput && endDateInput) {
-                // Filtro Customizado
-                filterStart = new Date(startDateInput); filterStart.setHours(0,0,0,0);
-                filterEnd = new Date(endDateInput); filterEnd.setHours(23,59,59,999);
-                isCustomFilter = true;
-            } else {
-                // Padrão: Tudo
-                filterStart = new Date('2023-01-01'); // Início do sistema
-                filterEnd = new Date();
-                filterEnd.setFullYear(filterEnd.getFullYear() + 1); // Futuro para garantir
-            }
+            let filterStart = startDateInput ? new Date(startDateInput) : new Date('2023-01-01');
+            let filterEnd = endDateInput ? new Date(endDateInput) : new Date();
+            if(startDateInput) filterStart.setHours(0,0,0,0);
+            if(endDateInput) filterEnd.setHours(23,59,59,999);
 
             let salesMonth = 0;
-            let totalTransfersMonth = 0;
-            let totalMaterialCostMonth = 0;
-            let totalExternalTransfersMonth = 0; // Escola + Produção
-
-            // Garantir produtos carregados para cálculos
-            if (!window.cachedProducts) {
-                const pSnap = await getDocs(collection(db, "products"));
-                window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
-            }
-
             orders.forEach(order => {
                 const d = new Date(order.createdAt);
-                // Aplica filtro nas métricas (seja o customizado ou o padrão do mês atual)
                 if (d >= filterStart && d <= filterEnd && order.status !== 'Orçamento' && order.status !== 'Arquivado') {
                     salesMonth += order.total || 0;
-
-                    // Calcular Repasses e Custos deste pedido
-                    const commissions = calculateCommissions(order);
-                    totalTransfersMonth += (commissions.school + commissions.prod + commissions.adm);
-                    totalExternalTransfersMonth += (commissions.school + commissions.prod);
-
-                    if (order.items) {
-                        order.items.forEach(item => {
-                            // Custo Material (Malha)
-                            const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
-                            if (malhaItem) totalMaterialCostMonth += (parseFloat(malhaItem.cost) || 0) * item.qty;
-
-                            // Custo Material (Estampa)
-                            const prod = window.cachedProducts.find(p => p.id === item.productId);
-                            if (prod && prod.printId) {
-                                const printItem = inventory.find(i => i.id === prod.printId);
-                                if (printItem) totalMaterialCostMonth += (parseFloat(printItem.cost) || 0) * item.qty;
-                            }
-                        });
-                        
-                        // Custo Insumos (Estimativa simples unitária para dashboard)
-                        inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
-                            const r = insumo.usageRule || {type:'unit', qty:1};
-                            if(r.type==='unit') totalMaterialCostMonth += (parseFloat(insumo.cost)||0) * (order.items.reduce((a,b)=>a+b.qty,0) * r.qty);
-                        });
-                    }
                 }
             });
 
-            const netProfit = salesMonth - totalMaterialCostMonth - totalExternalTransfersMonth;
-
             document.getElementById('dashSalesMonth').textContent = `R$ ${salesMonth.toFixed(2)}`;
-            document.getElementById('dashNetProfit').textContent = `R$ ${netProfit.toFixed(2)}`;
-            document.getElementById('dashTotalTransfers').textContent = `R$ ${totalTransfersMonth.toFixed(2)}`;
-
-            // 2. Listas de Pedidos
             document.getElementById('dashListBudget').innerHTML = '';
             document.getElementById('dashListPending').innerHTML = '';
             document.getElementById('dashListProduction').innerHTML = '';
 
-            const budgetContainer = document.getElementById('dashListBudget');
-            const pendingContainer = document.getElementById('dashListPending');
-            const productionContainer = document.getElementById('dashListProduction');
-
-            // As listas do dashboard mostram a visão operacional completa, independente do filtro de data.
-            const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            const listOrders = sortedOrders;
-
-            listOrders.forEach(order => {
-                const status = order.status || 'Orçamento'; // Trata pedidos antigos sem status como Orçamento
-                if (status === 'Orçamento') {
-                    const card = createOrderCardElement(order, 'Orçamento');
-                    budgetContainer.appendChild(card);
-                } else if (status === 'Pendente') {
-                    const card = createOrderCardElement(order, 'Pendente');
-                    pendingContainer.appendChild(card);
-                } else if (status === 'Produção') {
-                    const card = createOrderCardElement(order, 'Produção');
-                    productionContainer.appendChild(card);
+            orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).forEach(order => {
+                const status = order.status || 'Orçamento';
+                const containerMap = { 'Orçamento': 'dashListBudget', 'Pendente': 'dashListPending', 'Produção': 'dashListProduction' };
+                if (containerMap[status]) {
+                    document.getElementById(containerMap[status]).appendChild(createOrderCardElement(order, status));
                 }
             });
             lucide.createIcons();
         }
         window.renderDashboard = renderDashboard;
+
+        // Inicializar
+        fetchPartners();
     </script>
 </body>
 </html>
