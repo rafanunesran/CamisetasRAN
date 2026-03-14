@@ -4672,6 +4672,42 @@
             }
         }
 
+        // Função auxiliar para criar cards de pedido no Dashboard
+        function createOrderCardElement(order, type) {
+            const card = document.createElement('div');
+            card.className = 'bg-white p-3 rounded border shadow-sm space-y-2 text-sm relative';
+            
+            const partner = partners.find(p => p.id === order.partnerId);
+            const partnerName = partner ? (partner.nickname || partner.name) : 'Geral';
+            
+            // Verifica se tem observação para destacar
+            const hasObs = order.observation && order.observation.trim() !== '';
+            const obsClass = hasObs ? 'border-l-4 border-l-yellow-400' : '';
+            if(hasObs) card.className += ' ' + obsClass;
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div class="font-bold truncate max-w-[150px] text-gray-800">${order.clientName}</div>
+                    <div class="text-[10px] text-gray-400 font-mono">#${order.id.slice(-4)}</div>
+                </div>
+                <div class="text-[11px] text-gray-500 flex items-center gap-1">
+                    <i data-lucide="building-2" class="h-3 w-3"></i> ${partnerName}
+                </div>
+                ${order.studentName ? `<div class="text-[11px] text-blue-600 font-medium">${order.studentName}</div>` : ''}
+                <div class="flex justify-between items-center pt-1 border-t">
+                    <span class="font-bold text-primary">R$ ${parseFloat(order.total || 0).toFixed(2)}</span>
+                    <div class="flex gap-1">
+                        <button onclick="sendOrderToWhatsapp('${order.id}')" class="p-1 hover:bg-green-50 text-green-600 rounded" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></button>
+                        <button onclick="window.openOrderModal('${order.id}')" class="p-1 hover:bg-blue-50 text-blue-600 rounded" title="Editar"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
+                        ${type === 'Orçamento' ? `
+                            <button onclick="window.openConfirmOrderModal('${order.id}')" class="p-1 hover:bg-green-50 text-green-600 rounded" title="Aprovar Orçamento"><i data-lucide="check-circle" class="h-3.5 w-3.5"></i></button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
         // --- Dashboard Logic ---
         async function renderDashboard() {
             const orders = window.allOrders;
