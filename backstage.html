@@ -444,8 +444,8 @@
                 <div id="production-actions" class="hidden bg-blue-50 p-2 rounded border border-blue-100 flex justify-between items-center">
                     <span class="text-sm text-blue-800 font-medium"><span id="selected-count">0</span> pedidos selecionados</span>
                     <div class="flex gap-2">
-                        <button onclick="generateProductionReport()" class="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 flex items-center gap-1"><i data-lucide="list" class="h-3 w-3"></i> Relatório de Produção</button>
-                        <button onclick="generateMaterialReport()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="clipboard-list" class="h-3 w-3"></i> Relatório de Materiais</button>
+                        <button onclick="window.generateProductionReport()" class="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 flex items-center gap-1"><i data-lucide="list" class="h-3 w-3"></i> Relatório de Produção</button>
+                        <button onclick="window.generateMaterialReport()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="clipboard-list" class="h-3 w-3"></i> Relatório de Materiais</button>
                     </div>
                 </div>
 
@@ -644,7 +644,7 @@
     </main>
 
     <!-- Modal de Parceiro -->
-    <div id="partnerModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="partnerModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 id="modalTitle" class="text-xl font-bold text-primary">Novo Parceiro</h2>
             <div class="space-y-2">
@@ -676,7 +676,7 @@
     </div>
 
     <!-- Modal de Cliente -->
-    <div id="clientModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="clientModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 id="clientModalTitle" class="text-xl font-bold text-primary">Novo Cliente</h2>
             <div class="space-y-2">
@@ -705,7 +705,7 @@
     </div>
 
     <!-- Modal de Estoque -->
-    <div id="inventoryModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="inventoryModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 id="inventoryModalTitle" class="text-xl font-bold text-primary">Novo Item de Estoque</h2>
             
@@ -791,7 +791,7 @@
     </div>
 
     <!-- Modal de Compra -->
-    <div id="purchaseModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="purchaseModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <h2 class="text-xl font-bold text-primary">Registrar Compra</h2>
             
@@ -853,7 +853,7 @@
     </div>
 
     <!-- Modal de Movimentações -->
-    <div id="movementsModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="movementsModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-primary">Extrato de Movimentações</h2>
@@ -880,7 +880,7 @@
     </div>
 
     <!-- Modal de Visualização de Imagem (Zoom) -->
-    <div id="imageModal" class="fixed inset-0 z-[150] hidden items-center justify-center bg-black/80 backdrop-blur-sm" onclick="closeImageModal()">
+    <div id="imageModal" style="z-index: 10000;" class="fixed inset-0 hidden items-center justify-center bg-black/80 backdrop-blur-sm" onclick="closeImageModal()">
         <div class="relative max-w-4xl max-h-[90vh] p-4" onclick="event.stopPropagation()">
             <button onclick="closeImageModal()" class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors">
                 <i data-lucide="x" class="h-8 w-8"></i>
@@ -890,7 +890,7 @@
     </div>
 
     <!-- Modal de Produto -->
-    <div id="productModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="productModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
                 <h2 id="productModalTitle" class="text-xl font-bold text-primary">Novo Produto</h2>
@@ -966,7 +966,7 @@
     </div>
 
     <!-- Modal de Orçamento/Pedido -->
-    <div id="orderModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="orderModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-3xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
                 <h2 id="orderModalTitle" class="text-xl font-bold text-primary">Novo Orçamento</h2>
@@ -1062,7 +1062,7 @@
     </div>
 
     <!-- Modal de Confirmação de Orçamento -->
-    <div id="confirmOrderModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="confirmOrderModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 class="text-xl font-bold text-primary">Aprovar Orçamento</h2>
             <p class="text-sm text-gray-600">Ao aprovar, o cliente será cadastrado e o pedido irá para "Pendente".</p>
@@ -1096,7 +1096,7 @@
     </div>
 
     <!-- Modal de Alteração de Produtor -->
-    <div id="changeProducerModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="changeProducerModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 class="text-xl font-bold text-primary">Alterar Responsável pela Produção</h2>
             <p class="text-sm text-gray-600">Isso irá reatribuir o repasse de produção para o novo parceiro selecionado.</p>
@@ -1116,7 +1116,7 @@
     </div>
 
     <!-- Modal de Erro de Produção -->
-    <div id="errorModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="errorModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
                 <h2 class="text-xl font-bold text-destructive">Reportar Erro de Produção</h2>
@@ -1155,7 +1155,7 @@
     </div>
 
     <!-- Modal de Edição de Erro -->
-    <div id="editErrorModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="editErrorModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-lg space-y-4 shadow-xl border border-gray-200">
             <div class="flex justify-between items-center border-b pb-2">
                 <h2 class="text-xl font-bold text-primary">Editar Registro de Erro</h2>
@@ -1187,7 +1187,7 @@
     </div>
 
     <!-- Modal de Relatório de Materiais -->
-    <div id="materialReportModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="materialReportModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
                 <h2 class="text-xl font-bold text-primary">Relatório de Produção e Compras</h2>
@@ -1228,7 +1228,7 @@
     </div>
 
     <!-- Modal de Relatório de Produção (Quantitativo) -->
-    <div id="productionReportModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="productionReportModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-3xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
                 <h2 class="text-xl font-bold text-primary">Relatório de Produção (Quantitativo)</h2>
@@ -1248,7 +1248,7 @@
     </div>
 
     <!-- Modal de Histórico de Pagamentos -->
-    <div id="paymentHistoryModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="paymentHistoryModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-primary">Histórico de Repasses Realizados</h2>
