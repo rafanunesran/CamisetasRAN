@@ -318,10 +318,8 @@
                             <thead class="text-muted-foreground font-medium border-b">
                                 <tr><th class="pb-3">Imagem</th><th class="pb-3">Produto</th><th class="pb-3">Parceiro</th><th class="pb-3">Categoria</th><th class="pb-3">Preço</th><th class="pb-3">Status</th><th class="pb-3 text-right">Ações</th></tr>
                             </thead>
-                            <tbody class="divide-y">
-                                <tbody id="products-table-body" class="divide-y">
-                                    <tr><td colspan="7" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
-                                </tbody>
+                            <tbody id="products-table-body" class="divide-y">
+                                <tr><td colspan="7" class="py-4 text-center text-muted-foreground">Carregando produtos...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -441,7 +439,7 @@
                     </select>
                 </div>
 
-                <div id="production-actions" class="hidden bg-blue-50 p-2 rounded border border-blue-100 flex justify-between items-center">
+                <div id="production-actions" class="hidden bg-blue-50 p-2 rounded border border-blue-100 flex justify-between items-center relative z-30">
                     <span class="text-sm text-blue-800 font-medium"><span id="selected-count">0</span> pedidos selecionados</span>
                     <div class="flex gap-2">
                         <button onclick="window.generateProductionReport()" class="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 flex items-center gap-1"><i data-lucide="list" class="h-3 w-3"></i> Relatório de Produção</button>
@@ -644,7 +642,7 @@
     </main>
 
     <!-- Modal de Parceiro -->
-    <div id="partnerModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="partnerModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 id="modalTitle" class="text-xl font-bold text-primary">Novo Parceiro</h2>
             <div class="space-y-2">
@@ -669,14 +667,14 @@
                 <input id="partnerPix" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="CPF, CNPJ, Email ou Aleatória">
             </div>
             <div class="flex justify-end gap-2 pt-4">
-                <button onclick="closePartnerModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
+                <button onclick="window.closeModalById('partnerModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
                 <button id="savePartnerBtn" onclick="savePartner()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Salvar</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Cliente -->
-    <div id="clientModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="clientModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 id="clientModalTitle" class="text-xl font-bold text-primary">Novo Cliente</h2>
             <div class="space-y-2">
@@ -698,14 +696,14 @@
                 <input id="clientStudent" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Nome do aluno">
             </div>
             <div class="flex justify-end gap-2 pt-4">
-                <button onclick="closeClientModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
+                <button onclick="window.closeModalById('clientModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
                 <button id="saveClientBtn" onclick="saveClient()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Salvar</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Estoque -->
-    <div id="inventoryModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="inventoryModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 id="inventoryModalTitle" class="text-xl font-bold text-primary">Novo Item de Estoque</h2>
             
@@ -784,14 +782,14 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4">
-                <button onclick="closeInventoryModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
+                <button onclick="window.closeModalById('inventoryModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Cancelar</button>
                 <button id="saveInventoryBtn" onclick="saveInventory()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">Salvar</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Compra -->
-    <div id="purchaseModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="purchaseModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <h2 class="text-xl font-bold text-primary">Registrar Compra</h2>
             
@@ -846,18 +844,17 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4 border-t">
-                <button onclick="closePurchaseModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button onclick="window.closeModalById('purchaseModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                 <button id="finalizePurchaseBtn" onclick="finalizePurchase()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Finalizar Compra</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Movimentações -->
-    <div id="movementsModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="movementsModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-primary">Extrato de Movimentações</h2>
-                <button onclick="closeMovementsModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 class="text-xl font-bold text-primary">Extrato de Movimentações</h2><button onclick="window.closeModalById('movementsModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             <div class="border rounded-md overflow-hidden">
                 <table class="w-full text-sm text-left">
@@ -880,9 +877,9 @@
     </div>
 
     <!-- Modal de Visualização de Imagem (Zoom) -->
-    <div id="imageModal" style="z-index: 10000;" class="fixed inset-0 hidden items-center justify-center bg-black/80 backdrop-blur-sm" onclick="closeImageModal()">
+    <div id="imageModal" class="fixed inset-0 bg-black/80 items-center justify-center z-[99999] hidden" onclick="window.closeModalById('imageModal')">
         <div class="relative max-w-4xl max-h-[90vh] p-4" onclick="event.stopPropagation()">
-            <button onclick="closeImageModal()" class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors">
+            <button onclick="window.closeModalById('imageModal')" class="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors">
                 <i data-lucide="x" class="h-8 w-8"></i>
             </button>
             <img id="fullSizeImage" src="" alt="Visualização Ampliada" referrerpolicy="no-referrer" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black">
@@ -890,11 +887,10 @@
     </div>
 
     <!-- Modal de Produto -->
-    <div id="productModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="productModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
-                <h2 id="productModalTitle" class="text-xl font-bold text-primary">Novo Produto</h2>
-                <button onclick="closeProductModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 id="productModalTitle" class="text-xl font-bold text-primary">Novo Produto</h2><button onclick="window.closeModalById('productModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -959,18 +955,17 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4 border-t mt-4">
-                <button onclick="closeProductModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button onclick="window.closeModalById('productModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                 <button id="saveProductBtn" onclick="saveProduct()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Produto</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Orçamento/Pedido -->
-    <div id="orderModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="orderModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-3xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
-                <h2 id="orderModalTitle" class="text-xl font-bold text-primary">Novo Orçamento</h2>
-                <button onclick="closeOrderModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 id="orderModalTitle" class="text-xl font-bold text-primary">Novo Orçamento</h2><button onclick="window.closeModalById('orderModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1054,7 +1049,7 @@
                         <div class="text-xl font-bold">Total: <span id="orderTotalDisplay" class="text-primary">R$ 0,00</span></div>
                     </div>
                     <div class="flex gap-2">
-                    <button onclick="closeOrderModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button onclick="window.closeModalById('orderModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                     <button id="saveOrderBtn" onclick="saveOrder()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Orçamento</button>
                 </div>
             </div>
@@ -1062,7 +1057,7 @@
     </div>
 
     <!-- Modal de Confirmação de Orçamento -->
-    <div id="confirmOrderModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="confirmOrderModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 class="text-xl font-bold text-primary">Aprovar Orçamento</h2>
             <p class="text-sm text-gray-600">Ao aprovar, o cliente será cadastrado e o pedido irá para "Pendente".</p>
@@ -1089,14 +1084,14 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4">
-                <button onclick="document.getElementById('confirmOrderModal').classList.add('hidden'); document.getElementById('confirmOrderModal').classList.remove('flex');" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button onclick="window.closeModalById('confirmOrderModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                 <button id="btnConfirmOrderAction" onclick="window.confirmOrderAction()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Confirmar e Produzir</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Alteração de Produtor -->
-    <div id="changeProducerModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="changeProducerModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl border border-gray-200">
             <h2 class="text-xl font-bold text-primary">Alterar Responsável pela Produção</h2>
             <p class="text-sm text-gray-600">Isso irá reatribuir o repasse de produção para o novo parceiro selecionado.</p>
@@ -1109,18 +1104,17 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4">
-                <button onclick="document.getElementById('changeProducerModal').classList.add('hidden'); document.getElementById('changeProducerModal').classList.remove('flex');" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button onclick="window.closeModalById('changeProducerModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                 <button id="btnChangeProducerAction" onclick="changeProducerAction()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Alteração</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Erro de Produção -->
-    <div id="errorModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="errorModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
-                <h2 class="text-xl font-bold text-destructive">Reportar Erro de Produção</h2>
-                <button onclick="closeErrorModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 class="text-xl font-bold text-destructive">Reportar Erro de Produção</h2><button onclick="window.closeModalById('errorModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <p class="text-sm text-gray-600">
@@ -1148,18 +1142,17 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4 border-t">
-                <button onclick="closeErrorModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button onclick="window.closeModalById('errorModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                 <button id="saveErrorBtn" onclick="saveProductionError()" class="px-4 py-2 text-sm font-medium text-white bg-destructive rounded-md hover:bg-destructive/90">Registrar Perda</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Edição de Erro -->
-    <div id="editErrorModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="editErrorModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-lg space-y-4 shadow-xl border border-gray-200">
             <div class="flex justify-between items-center border-b pb-2">
-                <h2 class="text-xl font-bold text-primary">Editar Registro de Erro</h2>
-                <button onclick="closeEditErrorModal()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 class="text-xl font-bold text-primary">Editar Registro de Erro</h2><button onclick="window.closeModalById('editErrorModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <div class="bg-gray-50 p-3 rounded border">
@@ -1180,18 +1173,17 @@
             </div>
 
             <div class="flex justify-end gap-2 pt-4 border-t">
-                <button onclick="closeEditErrorModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button onclick="window.closeModalById('editErrorModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
                 <button id="saveEditedErrorBtn" onclick="saveEditedError()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90">Salvar Alterações</button>
             </div>
         </div>
     </div>
 
     <!-- Modal de Relatório de Materiais -->
-    <div id="materialReportModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="materialReportModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
-                <h2 class="text-xl font-bold text-primary">Relatório de Produção e Compras</h2>
-                <button onclick="document.getElementById('materialReportModal').classList.add('hidden'); document.getElementById('materialReportModal').classList.remove('flex');" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 class="text-xl font-bold text-primary">Relatório de Produção e Compras</h2><button onclick="window.closeModalById('materialReportModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1228,11 +1220,10 @@
     </div>
 
     <!-- Modal de Relatório de Produção (Quantitativo) -->
-    <div id="productionReportModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="productionReportModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-3xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
-                <h2 class="text-xl font-bold text-primary">Relatório de Produção (Quantitativo)</h2>
-                <button onclick="document.getElementById('productionReportModal').classList.add('hidden'); document.getElementById('productionReportModal').classList.remove('flex');" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 class="text-xl font-bold text-primary">Relatório de Produção (Quantitativo)</h2><button onclick="window.closeModalById('productionReportModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <div class="border rounded-md overflow-hidden">
@@ -1248,11 +1239,10 @@
     </div>
 
     <!-- Modal de Histórico de Pagamentos -->
-    <div id="paymentHistoryModal" style="z-index: 9999;" class="fixed inset-0 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div id="paymentHistoryModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-primary">Histórico de Repasses Realizados</h2>
-                <button onclick="document.getElementById('paymentHistoryModal').classList.add('hidden'); document.getElementById('paymentHistoryModal').classList.remove('flex');" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <h2 class="text-xl font-bold text-primary">Histórico de Repasses Realizados</h2><button onclick="window.closeModalById('paymentHistoryModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <div class="border rounded-md overflow-hidden">
@@ -1294,6 +1284,22 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
 
+        // --- Centralized Modal Control (Class-based) ---
+        window.openModalById = (id) => {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        };
+        window.closeModalById = (id) => {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        };
+
         // --- Configuração do Upload via Apps Script ---
         // COLE AQUI A URL QUE VOCÊ COPIOU NO PASSO 1
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkgUduzLRYSABf5bY5YZrRCmWr8yFOeS0CIW4JMS1tC-MS4GqWaNUBXp8PvOBlnhSqHg/exec';
@@ -1329,14 +1335,14 @@
                 });
                 renderPartners();
                 populateProductFilter(); // Popula o filtro de produtos
-                fetchClients(); // Busca clientes depois de ter os parceiros para mapear nomes
-                fetchInventory();
-                fetchProducts();
-                fetchOrders();
-                fetchSettings();
-                fetchErrors();
-                // fetchTransfers será chamado ao clicar na aba ou manualmente se necessário, mas vamos popular o filtro de parceiros dele
-                checkAutoArchive(); // Verifica arquivamento automático ao iniciar
+                await fetchClients(); // Busca clientes depois de ter os parceiros para mapear nomes
+                await fetchInventory();
+                await fetchProducts();
+                await fetchOrders();
+                await fetchSettings();
+                await fetchErrors();
+                // fetchTransfers será chamado ao clicar na aba ou manualmente
+                await checkAutoArchive(); // Verifica arquivamento automático ao iniciar
             } catch (error) {
                 console.error("Erro ao buscar parceiros:", error);
                 document.getElementById('partners-table-body').innerHTML = '<tr><td colspan="5" class="py-4 text-center text-red-500">Erro ao carregar dados.</td></tr>';
@@ -1602,6 +1608,7 @@
                 querySnapshot.forEach((doc) => {
                     products.push({ id: doc.id, ...doc.data() });
                 });
+                window.cachedProducts = products; // Cache global para uso em relatórios
                 renderProducts(products);
             } catch (error) {
                 console.error("Erro ao buscar produtos:", error);
@@ -1721,14 +1728,11 @@
                 categoryInput.value = 'Escola';
                 pixInput.value = '';
             }
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('partnerModal');
         }
 
         window.closePartnerModal = () => {
-            const modal = document.getElementById('partnerModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            window.closeModalById('partnerModal');
         }
 
         window.savePartner = async () => {
@@ -1820,14 +1824,11 @@
                 partnerSelect.value = '';
                 studentInput.value = '';
             }
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('clientModal');
         }
 
         window.closeClientModal = () => {
-            const modal = document.getElementById('clientModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            window.closeModalById('clientModal');
         }
 
         window.saveClient = async () => {
@@ -1986,15 +1987,12 @@
             }
             
             window.toggleInventoryFields(); // Atualiza visibilidade do campo de imagem
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('inventoryModal');
             lucide.createIcons(); // Atualiza ícones (para o botão de +)
         }
 
         window.closeInventoryModal = () => {
-            const modal = document.getElementById('inventoryModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            window.closeModalById('inventoryModal');
         }
 
         window.toggleInventoryFields = () => {
@@ -2169,13 +2167,11 @@
                 select.appendChild(option);
             });
 
-            document.getElementById('purchaseModal').classList.remove('hidden');
-            document.getElementById('purchaseModal').classList.add('flex');
+            window.openModalById('purchaseModal');
         }
 
         window.closePurchaseModal = () => {
-            document.getElementById('purchaseModal').classList.add('hidden');
-            document.getElementById('purchaseModal').classList.remove('flex');
+            window.closeModalById('purchaseModal');
         }
 
         window.addPurchaseItem = () => {
@@ -2301,8 +2297,7 @@
 
         // --- Lógica de Movimentações ---
         window.openMovementsModal = async () => {
-            document.getElementById('movementsModal').classList.remove('hidden');
-            document.getElementById('movementsModal').classList.add('flex');
+            window.openModalById('movementsModal');
             
             const tbody = document.getElementById('movementsTableBody');
             tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center">Carregando...</td></tr>';
@@ -2343,31 +2338,24 @@
         }
 
         window.closeMovementsModal = () => {
-            document.getElementById('movementsModal').classList.add('hidden');
-            document.getElementById('movementsModal').classList.remove('flex');
+            window.closeModalById('movementsModal');
         }
 
         // Helper para converter URLs do Drive para formato direto (lh3)
         function getDisplayUrl(url) {
             if (!url) return '';
-            // Converte: https://drive.google.com/uc?export=view&id=XYZ
-            // Para: https://lh3.googleusercontent.com/d/XYZ
             if (url.includes('drive.google.com') && url.includes('id=')) {
                 const match = url.match(/id=([^&]+)/);
-                if (match && match[1]) {
-                    return `https://lh3.googleusercontent.com/d/${match[1]}`;
-                }
+                if (match && match[1]) return `https://lh3.googleusercontent.com/d/${match[1]}`;
             }
             return url;
         }
 
         // --- Visualização de Imagem ---
         window.openImageModal = (url) => {
-            const modal = document.getElementById('imageModal');
             const img = document.getElementById('fullSizeImage');
             img.src = getDisplayUrl(url);
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('imageModal');
         }
 
         window.closeImageModal = () => {
@@ -2379,7 +2367,6 @@
 
         // --- Lógica de Produtos ---
         window.openProductModal = async (id = null) => {
-            const modal = document.getElementById('productModal');
             const title = document.getElementById('productModalTitle');
             const nameInput = document.getElementById('productName');
             const printSelect = document.getElementById('productPrint');
@@ -2438,12 +2425,10 @@
                 addProductCategoryRow(); // Adiciona uma linha vazia por padrão
             }
 
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('productModal');
             lucide.createIcons();
         }
 
-        // Função auxiliar para adicionar linha de preço
         window.addProductCategoryRow = (data = null) => {
             const tbody = document.getElementById('productPricingBody');
             const row = document.createElement('tr');
@@ -2451,9 +2436,18 @@
             const category = data ? data.category : '';
             const sale = data ? data.salePrice : '';
             const cost = data ? data.productionCost : '';
-            const school = data ? data.schoolCommission : '';
-            // Usa o valor salvo se existir, caso contrário calcula
-            const admin = (data && data.adminProfit !== undefined) ? parseFloat(data.adminProfit).toFixed(2) : (data ? (data.salePrice - data.productionCost - data.schoolCommission).toFixed(2) : '0.00');
+            const school = (data && data.schoolCommission !== undefined) ? data.schoolCommission : '';
+            
+            // Cálculo seguro do Admin para evitar NaN
+            let admin = '0.00';
+            if (data && data.adminProfit !== undefined) {
+                admin = parseFloat(data.adminProfit).toFixed(2);
+            } else if (data) {
+                const s = parseFloat(data.salePrice) || 0;
+                const c = parseFloat(data.productionCost) || 0;
+                const sc = parseFloat(data.schoolCommission) || 0;
+                admin = (s - c - sc).toFixed(2);
+            }
 
             // Obter categorias de Malha do estoque
             const malhaCategories = [...new Set(inventory.filter(i => i.type === 'Malha' && i.category).map(i => i.category))].sort();
@@ -2474,11 +2468,6 @@
             `;
             tbody.appendChild(row);
             lucide.createIcons();
-        }
-
-        window.closeProductModal = () => {
-            document.getElementById('productModal').classList.add('hidden');
-            document.getElementById('productModal').classList.remove('flex');
         }
 
         window.saveProduct = async () => {
@@ -2539,7 +2528,7 @@
                     await addDoc(collection(db, "products"), { ...productData, status: 'Ativo', createdAt: new Date().toISOString() });
                 }
 
-                closeProductModal();
+                window.closeModalById('productModal');
                 fetchProducts();
             } catch (e) {
                 console.error("Erro ao salvar produto:", e);
@@ -2784,223 +2773,207 @@
 
         window.generateProductionReport = async () => {
             // Usar window.allOrders que já contém os pedidos carregados
-            const selectedOrders = window.allOrders.filter(o => selectedOrderIds.has(o.id));
-            
-            if (selectedOrders.length === 0) {
-                alert("Selecione pelo menos um pedido para gerar o relatório.");
-                return;
+            try {
+                // Garante que os pedidos estejam carregados
+                if (!window.allOrders || window.allOrders.length === 0) {
+                    console.log("Carregando pedidos para o relatório...");
+                    await fetchOrders();
+                }
+
+                const selectedOrders = (window.allOrders || []).filter(o => selectedOrderIds.has(o.id));
+                
+                if (selectedOrders.length === 0) {
+                    alert("Selecione pelo menos um pedido para gerar o relatório.");
+                    return;
+                }
+
+                // Agrupar Itens: { "Malha": { "Tamanho": { total: 0, variations: { "Produto": count } } } }
+                const reportData = {};
+
+                selectedOrders.forEach(order => {
+                    if (!order.items) return;
+                    order.items.forEach(item => {
+                        const fabric = item.category || 'Malha Padrão'; // Ex: 'Algodão'
+                        const size = item.size || 'U'; // Ex: 'P'
+                        const productName = item.name || 'Sem Nome'; // Ex: 'Camiseta Gato'
+                        const qty = parseInt(item.qty) || 0;
+
+                        if (!reportData[fabric]) reportData[fabric] = {};
+                        if (!reportData[fabric][size]) reportData[fabric][size] = { total: 0, variations: {} };
+
+                        reportData[fabric][size].total += qty;
+                        reportData[fabric][size].variations[productName] = (reportData[fabric][size].variations[productName] || 0) + qty;
+                    });
+                });
+
+                // Renderizar
+                const container = document.getElementById('productionReportBody');
+                container.innerHTML = '';
+
+                Object.keys(reportData).sort().forEach(fabric => {
+                    // Cabeçalho da Malha
+                    const trFabric = document.createElement('tr');
+                    trFabric.innerHTML = `<td colspan="2" class="bg-gray-100 font-bold text-sm p-2 border-b uppercase tracking-wider text-gray-700">${fabric}</td>`;
+                    container.appendChild(trFabric);
+
+                    const sizes = reportData[fabric];
+                    Object.keys(sizes).sort().forEach(size => {
+                        const data = sizes[size];
+                        const varText = Object.entries(data.variations).map(([key, val]) => `<span class="font-bold text-gray-900">${val}</span> ${key}`).join(', ');
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td class="p-2 border-b align-top w-1/4 font-bold text-primary text-base">${size} <span class="text-xs font-normal text-gray-500 ml-1">(${data.total} un)</span></td><td class="p-2 border-b text-gray-600">sendo ${varText}</td>`;
+                        container.appendChild(tr);
+                    });
+                });
+
+                window.openModalById('productionReportModal');
+                lucide.createIcons();
+            } catch (e) {
+                console.error("Erro ao gerar relatório de produção:", e);
+                alert("Erro ao gerar relatório: " + e.message);
             }
-
-            // Agrupar Itens: { "Malha": { "Tamanho": { total: 0, variations: { "Produto": count } } } }
-            const reportData = {};
-
-            selectedOrders.forEach(order => {
-                if (!order.items) return;
-                order.items.forEach(item => {
-                    const fabric = item.category || 'Malha Padrão'; // Ex: 'Algodão'
-                    const size = item.size || 'U'; // Ex: 'P'
-                    const productName = item.name || 'Sem Nome'; // Ex: 'Camiseta Gato'
-                    const qty = parseInt(item.qty) || 0;
-
-                    if (!reportData[fabric]) reportData[fabric] = {};
-                    if (!reportData[fabric][size]) reportData[fabric][size] = { total: 0, variations: {} };
-
-                    reportData[fabric][size].total += qty;
-                    reportData[fabric][size].variations[productName] = (reportData[fabric][size].variations[productName] || 0) + qty;
-                });
-            });
-
-            // Renderizar
-            const container = document.getElementById('productionReportBody');
-            container.innerHTML = '';
-
-            Object.keys(reportData).sort().forEach(fabric => {
-                // Cabeçalho da Malha
-                const trFabric = document.createElement('tr');
-                trFabric.innerHTML = `<td colspan="2" class="bg-gray-100 font-bold text-sm p-2 border-b uppercase tracking-wider text-gray-700">${fabric}</td>`;
-                container.appendChild(trFabric);
-
-                const sizes = reportData[fabric];
-                Object.keys(sizes).sort().forEach(size => {
-                    const data = sizes[size];
-                    const varText = Object.entries(data.variations).map(([key, val]) => `<span class="font-bold text-gray-900">${val}</span> ${key}`).join(', ');
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td class="p-2 border-b align-top w-1/4 font-bold text-primary text-base">${size} <span class="text-xs font-normal text-gray-500 ml-1">(${data.total} un)</span></td><td class="p-2 border-b text-gray-600">sendo ${varText}</td>`;
-                    container.appendChild(tr);
-                });
-            });
-
-            document.getElementById('productionReportModal').classList.remove('hidden');
-            document.getElementById('productionReportModal').classList.add('flex');
         }
 
         window.generateMaterialReport = async () => {
-            // 1. Buscar todos os pedidos ativos para calcular reserva
-            const allOrdersSnap = await getDocs(collection(db, "orders"));
-            const allOrders = [];
-            allOrdersSnap.forEach(doc => allOrders.push({id: doc.id, ...doc.data()}));
-
-            // Filtra pedidos ativos (Pendente/Produção)
-            const activeOrders = allOrders.filter(o => o.status === 'Pendente' || o.status === 'Produção');
-
-            // Mapas de cálculo
-            const needs = {}; // O que os selecionados precisam
-            const reserved = {}; // O que os OUTROS ativos precisam
-
-            // Função auxiliar para somar materiais
-            const calculateMaterials = (order, targetMap) => {
-                if (!order.items) return;
-                
-                // A. Itens do Pedido (Malhas e Estampas)
-                order.items.forEach(item => {
-                    // 1. Malha (Baseado no Tamanho/Variação que é o nome do item no estoque)
-                    // Procura no estoque um item do tipo Malha com esse nome e categoria
-                    const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
-                    if (malhaItem) {
-                        targetMap[malhaItem.id] = (targetMap[malhaItem.id] || 0) + item.qty;
-                    }
-
-                    // 2. Estampa (Baseado no Produto -> printId)
-                    // Precisamos achar o produto original para pegar o printId
-                    // Como não temos a lista de produtos completa aqui fácil, vamos assumir que o estoque de estampas tem o ID salvo ou buscar.
-                    // Melhor: Vamos iterar os produtos carregados (fetchProducts já rodou)
-                    // Nota: `products` variável global pode não estar populada se não abriu a aba. Vamos garantir.
-                });
-
-                // B. Insumos (Regras Globais)
-                inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
-                    let qtyNeeded = 0;
-                    const rule = insumo.usageRule || { type: 'unit', qty: 1 };
-                    
-                    if (rule.type === 'unit') {
-                        // Soma total de itens no pedido
-                        const totalItems = order.items.reduce((acc, i) => acc + i.qty, 0);
-                        qtyNeeded = totalItems * (parseFloat(rule.qty) || 1);
-                    } else if (rule.type === 'order') {
-                        qtyNeeded = (parseFloat(rule.qty) || 1);
-                    } else if (rule.type === 'batch') {
-                        const totalItems = order.items.reduce((acc, i) => acc + i.qty, 0);
-                        const limit = parseFloat(rule.limit) || 1;
-                        qtyNeeded = Math.ceil(totalItems / limit) * (parseFloat(rule.qty) || 1);
-                    }
-                    
-                    if (qtyNeeded > 0) {
-                        targetMap[insumo.id] = (targetMap[insumo.id] || 0) + qtyNeeded;
-                    }
-                });
-            };
-
-            // Calcular necessidades
-            // Precisamos iterar os pedidos selecionados e buscar os produtos para ver as estampas
-            // Para simplificar, vamos fazer um loop assíncrono se precisar buscar produtos, mas tentaremos usar o cache
-            
-            // Garantir produtos carregados para link de estampa
-            if (!window.cachedProducts) {
-                const pSnap = await getDocs(collection(db, "products"));
-                window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
-            }
-
-            const processOrder = (order, targetMap) => {
-                if (!order.items) return;
-                order.items.forEach(item => {
-                    // Malha
-                    const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
-                    if (malhaItem) targetMap[malhaItem.id] = (targetMap[malhaItem.id] || 0) + item.qty;
-
-                    // Estampa
-                    const prod = window.cachedProducts.find(p => p.id === item.productId);
-                    if (prod && prod.printId) {
-                        targetMap[prod.printId] = (targetMap[prod.printId] || 0) + item.qty;
-                    }
-                });
-                // Insumos (código repetido da lógica acima, simplificado aqui)
-                inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
-                    let q = 0;
-                    const r = insumo.usageRule || {type:'unit', qty:1};
-                    const total = order.items.reduce((a,b)=>a+b.qty,0);
-                    if(r.type==='unit') q = total * r.qty;
-                    if(r.type==='order') q = parseFloat(r.qty);
-                    if(r.type==='batch') q = Math.ceil(total/r.limit)*r.qty;
-                    if(q>0) targetMap[insumo.id] = (targetMap[insumo.id]||0)+q;
-                });
-            };
-
-            activeOrders.forEach(order => {
-                if (selectedOrderIds.has(order.id)) {
-                    processOrder(order, needs);
-                } else {
-                    processOrder(order, reserved);
+            try {
+                // Garante que o inventário esteja carregado
+                if (!inventory || inventory.length === 0) {
+                    console.log("Inventário não carregado, buscando...");
+                    await fetchInventory();
                 }
-            });
 
-            // Renderizar Relatório
-            const needsBody = document.getElementById('reportNeedsBody');
-            const missingBody = document.getElementById('reportMissingBody');
-            needsBody.innerHTML = '';
-            missingBody.innerHTML = '';
-
-            const needsByType = { 'Malha': [], 'Estampa': [], 'Insumo': [] };
-            const missingByType = { 'Malha': [], 'Estampa': [], 'Insumo': [] };
-
-            Object.keys(needs).forEach(itemId => {
-                const item = inventory.find(i => i.id === itemId);
-                if (!item) return;
-
-                const qtyNeeded = needs[itemId];
-                const qtyReserved = reserved[itemId] || 0;
-                const currentStock = parseFloat(item.quantity) || 0;
-                const netStock = currentStock - qtyReserved;
-                const missing = Math.max(0, qtyNeeded - netStock);
-
-                // Agrupar por tipo
-                const type = item.type || 'Outros';
-                if (!needsByType[type]) needsByType[type] = [];
-                needsByType[type].push({ item, qtyNeeded });
-
-                if (missing > 0) {
-                    if (!missingByType[type]) missingByType[type] = [];
-                    missingByType[type].push({ item, missing, currentStock, netStock });
+                // Garante que os produtos estejam no cache para vincular estampas
+                if (!window.cachedProducts || window.cachedProducts.length === 0) {
+                    console.log("Carregando produtos para o relatório...");
+                    await fetchProducts(); // Isso popula window.cachedProducts se implementado ou faremos manual abaixo
+                    // Fetch products manually into cache if global fetch fails
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = [];
+                    pSnap.forEach(doc => window.cachedProducts.push({ id: doc.id, ...doc.data() }));
                 }
-            });
 
-            const renderGroup = (container, type, items, isMissing) => {
-                if (!items || items.length === 0) return;
-                
-                // Cabeçalho do Grupo
-                const trHead = document.createElement('tr');
-                trHead.innerHTML = `<td colspan="${isMissing ? 3 : 2}" class="bg-gray-100 font-bold text-xs uppercase tracking-wider p-2 text-gray-700">${type}s</td>`;
-                container.appendChild(trHead);
+                // 1. Buscar todos os pedidos ativos para calcular reserva
+                const allOrdersSnap = await getDocs(collection(db, "orders"));
+                const allOrders = [];
+                allOrdersSnap.forEach(doc => allOrders.push({id: doc.id, ...doc.data()}));
 
-                items.forEach(data => {
-                    const tr = document.createElement('tr');
-                    if (isMissing) {
-                        tr.innerHTML = `
-                            <td class="p-2 border-b text-red-700 font-medium pl-4">${data.item.name} <span class="text-xs text-red-400">(${data.item.category || data.item.type})</span></td>
-                            <td class="p-2 border-b text-right text-red-700 font-bold">${data.missing}</td>
-                            <td class="p-2 border-b text-right text-gray-500">${data.currentStock} (Disp: ${data.netStock})</td>
-                        `;
+                // Filtra pedidos ativos (Pendente/Produção)
+                const activeOrders = allOrders.filter(o => o.status === 'Pendente' || o.status === 'Produção');
+
+                // Mapas de cálculo
+                const needs = {}; // O que os selecionados precisam
+                const reserved = {}; // O que os OUTROS ativos precisam
+
+                // Garantir produtos carregados para link de estampa
+                if (!window.cachedProducts) {
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
+                const processOrder = (order, targetMap) => {
+                    if (!order.items) return;
+                    order.items.forEach(item => {
+                        // Malha
+                        const malhaItem = inventory.find(i => i.type === 'Malha' && i.name === item.size && i.category === item.category);
+                        if (malhaItem) targetMap[malhaItem.id] = (targetMap[malhaItem.id] || 0) + item.qty;
+
+                        // Estampa
+                        const prod = window.cachedProducts.find(p => p.id === item.productId);
+                        if (prod && prod.printId) {
+                            targetMap[prod.printId] = (targetMap[prod.printId] || 0) + item.qty;
+                        }
+                    });
+                    // Insumos (código repetido da lógica acima, simplificado aqui)
+                    inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
+                        let q = 0;
+                        const r = insumo.usageRule || {type:'unit', qty:1};
+                        const total = order.items.reduce((a,b)=>a+b.qty,0);
+                        if(r.type==='unit') q = total * r.qty;
+                        if(r.type==='order') q = parseFloat(r.qty);
+                        if(r.type==='batch') q = Math.ceil(total/r.limit)*r.qty;
+                        if(q>0) targetMap[insumo.id] = (targetMap[insumo.id]||0)+q;
+                    });
+                };
+
+                activeOrders.forEach(order => {
+                    if (selectedOrderIds.has(order.id)) {
+                        processOrder(order, needs);
                     } else {
-                        tr.innerHTML = `
-                            <td class="p-2 border-b pl-4">${data.item.name} <span class="text-xs text-gray-500">(${data.item.category || data.item.type})</span></td>
-                            <td class="p-2 border-b text-right font-bold">${data.qtyNeeded}</td>
-                        `;
+                        processOrder(order, reserved);
                     }
-                    container.appendChild(tr);
                 });
-            };
 
-            ['Malha', 'Estampa', 'Insumo', 'Outros'].forEach(type => {
-                renderGroup(needsBody, type, needsByType[type], false);
-                renderGroup(missingBody, type, missingByType[type], true);
-            });
+                // Renderizar Relatório
+                const needsBody = document.getElementById('reportNeedsBody');
+                const missingBody = document.getElementById('reportMissingBody');
+                needsBody.innerHTML = '';
+                missingBody.innerHTML = '';
 
-            if (missingBody.children.length === 0) {
-                missingBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-green-600 font-medium">Estoque suficiente para os pedidos selecionados!</td></tr>';
+                const needsByType = { 'Malha': [], 'Estampa': [], 'Insumo': [] };
+                const missingByType = { 'Malha': [], 'Estampa': [], 'Insumo': [] };
+
+                Object.keys(needs).forEach(itemId => {
+                    const item = inventory.find(i => i.id === itemId);
+                    if (!item) return;
+
+                    const qtyNeeded = needs[itemId];
+                    const qtyReserved = reserved[itemId] || 0;
+                    const currentStock = parseFloat(item.quantity) || 0;
+                    const netStock = currentStock - qtyReserved;
+                    const missing = Math.max(0, qtyNeeded - netStock);
+
+                    // Agrupar por tipo
+                    const type = item.type || 'Outros';
+                    if (!needsByType[type]) needsByType[type] = [];
+                    needsByType[type].push({ item, qtyNeeded });
+
+                    if (missing > 0) {
+                        if (!missingByType[type]) missingByType[type] = [];
+                        missingByType[type].push({ item, missing, currentStock, netStock });
+                    }
+                });
+
+                const renderGroup = (container, type, items, isMissing) => {
+                    if (!items || items.length === 0) return;
+                    
+                    // Cabeçalho do Grupo
+                    const trHead = document.createElement('tr');
+                    trHead.innerHTML = `<td colspan="${isMissing ? 3 : 2}" class="bg-gray-100 font-bold text-xs uppercase tracking-wider p-2 text-gray-700">${type}s</td>`;
+                    container.appendChild(trHead);
+
+                    items.forEach(data => {
+                        const tr = document.createElement('tr');
+                        if (isMissing) {
+                            tr.innerHTML = `
+                                <td class="p-2 border-b text-red-700 font-medium pl-4">${data.item.name} <span class="text-xs text-red-400">(${data.item.category || data.item.type})</span></td>
+                                <td class="p-2 border-b text-right text-red-700 font-bold">${data.missing}</td>
+                                <td class="p-2 border-b text-right text-gray-500">${data.currentStock} (Disp: ${data.netStock})</td>
+                            `;
+                        } else {
+                            tr.innerHTML = `
+                                <td class="p-2 border-b pl-4">${data.item.name} <span class="text-xs text-gray-500">(${data.item.category || data.item.type})</span></td>
+                                <td class="p-2 border-b text-right font-bold">${data.qtyNeeded}</td>
+                            `;
+                        }
+                        container.appendChild(tr);
+                    });
+                };
+
+                ['Malha', 'Estampa', 'Insumo', 'Outros'].forEach(type => {
+                    renderGroup(needsBody, type, needsByType[type], false);
+                    renderGroup(missingBody, type, missingByType[type], true);
+                });
+
+                if (missingBody.children.length === 0) {
+                    missingBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-green-600 font-medium">Estoque suficiente para os pedidos selecionados!</td></tr>';
+                }
+
+                window.openModalById('materialReportModal');
+                lucide.createIcons();
+            } catch (e) {
+                console.error("Erro ao gerar relatório de materiais:", e);
+                alert("Erro ao gerar relatório: " + e.message);
             }
-
-            const modal = document.getElementById('materialReportModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
         }
 
         window.fillClientData = () => {
@@ -3171,14 +3144,7 @@
                 saveBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
             }
 
-            renderOrderItems();
-            document.getElementById('orderModal').classList.remove('hidden');
-            document.getElementById('orderModal').classList.add('flex');
-        }
-
-        window.closeOrderModal = () => {
-            document.getElementById('orderModal').classList.add('hidden');
-            document.getElementById('orderModal').classList.remove('flex');
+            renderOrderItems(); window.openModalById('orderModal');
         }
 
         window.onOrderProductChange = () => {
@@ -3352,7 +3318,7 @@
                         ...newOrder
                     });
                 }
-                closeOrderModal();
+                window.closeModalById('orderModal');
                 fetchOrders();
             } catch (e) {
                 console.error("Erro ao salvar pedido:", e);
@@ -3385,32 +3351,50 @@
             }
         }
 
-        window.openConfirmOrderModal = (orderId) => {
-            orderToConfirmId = orderId;
-            const modal = document.getElementById('confirmOrderModal');
-            const producerSelect = document.getElementById('confirmProducer');
-            
-            // Popular select de produtores (Produção ou ADM)
-            producerSelect.innerHTML = '<option value="">Selecione...</option>';
-            const producers = partners.filter(p => {
-                const cat = (p.category || '').trim().toLowerCase();
-                return cat === 'produção' || cat === 'producao' || cat === 'adm';
-            });
-            
-            producers.forEach(p => {
-                const option = document.createElement('option');
-                option.value = p.id;
-                option.textContent = p.nickname || p.name;
-                producerSelect.appendChild(option);
-            });
+        window.openConfirmOrderModal = async (orderId) => {
+            try {
+                // Garante que os parceiros estejam carregados
+                if (!partners || partners.length === 0) {
+                    console.log("Parceiros não carregados, buscando...");
+                    const partnersSnap = await getDocs(collection(db, "partners"));
+                    partners = [];
+                    partnersSnap.forEach((doc) => {
+                        partners.push({ id: doc.id, ...doc.data() });
+                    });
+                }
 
-            // Resetar campos
-            document.getElementById('confirmPaymentStatus').value = 'Pendente';
-            document.getElementById('confirmSinalValue').value = '';
-            window.toggleSinalInput();
+                orderToConfirmId = orderId;
+                const producerSelect = document.getElementById('confirmProducer');
+                
+                // Popular select de produtores (Produção ou ADM)
+                producerSelect.innerHTML = '<option value="">Selecione...</option>';
+                const producers = partners.filter(p => {
+                    const cat = (p.category || '').trim().toLowerCase();
+                    return cat === 'produção' || cat === 'producao' || cat === 'adm';
+                });
 
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+                if (producers.length === 0) {
+                    alert("Nenhum parceiro de 'Produção' ou 'ADM' foi encontrado. Por favor, cadastre um na aba 'Escolas/Rev' antes de aprovar um orçamento.");
+                    return;
+                }
+                
+                producers.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.id;
+                    option.textContent = p.nickname || p.name;
+                    producerSelect.appendChild(option);
+                });
+
+                // Resetar campos
+                document.getElementById('confirmPaymentStatus').value = 'Pendente';
+                document.getElementById('confirmSinalValue').value = '';
+                try { window.toggleSinalInput(); } catch(e) {}
+
+                window.openModalById('confirmOrderModal');
+            } catch (e) {
+                console.error("Erro ao abrir modal de confirmação:", e);
+                alert("Erro ao abrir janela de aprovação. Tente recarregar a página.");
+            }
         }
 
         window.confirmOrderAction = async () => {
@@ -3460,8 +3444,7 @@
                     downPayment: downPayment
                 });
 
-                document.getElementById('confirmOrderModal').classList.add('hidden');
-                document.getElementById('confirmOrderModal').classList.remove('flex');
+                window.closeModalById('confirmOrderModal');
                 fetchOrders(); // Atualiza a tela (vai sumir da aba Orçamento)
 
             } catch (e) {
@@ -3475,7 +3458,6 @@
 
         window.openChangeProducerModal = (orderId) => {
             orderToChangeProducerId = orderId;
-            const modal = document.getElementById('changeProducerModal');
             const producerSelect = document.getElementById('changeProducerSelect');
             
             producerSelect.innerHTML = '<option value="">Selecione...</option>';
@@ -3497,8 +3479,7 @@
                 producerSelect.value = order.producerId;
             }
 
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('changeProducerModal');
         }
 
         window.changeProducerAction = async () => {
@@ -3519,8 +3500,7 @@
                     producerId: newProducerId
                 });
 
-                document.getElementById('changeProducerModal').classList.add('hidden');
-                document.getElementById('changeProducerModal').classList.remove('flex');
+                window.closeModalById('changeProducerModal');
                 fetchOrders(); // Refresh UI
                 // If on transfers tab, it will be updated on next render
                 if (document.getElementById('transfers').classList.contains('active')) {
@@ -3698,9 +3678,7 @@
                 tbody.appendChild(tr);
             });
 
-            const modal = document.getElementById('errorModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('errorModal');
         }
 
         window.closeErrorModal = () => {
@@ -3800,7 +3778,7 @@
                 await Promise.all(errorPromises);
 
                 alert("Erro registrado e materiais baixados do estoque.");
-                closeErrorModal();
+                window.closeModalById('errorModal');
                 fetchOrders(); // Para atualizar o indicador na UI
                 fetchErrors(); // Para atualizar a lista de erros
                 fetchInventory(); // Atualizar UI de estoque
@@ -3828,14 +3806,11 @@
             // Store original quantity to calculate diff on save
             document.getElementById('editErrorQty').dataset.originalQty = error.errorQty;
 
-            const modal = document.getElementById('editErrorModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('editErrorModal');
         }
 
         window.closeEditErrorModal = () => {
-            document.getElementById('editErrorModal').classList.add('hidden');
-            document.getElementById('editErrorModal').classList.remove('flex');
+            window.closeModalById('editErrorModal');
             currentErrorId = null;
         }
 
@@ -3908,7 +3883,7 @@
                 await Promise.all(updatePromises);
 
                 alert("Registro de erro atualizado com sucesso.");
-                closeEditErrorModal();
+                window.closeModalById('editErrorModal');
                 fetchErrors();
                 fetchInventory();
 
@@ -4309,7 +4284,6 @@
 
         // --- Histórico de Pagamentos ---
         window.openPaymentHistoryModal = () => {
-            const modal = document.getElementById('paymentHistoryModal');
             const tbody = document.getElementById('paymentHistoryBody');
             
             // Filtrar apenas os pagos
@@ -4340,8 +4314,7 @@
                 });
             }
 
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            window.openModalById('paymentHistoryModal');
         }
 
         // --- Impressão de Etiqueta (48mm) ---
