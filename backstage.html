@@ -992,6 +992,11 @@
                     <label class="text-sm font-medium text-gray-700">Observações</label>
                     <textarea id="orderObservation" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" rows="2" placeholder="Detalhes especiais do pedido..."></textarea>
                 </div>
+                <!-- Histórico -->
+                <div id="orderHistoryContainer" class="col-span-1 md:col-span-2 space-y-2 hidden">
+                    <label class="text-sm font-medium text-gray-700 flex items-center gap-2"><i data-lucide="history" class="h-4 w-4"></i> Histórico do Pedido</label>
+                    <div id="orderHistoryList" class="text-[10px] space-y-1 bg-gray-50 p-3 rounded-md border border-gray-200 max-h-32 overflow-y-auto"></div>
+                </div>
             </div>
 
             <div class="p-4 bg-gray-50 rounded-md border border-gray-200 space-y-4">
@@ -2064,11 +2069,16 @@
                             method: 'POST',
                             body: JSON.stringify(payload)
                         });
+
+                        if (!response.ok) {
+                            throw new Error(`Falha na comunicação com o Google: ${response.statusText}`);
+                        }
+
                         const data = await response.json();
                         if (data.result === 'success') {
                             resolve(data.url);
                         } else {
-                            throw new Error(data.error || 'Erro desconhecido no script');
+                            throw new Error(data.error || 'O servidor do Google retornou um erro desconhecido.');
                         }
                     } catch (err) {
                         console.error(err);
@@ -3018,6 +3028,12 @@
             document.getElementById('orderProductQty').value = 1;
             document.getElementById('orderProductPrice').value = '';
             
+            // Resetar Histórico
+            const historyContainer = document.getElementById('orderHistoryContainer');
+            const historyList = document.getElementById('orderHistoryList');
+            historyContainer.classList.add('hidden');
+            historyList.innerHTML = '';
+
             // Popular Select de Parceiros
             const partnerSelect = document.getElementById('orderPartner');
             partnerSelect.innerHTML = '<option value="">Selecione...</option>';
@@ -3132,6 +3148,18 @@
                     }
                     document.getElementById('orderObservation').value = data.observation || '';
                     orderList = data.items || [];
+
+                    // Renderizar Histórico
+                    if (data.history && data.history.length > 0) {
+                        historyContainer.classList.remove('hidden');
+                        data.history.forEach(log => {
+                            const date = new Date(log.date).toLocaleString('pt-BR');
+                            const div = document.createElement('div');
+                            div.className = 'flex justify-between border-b border-gray-100 pb-1 last:border-0';
+                            div.innerHTML = `<span>Status mudou para: <span class="font-bold">${log.status}</span></span> <span class="text-gray-400">${date}</span>`;
+                            historyList.appendChild(div);
+                        });
+                    }
                 } 
                 saveBtn.textContent = 'Salvar Alterações';
                 saveBtn.dataset.status = ''; 
@@ -3309,7 +3337,8 @@
                     const newOrder = { 
                         ...orderData, 
                         status: statusToSave, 
-                        createdAt: new Date().toISOString() 
+                        createdAt: new Date().toISOString(),
+                        history: [{ status: statusToSave, date: new Date().toISOString() }]
                     };
                     if (statusToSave === 'Pendente') {
                         newOrder.paymentStatus = 'Pendente';
@@ -3442,7 +3471,8 @@
                     paymentStatus: paymentStatus,
                     producerId: producerId,
                     approvedAt: new Date().toISOString(),
-                    downPayment: downPayment
+                    downPayment: downPayment,
+                    history: [...(orderData.history || []), { status: 'Pendente', date: new Date().toISOString() }]
                 });
 
                 window.closeModalById('confirmOrderModal');

@@ -855,6 +855,7 @@
                     total: cart.reduce((acc, i) => acc + (i.price * i.qty), 0),
                     status: 'Orçamento',
                     createdAt: new Date().toISOString(),
+                    history: [{ status: 'Orçamento', date: new Date().toISOString() }],
                     partnerId: partnerId || 'Geral' // Se ainda assim for null, vai para Geral
                 };
 
