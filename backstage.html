@@ -521,6 +521,9 @@
                             <button onclick="markSelectedAsPaid()" class="text-xs bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-1">
                                 <i data-lucide="check-circle" class="h-3 w-3"></i> Efetivar Pagamentos (<span id="transfer-selected-count">0</span>) - <span id="transfer-selected-total" class="font-bold">R$ 0,00</span>
                             </button>
+                            <button onclick="openPayTransferModal()" class="text-xs bg-primary text-white px-3 py-2 rounded hover:bg-primary/90 transition-colors flex items-center gap-1">
+                                <i data-lucide="banknote" class="h-3 w-3"></i> Registrar Repasse
+                            </button>
                             <button onclick="openPaymentHistoryModal()" class="text-xs border border-gray-300 bg-white text-gray-700 px-3 py-2 rounded hover:bg-gray-50 transition-colors flex items-center gap-1">
                                 <i data-lucide="history" class="h-3 w-3"></i> Histórico
                             </button>
@@ -560,6 +563,12 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Aviso de créditos aplicados automaticamente -->
+                    <div id="transferCreditNotice" class="hidden mx-6 mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"></div>
+
+                    <!-- Créditos em aberto (adiantamentos a consumir) -->
+                    <div id="transferCreditPanel" class="hidden mx-6 mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"></div>
 
                     <div class="p-6">
                         <table class="w-full text-sm text-left">
@@ -1240,6 +1249,60 @@
             
             <div class="flex justify-end pt-4 border-t">
                 <button onclick="window.print()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"><i data-lucide="printer" class="h-4 w-4"></i> Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Registrar Repasse -->
+    <div id="payTransferModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
+        <div class="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold text-primary">Registrar Repasse</h2>
+                    <p class="text-sm text-muted-foreground mt-1">Informe o valor e o sistema quita as OS pendentes, da mais antiga para a mais nova.</p>
+                </div>
+                <button onclick="window.closeModalById('payTransferModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-gray-500">Repassando para</label>
+                    <select id="payTransferBeneficiary" onchange="renderPayTransferPreview()" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"></select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-gray-500">Valor a repassar (R$)</label>
+                    <input type="number" step="0.01" min="0" id="payTransferAmount" oninput="renderPayTransferPreview()" placeholder="0,00" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                </div>
+            </div>
+
+            <div id="payTransferMessage" class="hidden rounded-md p-3 text-sm"></div>
+
+            <div class="border rounded-md overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-muted-foreground font-medium">
+                        <tr>
+                            <th class="px-3 py-2">Data Pedido</th>
+                            <th class="px-3 py-2">Pedido / Cliente</th>
+                            <th class="px-3 py-2">Tipo</th>
+                            <th class="px-3 py-2 text-right">Valor</th>
+                            <th class="px-3 py-2 text-right">Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payTransferBody" class="divide-y">
+                        <tr><td colspan="5" class="p-4 text-center text-muted-foreground">Escolha o beneficiário.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center border-t pt-4">
+                <div class="text-sm">
+                    <span class="text-gray-500">Será registrado:</span>
+                    <span id="payTransferTotal" class="text-lg font-bold text-green-700 ml-1">R$ 0,00</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="window.closeModalById('payTransferModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button id="payTransferConfirmBtn" onclick="confirmPayTransfer()" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Confirmar Repasse</button>
+                </div>
             </div>
         </div>
     </div>
@@ -4122,6 +4185,173 @@
         // --- Lógica de Repasses (Transfers) ---
         let transferList = [];
         let selectedTransferIds = new Set();
+        let partnerCredits = []; // Adiantamentos por beneficiário, a consumir em OS futuras
+
+        // Tolerância para comparar dinheiro (evita sobra de centavo por ponto flutuante)
+        const CENT = 0.005;
+
+        // Um beneficiário pode não ter parceiro cadastrado (Produção Geral, Caixa Interno).
+        // A chave normalizada mantém esses casos agrupados e serve de id no Firestore.
+        function transferBeneficiaryKey(t) {
+            return t.partnerId || `sem-parceiro-${t.type}`;
+        }
+
+        function sumTransfers(list) {
+            return list.reduce((total, t) => total + t.amount, 0);
+        }
+
+        // Pedido sem createdAt viraria Invalid Date e bagunçaria a ordenação: conta como o mais antigo.
+        function transferTime(t) {
+            const time = t.date ? new Date(t.date).getTime() : 0;
+            return isNaN(time) ? 0 : time;
+        }
+
+        // FIFO com salto: da OS mais antiga para a mais nova, pega toda que couber no saldo.
+        function selectTransfersForAmount(pending, amount) {
+            const ordered = [...pending].sort((a, b) => transferTime(a) - transferTime(b));
+            const selected = [];
+            let remaining = amount;
+
+            ordered.forEach(t => {
+                if (t.amount <= remaining + CENT) {
+                    selected.push(t);
+                    remaining -= t.amount;
+                }
+            });
+
+            return { ordered, selected, leftover: Math.max(remaining, 0) };
+        }
+
+        // Grava os repasses como pagos, agrupando por pedido (mesmo padrão de markSelectedAsPaid)
+        async function payTransfers(transfers, paymentDate) {
+            const updatesByOrder = {};
+
+            transfers.forEach(t => {
+                if (!updatesByOrder[t.orderId]) updatesByOrder[t.orderId] = {};
+                updatesByOrder[t.orderId][`payouts.${t.payoutKey}`] = true;
+                updatesByOrder[t.orderId][`payouts.${t.payoutKey}Date`] = paymentDate;
+            });
+
+            await Promise.all(Object.keys(updatesByOrder).map(orderId =>
+                updateDoc(doc(db, "orders", orderId), updatesByOrder[orderId])
+            ));
+
+            // Reflete na lista em memória para não precisar recarregar tudo
+            transfers.forEach(t => {
+                t.status = 'Pago';
+                t.paymentDate = paymentDate;
+            });
+        }
+
+        async function fetchPartnerCredits() {
+            try {
+                const snap = await getDocs(collection(db, "partnerCredits"));
+                partnerCredits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (e) {
+                console.error("Erro ao buscar créditos de repasse:", e);
+                partnerCredits = [];
+            }
+            return partnerCredits;
+        }
+
+        function getPartnerCredit(key) {
+            const credit = partnerCredits.find(c => c.id === key);
+            return credit ? (parseFloat(credit.amount) || 0) : 0;
+        }
+
+        // Grava o saldo de crédito do beneficiário, registrando o movimento no histórico
+        async function savePartnerCredit(key, beneficiary, amount, movement) {
+            const existing = partnerCredits.find(c => c.id === key);
+            const payload = {
+                partnerId: key,
+                beneficiary,
+                amount,
+                updatedAt: new Date().toISOString(),
+                history: [...((existing && existing.history) || []), movement]
+            };
+
+            await setDoc(doc(db, "partnerCredits", key), payload);
+
+            if (existing) {
+                Object.assign(existing, payload);
+            } else {
+                partnerCredits.push({ id: key, ...payload });
+            }
+        }
+
+        // Consome os adiantamentos nas OS que ficaram Pendentes, da mais antiga para a mais nova.
+        async function applyPartnerCredits() {
+            const notices = [];
+
+            for (const credit of partnerCredits) {
+                const available = parseFloat(credit.amount) || 0;
+                if (available <= CENT) continue;
+
+                const pending = transferList.filter(t =>
+                    t.status === 'Pendente' && transferBeneficiaryKey(t) === credit.id);
+                if (!pending.length) continue;
+
+                const { selected, leftover } = selectTransfersForAmount(pending, available);
+                if (!selected.length) continue;
+
+                const paymentDate = new Date().toISOString();
+                const used = sumTransfers(selected);
+
+                await payTransfers(selected, paymentDate);
+                await savePartnerCredit(credit.id, credit.beneficiary, leftover, {
+                    type: 'consumo',
+                    amount: used,
+                    date: paymentDate,
+                    orders: selected.map(t => t.orderId)
+                });
+
+                notices.push({
+                    beneficiary: credit.beneficiary,
+                    used,
+                    count: selected.length,
+                    remaining: leftover
+                });
+            }
+
+            return notices;
+        }
+
+        function renderCreditNotice(notices) {
+            const el = document.getElementById('transferCreditNotice');
+            if (!el) return;
+
+            if (!notices || !notices.length) {
+                el.classList.add('hidden');
+                el.innerHTML = '';
+                return;
+            }
+
+            el.innerHTML = '<div class="font-medium mb-1">Créditos aplicados automaticamente</div>' +
+                notices.map(n => {
+                    const resto = n.remaining > CENT
+                        ? ` Restam R$ ${n.remaining.toFixed(2)} de crédito.`
+                        : ' Crédito zerado.';
+                    return `<div>${n.beneficiary}: ${n.count} ${n.count === 1 ? 'OS quitada' : 'OS quitadas'} com R$ ${n.used.toFixed(2)}.${resto}</div>`;
+                }).join('');
+            el.classList.remove('hidden');
+        }
+
+        function renderCreditPanel() {
+            const el = document.getElementById('transferCreditPanel');
+            if (!el) return;
+
+            const abertos = partnerCredits.filter(c => (parseFloat(c.amount) || 0) > CENT);
+            if (!abertos.length) {
+                el.classList.add('hidden');
+                el.innerHTML = '';
+                return;
+            }
+
+            el.innerHTML = '<div class="font-medium mb-1">Créditos em aberto (serão usados nas próximas OS)</div>' +
+                abertos.map(c => `<div>${c.beneficiary}: <span class="font-bold">R$ ${(parseFloat(c.amount) || 0).toFixed(2)}</span></div>`).join('');
+            el.classList.remove('hidden');
+        }
+
 
         window.setTransferQuickFilter = (type, value) => {
             const now = new Date();
@@ -4201,6 +4431,7 @@
                         transferList.push({
                             id: `${order.id}_school`,
                             orderId: order.id,
+                            payoutKey: 'school',
                             date: order.createdAt,
                             clientName: order.clientName,
                             beneficiary: partner ? (partner.nickname || partner.name) : 'Escola Indefinida',
@@ -4218,6 +4449,7 @@
                         transferList.push({
                             id: `${order.id}_producer`,
                             orderId: order.id,
+                            payoutKey: 'producer',
                             date: order.createdAt,
                             clientName: order.clientName,
                             beneficiary: producer ? (producer.nickname || producer.name) : 'Produção Geral',
@@ -4235,6 +4467,7 @@
                         transferList.push({
                             id: `${order.id}_adm`,
                             orderId: order.id,
+                            payoutKey: 'adm',
                             date: order.createdAt,
                             clientName: order.clientName,
                             beneficiary: admPartner ? (admPartner.nickname || admPartner.name) : 'Caixa Interno',
@@ -4247,7 +4480,13 @@
                     }
                 });
 
+                // Adiantamentos: quitam automaticamente as OS que ficaram Pendentes
+                await fetchPartnerCredits();
+                const creditNotices = await applyPartnerCredits();
+
                 renderTransfers();
+                renderCreditNotice(creditNotices);
+                renderCreditPanel();
 
             } catch (e) {
                 console.error("Erro ao calcular repasses:", e);
@@ -4413,6 +4652,164 @@
             } catch (e) {
                 console.error("Erro ao efetivar pagamentos:", e);
                 alert("Erro ao atualizar dados.");
+            }
+        }
+
+        // --- Modal de Registrar Repasse ---
+        let payTransferSelection = { selected: [], ordered: [], leftover: 0, totalPending: 0, excess: 0 };
+
+        window.openPayTransferModal = () => {
+            const select = document.getElementById('payTransferBeneficiary');
+
+            // Beneficiários com repasse pendente, ordenados pelo maior valor a pagar
+            const byBeneficiary = new Map();
+            transferList.filter(t => t.status === 'Pendente').forEach(t => {
+                const key = transferBeneficiaryKey(t);
+                if (!byBeneficiary.has(key)) {
+                    byBeneficiary.set(key, { key, name: t.beneficiary, total: 0, count: 0 });
+                }
+                const entry = byBeneficiary.get(key);
+                entry.total += t.amount;
+                entry.count++;
+            });
+
+            const options = [...byBeneficiary.values()].sort((a, b) => b.total - a.total);
+
+            if (!options.length) {
+                alert("Não há repasses com status Pendente para registrar.");
+                return;
+            }
+
+            select.innerHTML = options.map(o =>
+                `<option value="${o.key}">${o.name} — ${o.count} ${o.count === 1 ? 'OS' : 'OS'} / R$ ${o.total.toFixed(2)}</option>`
+            ).join('');
+
+            document.getElementById('payTransferAmount').value = '';
+            renderPayTransferPreview();
+            window.openModalById('payTransferModal');
+        }
+
+        window.renderPayTransferPreview = () => {
+            const key = document.getElementById('payTransferBeneficiary').value;
+            const amount = parseFloat(document.getElementById('payTransferAmount').value) || 0;
+            const tbody = document.getElementById('payTransferBody');
+            const msgEl = document.getElementById('payTransferMessage');
+            const totalEl = document.getElementById('payTransferTotal');
+            const confirmBtn = document.getElementById('payTransferConfirmBtn');
+
+            const pending = transferList.filter(t => t.status === 'Pendente' && transferBeneficiaryKey(t) === key);
+            const totalPending = sumTransfers(pending);
+            const credit = getPartnerCredit(key);
+
+            const { ordered, selected, leftover } = selectTransfersForAmount(pending, amount);
+            const selectedIds = new Set(selected.map(t => t.id));
+            const registered = sumTransfers(selected);
+            const excess = Math.max(amount - totalPending, 0);
+
+            payTransferSelection = { selected, ordered, leftover, totalPending, excess, key, amount };
+
+            tbody.innerHTML = ordered.map(t => {
+                const isSelected = selectedIds.has(t.id);
+                const situacao = isSelected
+                    ? '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Será paga</span>'
+                    : '<span class="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">Fica pendente</span>';
+                return `
+                    <tr class="${isSelected ? '' : 'opacity-50'}">
+                        <td class="px-3 py-2">${new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                        <td class="px-3 py-2 text-xs text-gray-500">#${t.orderId.slice(-4)} - ${t.clientName}</td>
+                        <td class="px-3 py-2">${t.type}</td>
+                        <td class="px-3 py-2 text-right font-medium">R$ ${t.amount.toFixed(2)}</td>
+                        <td class="px-3 py-2 text-right">${situacao}</td>
+                    </tr>`;
+            }).join('');
+
+            totalEl.textContent = `R$ ${registered.toFixed(2)}`;
+
+            // Mensagens: excedente vira crédito; sobra que não fecha OS não é usada
+            const avisos = [];
+            let tone = 'bg-blue-50 border border-blue-200 text-blue-900';
+
+            if (credit > CENT) {
+                avisos.push(`Este beneficiário já tem R$ ${credit.toFixed(2)} de crédito em aberto, que será usado nas próximas OS.`);
+            }
+
+            if (amount > CENT && selected.length === 0 && excess <= CENT) {
+                tone = 'bg-amber-50 border border-amber-200 text-amber-900';
+                const menor = Math.min(...pending.map(t => t.amount));
+                avisos.push(`Nenhuma OS pendente cabe em R$ ${amount.toFixed(2)}. A menor é de R$ ${menor.toFixed(2)}.`);
+            } else if (amount > CENT && excess > CENT) {
+                tone = 'bg-amber-50 border border-amber-200 text-amber-900';
+                avisos.push(`O valor excede em <b>R$ ${excess.toFixed(2)}</b> o total pendente (R$ ${totalPending.toFixed(2)}). Todas as ${pending.length} OS serão quitadas e o excedente vira crédito, usado automaticamente nas próximas OS.`);
+            } else if (amount > CENT && leftover > CENT) {
+                tone = 'bg-amber-50 border border-amber-200 text-amber-900';
+                avisos.push(`Sobram <b>R$ ${leftover.toFixed(2)}</b> que não fecham nenhuma OS e <b>não serão registrados</b>. Serão lançados R$ ${registered.toFixed(2)}.` +
+                    ` <button type="button" onclick="adjustPayTransferAmount()" class="underline font-medium">Ajustar para R$ ${registered.toFixed(2)}</button>`);
+            }
+
+            if (avisos.length) {
+                msgEl.className = `rounded-md p-3 text-sm space-y-1 ${tone}`;
+                msgEl.innerHTML = avisos.map(a => `<div>${a}</div>`).join('');
+            } else {
+                msgEl.className = 'hidden rounded-md p-3 text-sm';
+                msgEl.innerHTML = '';
+            }
+
+            confirmBtn.disabled = amount <= CENT || (selected.length === 0 && excess <= CENT);
+        }
+
+        window.adjustPayTransferAmount = () => {
+            const registered = sumTransfers(payTransferSelection.selected);
+            document.getElementById('payTransferAmount').value = registered.toFixed(2);
+            renderPayTransferPreview();
+        }
+
+        window.confirmPayTransfer = async () => {
+            const { key, amount, selected, excess, leftover, totalPending } = payTransferSelection;
+            const btn = document.getElementById('payTransferConfirmBtn');
+            const beneficiary = selected.length
+                ? selected[0].beneficiary
+                : (transferList.find(t => transferBeneficiaryKey(t) === key) || {}).beneficiary || 'Beneficiário';
+
+            const registered = sumTransfers(selected);
+
+            if (excess > CENT) {
+                if (!confirm(`O valor de R$ ${amount.toFixed(2)} excede o total pendente de ${beneficiary} (R$ ${totalPending.toFixed(2)}).\n\n` +
+                    `${selected.length} ${selected.length === 1 ? 'OS será quitada' : 'OS serão quitadas'} e R$ ${excess.toFixed(2)} ficarão como crédito, ` +
+                    `usado automaticamente nas próximas OS.\n\nConfirmar?`)) return;
+            } else if (leftover > CENT) {
+                if (!confirm(`Serão registrados R$ ${registered.toFixed(2)} para ${beneficiary}, e não os R$ ${amount.toFixed(2)} digitados.\n\n` +
+                    `A diferença de R$ ${leftover.toFixed(2)} não fecha nenhuma OS e não será registrada.\n\nConfirmar mesmo assim?`)) return;
+            } else {
+                if (!confirm(`Confirmar repasse de R$ ${registered.toFixed(2)} para ${beneficiary} (${selected.length} ${selected.length === 1 ? 'OS' : 'OS'})?`)) return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Registrando...';
+
+            try {
+                const paymentDate = new Date().toISOString();
+
+                if (selected.length) await payTransfers(selected, paymentDate);
+
+                if (excess > CENT) {
+                    await savePartnerCredit(key, beneficiary, getPartnerCredit(key) + excess, {
+                        type: 'entrada',
+                        amount: excess,
+                        date: paymentDate,
+                        orders: selected.map(t => t.orderId)
+                    });
+                }
+
+                window.closeModalById('payTransferModal');
+                alert(`Repasse registrado: R$ ${registered.toFixed(2)} para ${beneficiary}.` +
+                    (excess > CENT ? `\nCrédito gerado: R$ ${excess.toFixed(2)}.` : ''));
+                fetchTransfers();
+            } catch (e) {
+                console.error("Erro ao registrar repasse:", e);
+                alert("Erro ao registrar repasse: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Repasse';
             }
         }
 
