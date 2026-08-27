@@ -1331,6 +1331,16 @@
         let currentSizeChart = [];
         window.allOrders = []; // Global para acesso no dashboard
 
+        // Status em que o pedido é considerado concluído para fins de repasse.
+        const DONE_STATUSES = ['Finalizado', 'Entregue', 'Arquivado'];
+
+        // Um repasse está "liberado" quando já foi marcado como tal (payouts.releasedAt),
+        // ou - para pedidos antigos, sem a marca - quando o pedido está concluído.
+        function isTransferReleased(order) {
+            const payouts = order.payouts || {};
+            return !!payouts.releasedAt || DONE_STATUSES.includes(order.status || '');
+        }
+
         // Função para buscar parceiros
         async function fetchPartners() {
             try {
@@ -3360,6 +3370,27 @@
         }
 
         window.deleteOrder = async (id) => {
+            // Os repasses são derivados do pedido: excluir o pedido remove os repasses.
+            // Se algum deles já foi pago, avisar antes que o histórico será perdido.
+            const order = (window.allOrders || []).find(o => o.id === id);
+
+            if (order) {
+                if (!window.cachedProducts) {
+                    const pSnap = await getDocs(collection(db, "products"));
+                    window.cachedProducts = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                }
+
+                const commissions = calculateCommissions(order);
+                const payouts = order.payouts || {};
+                const paidTotal = (payouts.school ? commissions.school : 0)
+                                + (payouts.producer ? commissions.prod : 0)
+                                + (payouts.adm ? commissions.adm : 0);
+
+                if (paidTotal > 0 && !confirm(
+                    `ATENÇÃO: este pedido possui R$ ${paidTotal.toFixed(2)} em repasses já PAGOS.\n` +
+                    `Excluir vai remover esses lançamentos do histórico de repasses.\n\nContinuar?`)) return;
+            }
+
             if (confirm('Excluir este orçamento/pedido?')) {
                 try {
                     await deleteDoc(doc(db, "orders", id));
@@ -3559,9 +3590,16 @@
 
                 // Definir quais status consideram o estoque "baixado"
                 const deductedStatuses = ['Finalizado', 'Entregue'];
-                
-                const wasDeducted = deductedStatuses.includes(oldStatus);
-                const willBeDeducted = deductedStatuses.includes(newStatus);
+
+                // Arquivar é neutro para o estoque: preserva o estado de baixa anterior.
+                // Ao sair do arquivo, retoma o status de origem guardado em archivedFrom.
+                const effectiveOld = oldStatus === 'Arquivado'
+                    ? (order.archivedFrom || oldStatus)
+                    : oldStatus;
+                const effectiveNew = newStatus === 'Arquivado' ? effectiveOld : newStatus;
+
+                const wasDeducted = deductedStatuses.includes(effectiveOld);
+                const willBeDeducted = deductedStatuses.includes(effectiveNew);
 
                 // Carregar produtos para referência de estampas (se necessário)
                 if (!window.cachedProducts) {
@@ -3623,6 +3661,19 @@
                     updateData.deliveredAt = new Date().toISOString();
                 }
 
+                // Guarda de onde o pedido foi arquivado, para o estoque saber voltar
+                if (newStatus === 'Arquivado') {
+                    updateData.archivedFrom = oldStatus;
+                }
+
+                // Libera o repasse quando o pedido conclui com o cliente já 100% pago.
+                // Depois de liberado, só uma mudança no pagamento pode reverter.
+                if (DONE_STATUSES.includes(newStatus)
+                    && order.paymentStatus === 'Pago Total'
+                    && !(order.payouts || {}).releasedAt) {
+                    updateData['payouts.releasedAt'] = new Date().toISOString();
+                }
+
                 await updateDoc(doc(db, "orders", id), updateData);
                 fetchOrders(); 
             } catch (e) {
@@ -3635,8 +3686,10 @@
                 const updateData = { paymentStatus: newStatus };
                 let downPayment = 0;
 
+                const orderSnap = await getDoc(doc(db, "orders", id));
+                const order = orderSnap.exists() ? orderSnap.data() : null;
+
                 if (newStatus === 'Pago Parcial') {
-                    const order = window.allOrders.find(o => o.id === id);
                     const currentSinal = order ? (order.downPayment || 0) : 0;
                     const sinalValue = prompt("Informe o valor do sinal (entrada):", currentSinal);
                     downPayment = parseFloat(sinalValue);
@@ -3646,6 +3699,17 @@
                         return;
                     }
                     updateData.downPayment = downPayment;
+                }
+
+                // O pagamento do cliente é a única porta que libera ou reverte o repasse.
+                if (newStatus === 'Pago Total') {
+                    if (order && DONE_STATUSES.includes(order.status || '')
+                        && !(order.payouts || {}).releasedAt) {
+                        updateData['payouts.releasedAt'] = new Date().toISOString();
+                    }
+                } else {
+                    // Pagamento regrediu -> repasse ainda não pago volta para "Aberto"
+                    updateData['payouts.releasedAt'] = null;
                 }
 
                 await updateDoc(doc(db, "orders", id), updateData);
@@ -4116,15 +4180,17 @@
                     const { school: finalSchoolTotal, prod: finalProdTotal, adm: finalAdmTotal } = commissions;
 
                     // Determinar Status Base do Repasse
-                    // Aberto: Pedido não finalizado OU Cliente não pagou tudo
-                    // Pendente: Pedido Finalizado/Entregue E Cliente Pagou Tudo (Pronto para pagar parceiro)
+                    // Aberto: Repasse ainda não liberado OU Cliente não pagou tudo
+                    // Pendente: Repasse liberado E Cliente Pagou Tudo (Pronto para pagar parceiro)
                     // Pago: Marcado explicitamente no objeto payouts do pedido
+                    //
+                    // Uma vez liberado (payouts.releasedAt), só o pagamento do cliente devolve
+                    // o repasse para "Aberto" - arquivar ou voltar o status do pedido não mexe.
 
-                    const isOrderDone = ['Finalizado', 'Entregue'].includes(order.status);
                     const isClientPaid = order.paymentStatus === 'Pago Total';
                     const payouts = order.payouts || {};
 
-                    const baseStatus = (isOrderDone && isClientPaid) ? 'Pendente' : 'Aberto';
+                    const baseStatus = (isClientPaid && isTransferReleased(order)) ? 'Pendente' : 'Aberto';
 
                     // 1. Repasse Escola
                     if (finalSchoolTotal > 0) {
@@ -4579,7 +4645,14 @@
                             const diff = now - dateRef;
                             if (diff > thirtyDaysInMs) {
                                 console.log(`Arquivando pedido ${docSnap.id} automaticamente.`);
-                                await updateDoc(doc(db, "orders", docSnap.id), { status: 'Arquivado' });
+                                const archiveData = { status: 'Arquivado', archivedFrom: 'Entregue' };
+
+                                // Preserva a liberação do repasse ao arquivar
+                                if (order.paymentStatus === 'Pago Total' && !(order.payouts || {}).releasedAt) {
+                                    archiveData['payouts.releasedAt'] = new Date().toISOString();
+                                }
+
+                                await updateDoc(doc(db, "orders", docSnap.id), archiveData);
                             }
                         }
                     }
