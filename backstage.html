@@ -1248,7 +1248,10 @@
     <div id="paymentHistoryModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
         <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-primary">Histórico de Repasses Realizados</h2><button onclick="window.closeModalById('paymentHistoryModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+                <div>
+                    <h2 class="text-xl font-bold text-primary">Histórico de Repasses Realizados</h2>
+                    <p id="paymentHistoryScope" class="text-sm text-muted-foreground mt-1">Todos os repasses pagos</p>
+                </div><button onclick="window.closeModalById('paymentHistoryModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
             
             <div class="border rounded-md overflow-hidden">
@@ -4252,28 +4255,62 @@
             }
         }
 
-        function renderTransfers() {
-            const tbody = document.getElementById('transfers-table-body');
-            const filterPartner = document.getElementById('transferFilterPartner').value;
-            const filterType = document.getElementById('transferFilterType').value;
-            const filterStatus = document.getElementById('transferFilterStatus').value;
-            
+        // Lê os filtros da aba Repasses uma única vez (usado pela tabela e pelo extrato).
+        function getTransferFilters() {
             const startDateInput = document.getElementById('transferStartDate').value;
             const endDateInput = document.getElementById('transferEndDate').value;
-            let filterStart, filterEnd;
+            let start, end;
             if (startDateInput && endDateInput) {
-                filterStart = new Date(startDateInput); filterStart.setHours(0,0,0,0);
-                filterEnd = new Date(endDateInput); filterEnd.setHours(23,59,59,999);
+                // "2026-08-01" em new Date() é lido como UTC e, em fuso negativo, cai no dia
+                // anterior. Montar a data pelos componentes mantém o dia escolhido.
+                const [sy, sm, sd] = startDateInput.split('-').map(Number);
+                const [ey, em, ed] = endDateInput.split('-').map(Number);
+                start = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+                end = new Date(ey, em - 1, ed, 23, 59, 59, 999);
             }
+            return {
+                partner: document.getElementById('transferFilterPartner').value,
+                type: document.getElementById('transferFilterType').value,
+                status: document.getElementById('transferFilterStatus').value,
+                start,
+                end
+            };
+        }
 
-            let filtered = transferList.filter(t => {
-                if (filterPartner && t.partnerId !== filterPartner) return false;
-                if (filterType && t.type !== filterType) return false;
-                if (filterStatus && t.status !== filterStatus) return false;
-                const tDate = new Date(t.date);
-                if (filterStart && filterEnd && (tDate < filterStart || tDate > filterEnd)) return false;
+        // dateField: 'date' (data do pedido, usado na tabela) ou 'paymentDate' (extrato).
+        function filterTransfers(list, filters, dateField = 'date') {
+            return list.filter(t => {
+                if (filters.partner && t.partnerId !== filters.partner) return false;
+                if (filters.type && t.type !== filters.type) return false;
+                if (filters.status && t.status !== filters.status) return false;
+                if (filters.start && filters.end) {
+                    // Sem a data de referência não dá para afirmar que caiu na janela
+                    if (!t[dateField]) return false;
+                    const d = new Date(t[dateField]);
+                    if (d < filters.start || d > filters.end) return false;
+                }
                 return true;
             });
+        }
+
+        // Descreve em texto o recorte ativo, para o subtítulo do extrato.
+        function describeTransferFilters(filters) {
+            const parts = [];
+            if (filters.partner) {
+                const partner = partners.find(item => item.id === filters.partner);
+                parts.push(partner ? (partner.nickname || partner.name) : 'Parceiro selecionado');
+            }
+            if (filters.type) parts.push(filters.type);
+            if (filters.start && filters.end) {
+                parts.push(`pagamentos de ${filters.start.toLocaleDateString('pt-BR')} a ${filters.end.toLocaleDateString('pt-BR')}`);
+            }
+            return parts.length ? parts.join(' · ') : 'Todos os repasses pagos';
+        }
+
+        function renderTransfers() {
+            const tbody = document.getElementById('transfers-table-body');
+
+            let filtered = filterTransfers(transferList, getTransferFilters());
 
             // Ordenar: Pendente primeiro, depois Aberto, depois Pago
             const statusOrder = { 'Pendente': 1, 'Aberto': 2, 'Pago': 3 };
@@ -4383,8 +4420,18 @@
         window.openPaymentHistoryModal = () => {
             const tbody = document.getElementById('paymentHistoryBody');
             
-            // Filtrar apenas os pagos
-            const paidTransfers = transferList.filter(t => t.status === 'Pago');
+            // O extrato é sempre de repasses pagos, seguindo os filtros da aba.
+            // O filtro de Status não se aplica aqui (senão "Aberto" esvaziaria o extrato)
+            // e o período filtra pela data do PAGAMENTO, não pela data do pedido.
+            const filters = getTransferFilters();
+            const paidTransfers = filterTransfers(
+                transferList.filter(t => t.status === 'Pago'),
+                { ...filters, status: '' },
+                'paymentDate'
+            );
+
+            const scopeEl = document.getElementById('paymentHistoryScope');
+            if (scopeEl) scopeEl.textContent = describeTransferFilters(filters);
             
             // Ordenar por data de pagamento (mais recente primeiro)
             paidTransfers.sort((a, b) => {
@@ -4419,6 +4466,25 @@
                         <td class="px-4 py-3 text-right font-bold text-green-700">R$ ${dayTotal.toFixed(2)}</td>
                     `;
                     tbody.appendChild(headerRow);
+
+                    // Quanto cada beneficiário recebeu nesta movimentação.
+                    // Com um único beneficiário no dia a linha repetiria o total do cabeçalho.
+                    const byBeneficiary = new Map();
+                    items.forEach(t => {
+                        byBeneficiary.set(t.beneficiary, (byBeneficiary.get(t.beneficiary) || 0) + t.amount);
+                    });
+
+                    if (byBeneficiary.size > 1) {
+                        const resumo = [...byBeneficiary.entries()]
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([nome, valor]) => `<span class="whitespace-nowrap"><span class="font-medium text-gray-700">${nome}</span> R$ ${valor.toFixed(2)}</span>`)
+                            .join('<span class="text-gray-300 mx-2">·</span>');
+
+                        const resumoRow = document.createElement('tr');
+                        resumoRow.className = 'bg-gray-50';
+                        resumoRow.innerHTML = `<td colspan="5" class="px-4 pb-3 pl-8 text-xs text-gray-500">${resumo}</td>`;
+                        tbody.appendChild(resumoRow);
+                    }
 
                     // Detalhe de cada OS repassada no dia
                     items.forEach(t => {
