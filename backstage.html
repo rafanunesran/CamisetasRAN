@@ -1255,7 +1255,7 @@
                 <table class="w-full text-sm text-left">
                     <thead class="bg-gray-100 text-muted-foreground font-medium">
                         <tr>
-                            <th class="px-4 py-3">Data Pagamento</th>
+                            <th class="px-4 py-3">Hora</th>
                             <th class="px-4 py-3">Beneficiário</th>
                             <th class="px-4 py-3">Tipo</th>
                             <th class="px-4 py-3">Ref. Pedido</th>
@@ -4397,17 +4397,42 @@
             if (paidTransfers.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-muted-foreground">Nenhum pagamento registrado no histórico.</td></tr>';
             } else {
+                // Agrupar por dia de pagamento. A ordenação acima já garante que os dias
+                // saiam do mais recente para o mais antigo (Map preserva a ordem de inserção).
+                const byDay = new Map();
                 paidTransfers.forEach(t => {
-                    const dateStr = t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('pt-BR') + ' ' + new Date(t.paymentDate).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : '-';
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="px-4 py-3">${dateStr}</td>
-                        <td class="px-4 py-3 font-medium">${t.beneficiary}</td>
-                        <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs bg-gray-100">${t.type}</span></td>
-                        <td class="px-4 py-3 text-xs text-gray-500">#${t.orderId.slice(-4)} - ${t.clientName}</td>
-                        <td class="px-4 py-3 text-right font-bold text-green-700">R$ ${t.amount.toFixed(2)}</td>
+                    const dayKey = t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('pt-BR') : 'Sem data';
+                    if (!byDay.has(dayKey)) byDay.set(dayKey, []);
+                    byDay.get(dayKey).push(t);
+                });
+
+                byDay.forEach((items, day) => {
+                    // Cabeçalho do dia: total repassado naquele dia
+                    const dayTotal = items.reduce((sum, t) => sum + t.amount, 0);
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = 'bg-gray-50 border-t-2 border-gray-200';
+                    headerRow.innerHTML = `
+                        <td colspan="4" class="px-4 py-3 font-bold text-gray-800">
+                            ${day}
+                            <span class="ml-2 font-normal text-xs text-muted-foreground">${items.length} ${items.length === 1 ? 'repasse' : 'repasses'}</span>
+                        </td>
+                        <td class="px-4 py-3 text-right font-bold text-green-700">R$ ${dayTotal.toFixed(2)}</td>
                     `;
-                    tbody.appendChild(tr);
+                    tbody.appendChild(headerRow);
+
+                    // Detalhe de cada OS repassada no dia
+                    items.forEach(t => {
+                        const timeStr = t.paymentDate ? new Date(t.paymentDate).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : '-';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td class="px-4 py-3 pl-8 text-xs text-gray-500">${timeStr}</td>
+                            <td class="px-4 py-3 font-medium">${t.beneficiary}</td>
+                            <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs bg-gray-100">${t.type}</span></td>
+                            <td class="px-4 py-3 text-xs text-gray-500">#${t.orderId.slice(-4)} - ${t.clientName}</td>
+                            <td class="px-4 py-3 text-right text-green-700">R$ ${t.amount.toFixed(2)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
                 });
             }
 
