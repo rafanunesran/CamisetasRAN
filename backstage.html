@@ -1282,9 +1282,14 @@
                     <label class="text-xs font-medium text-gray-700">Espaçamento (<span class="pf-unit">cm</span>)</label>
                     <input id="printFileGap" type="number" step="0.1" min="0" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 1">
                 </div>
-                <label class="flex items-center gap-2 text-xs font-medium text-gray-700 h-9">
-                    <input id="printFileRotate" type="checkbox" checked class="h-4 w-4"> Permitir girar 90°
-                </label>
+                <div class="space-y-1">
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700">
+                        <input id="printFileRotate" type="checkbox" checked class="h-4 w-4"> Permitir girar
+                    </label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Áreas 100% transparentes de uma estampa podem ficar sobre outra; o espaçamento vale entre as partes com tinta">
+                        <input id="printFileNest" type="checkbox" checked class="h-4 w-4"> Encaixar nas áreas transparentes
+                    </label>
+                </div>
             </div>
             <p class="text-xs text-muted-foreground">A altura do arquivo é calculada automaticamente, com as estampas organizadas para o menor desperdício. O arquivo final usa a mesma resolução (DPI) das estampas (até 600 DPI ou mais, sem limite de altura); estampas com DPI diferentes saem em arquivos separados.</p>
 
@@ -3375,6 +3380,7 @@
             document.getElementById('printFileWidth').value = saved.width ?? '';
             document.getElementById('printFileGap').value = saved.gap ?? '';
             document.getElementById('printFileRotate').checked = saved.rotate !== false;
+            document.getElementById('printFileNest').checked = saved.nest !== false;
 
             document.getElementById('printFileStatus').textContent = '';
             document.getElementById('printFilePreview').innerHTML = '';
@@ -3637,10 +3643,11 @@
             const width = parseFloat(document.getElementById('printFileWidth').value);
             const gap = parseFloat(document.getElementById('printFileGap').value) || 0;
             const rotate = document.getElementById('printFileRotate').checked;
+            const nest = document.getElementById('printFileNest').checked;
             if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
             if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
-            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate })); } catch (e) { /* sem armazenamento local */ }
-            return { widthCm: toCm(width), gapCm: toCm(gap), rotate };
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest };
         }
 
         // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
@@ -3688,7 +3695,7 @@
                     });
                 });
                 if (!best) { leftover.push(r); return; }
-                placed.push({ ...r, x: best.x, y: best.y, pw: best.w, ph: best.h, rotated: best.rotated });
+                placed.push({ ...r, x: best.x, y: best.y, pw: best.w, ph: best.h, orient: best.rotated ? 1 : 0 });
 
                 // Divide os espaços livres que colidem com o item colocado
                 const next = [];
@@ -3760,26 +3767,175 @@
             return { ...best, dpi, sheetWidthPx, items };
         }
 
+        // ---- Encaixe pelas áreas com tinta (as transparentes podem se sobrepor) ----
+        const NEST_CELL_MM = 0.5; // resolução da grade de encaixe
+
+        // Varre o alpha da estampa uma vez: guarda as faixas com tinta de cada linha (para colar
+        // só os pixels visíveis) e o contorno (topo/base por coluna) nas 4 orientações.
+        function analyzePrintShape(pixels, cellPx) {
+            const { width: W, height: H, data, stride, offset, depth } = pixels;
+            const pxBytes = depth / 8 * 4;
+            const alphaAt = depth === 16 ? 6 : 3;
+            const cellFwd = new Int32Array(W); // coluna -> célula (da esquerda)
+            const cellRev = new Int32Array(W); // coluna -> célula (espelhada)
+            for (let x = 0; x < W; x++) { cellFwd[x] = Math.floor(x / cellPx); cellRev[x] = Math.floor((W - 1 - x) / cellPx); }
+            const cw = [Math.ceil(W / cellPx), Math.ceil(H / cellPx)];
+            const makeProfile = (cols) => ({ top: new Int32Array(cols).fill(-1), bottom: new Int32Array(cols).fill(-1) });
+            // orient 0: sem giro · 1: 90° horário · 2: 180° · 3: 270° horário
+            const prof = [makeProfile(cw[0]), makeProfile(cw[1]), makeProfile(cw[0]), makeProfile(cw[1])];
+            const mark = (pr, col, t, b) => {
+                if (pr.top[col] < 0 || t < pr.top[col]) pr.top[col] = t;
+                if (b > pr.bottom[col]) pr.bottom[col] = b;
+            };
+
+            const runStarts = new Int32Array(H + 1);
+            let runs = new Int32Array(Math.max(1024, H * 4));
+            let runCount = 0;
+            let inkPixels = 0;
+            for (let y = 0; y < H; y++) {
+                runStarts[y] = runCount;
+                const rowStart = offset + y * stride;
+                const cy = Math.floor(y / cellPx);
+                const cyRev = Math.floor((H - 1 - y) / cellPx);
+                let x = 0;
+                while (x < W) {
+                    let p = rowStart + x * pxBytes + alphaAt;
+                    while (x < W && data[p] === 0 && (depth === 8 || data[p + 1] === 0)) { x++; p += pxBytes; }
+                    if (x >= W) break;
+                    const a = x;
+                    while (x < W && (data[p] !== 0 || (depth === 16 && data[p + 1] !== 0))) { x++; p += pxBytes; }
+                    const b = x - 1;
+                    inkPixels += x - a;
+                    if (runCount * 2 + 2 > runs.length) { const bigger = new Int32Array(runs.length * 2); bigger.set(runs); runs = bigger; }
+                    runs[runCount * 2] = a; runs[runCount * 2 + 1] = x;
+                    runCount++;
+                    for (let c = cellFwd[a]; c <= cellFwd[b]; c++) mark(prof[0], c, cy, cy);
+                    for (let c = cellRev[b]; c <= cellRev[a]; c++) mark(prof[2], c, cyRev, cyRev);
+                    mark(prof[1], cyRev, cellFwd[a], cellFwd[b]);   // 90°: coluna = linha espelhada, linhas = colunas
+                    mark(prof[3], cy, cellRev[b], cellRev[a]);      // 270°: coluna = linha, linhas = colunas espelhadas
+                }
+            }
+            runStarts[H] = runCount;
+
+            const orients = prof.map((pr, orient) => {
+                let minC = -1, maxC = -1, minTop = Infinity, maxBottom = -1;
+                for (let c = 0; c < pr.top.length; c++) {
+                    if (pr.top[c] < 0) continue;
+                    if (minC < 0) minC = c;
+                    maxC = c;
+                    minTop = Math.min(minTop, pr.top[c]);
+                    maxBottom = Math.max(maxBottom, pr.bottom[c]);
+                }
+                return { orient, ...pr, cols: pr.top.length, minC, maxC, minTop, maxBottom };
+            });
+            return { runs, runStarts, inkPixels, orients, empty: runCount === 0 };
+        }
+
+        function nestPrints(items, settings, dpi) {
+            const sheetWidthPx = Math.round(settings.widthCm / 2.54 * dpi);
+            const gapPx = Math.round(settings.gapCm / 2.54 * dpi);
+            const cellPx = Math.max(1, Math.round(dpi * NEST_CELL_MM / 25.4));
+            const Wc = Math.floor(sheetWidthPx / cellPx);
+            const g = Math.ceil(gapPx / cellPx);
+
+            const shapes = items.map(row => {
+                const orients = (settings.rotate ? row.shape.orients : [row.shape.orients[0]])
+                    .filter(o => o.minC >= 0 && o.maxC - o.minC + 1 <= Wc)
+                    .map(o => {
+                        // Base "engordada" pelo espaçamento: o que a próxima estampa não pode invadir
+                        const bottomD = new Int32Array(o.cols + 2 * g).fill(-1);
+                        for (let c = o.minC; c <= o.maxC; c++) {
+                            if (o.bottom[c] < 0) continue;
+                            for (let d = c - g; d <= c + g; d++) bottomD[d + g] = Math.max(bottomD[d + g], o.bottom[c] + g);
+                        }
+                        return { ...o, bottomD };
+                    });
+                if (orients.length === 0) {
+                    throw new Error(`A estampa "${row.item.name}" (${formatCm(pxToCm(row.widthPx, dpi))} × ${formatCm(pxToCm(row.heightPx, dpi))} cm) não cabe na largura do arquivo.`);
+                }
+                return { row, orients, ink: row.shape.inkPixels };
+            });
+
+            const copies = [];
+            shapes.forEach(shape => { for (let c = 0; c < shape.row.copies; c++) copies.push(shape); });
+            const strategies = [
+                (a, b) => b.ink - a.ink,
+                (a, b) => Math.max(b.row.widthPx, b.row.heightPx) - Math.max(a.row.widthPx, a.row.heightPx) || b.ink - a.ink
+            ];
+
+            let best = null;
+            strategies.forEach(sortFn => {
+                const order = [...copies].sort(sortFn);
+                const sky = new Int32Array(Wc); // por coluna: primeira linha livre abaixo do que já foi colocado
+                const placed = [];
+                let extent = 0;
+                for (const shape of order) {
+                    let pick = null;
+                    for (const o of shape.orients) {
+                        for (let xs = -o.minC; xs + o.maxC < Wc; xs++) {
+                            // "Sobe" a estampa até encostar (respeitando o espaçamento) no que já existe
+                            let y = -o.minTop;
+                            for (let c = o.minC; c <= o.maxC; c++) {
+                                const t = o.top[c];
+                                if (t >= 0) { const need = sky[xs + c] - t; if (need > y) y = need; }
+                            }
+                            const bottom = y + o.maxBottom;
+                            if (!pick || bottom < pick.bottom || (bottom === pick.bottom && (y < pick.y || (y === pick.y && xs < pick.xs)))) {
+                                pick = { o, xs, y, bottom };
+                            }
+                        }
+                    }
+                    const { o, xs, y } = pick;
+                    for (let d = 0; d < o.bottomD.length; d++) {
+                        const col = xs + d - g;
+                        if (o.bottomD[d] < 0 || col < 0 || col >= Wc) continue;
+                        sky[col] = Math.max(sky[col], y + o.bottomD[d] + 1);
+                    }
+                    extent = Math.max(extent, pick.bottom + 1);
+                    placed.push({ row: shape.row, x: xs * cellPx, y: y * cellPx, orient: o.orient });
+                }
+                const heightPx = Math.max(1, extent * cellPx);
+                if (!best || heightPx < best.totalHeightPx) best = { sheets: [{ placed, heightPx }], totalHeightPx: heightPx };
+            });
+            return { ...best, dpi, sheetWidthPx, items };
+        }
+
+        // Escolhe entre o encaixe por contorno e o retangular, o que gastar menos altura
+        function layoutPrints(group, settings, dpi) {
+            const rect = packPrints(group, settings, dpi);
+            if (!settings.nest) return rect;
+            const cellPx = Math.max(1, Math.round(dpi * NEST_CELL_MM / 25.4));
+            group.forEach(row => {
+                if (!row.shape || row.shape.cellPx !== cellPx) row.shape = { ...analyzePrintShape(row.pixels, cellPx), cellPx };
+                if (row.shape.empty) throw new Error(`A estampa "${row.item.name}" é totalmente transparente.`);
+            });
+            const nested = nestPrints(group, settings, dpi);
+            return nested.totalHeightPx < rect.totalHeightPx ? nested : rect;
+        }
+
+        const orientedSize = (row, orient) => orient % 2 ? [row.heightPx, row.widthPx] : [row.widthPx, row.heightPx];
+
         // Pré-visualização (miniaturas); o arquivo final é gravado por writePrintSheetPng
         function drawSheet(ctx, sheet, scale) {
             sheet.placed.forEach(p => {
                 const w = p.row.widthPx * scale;
                 const h = p.row.heightPx * scale;
+                const x = p.x * scale, y = p.y * scale;
                 ctx.save();
-                if (p.rotated) {
-                    ctx.translate(p.x * scale + h, p.y * scale);
-                    ctx.rotate(Math.PI / 2);
-                    ctx.drawImage(p.row.preview, 0, 0, w, h);
-                } else {
-                    ctx.drawImage(p.row.preview, p.x * scale, p.y * scale, w, h);
-                }
+                if (p.orient === 1) ctx.translate(x + h, y);
+                else if (p.orient === 2) ctx.translate(x + w, y + h);
+                else if (p.orient === 3) ctx.translate(x, y + w);
+                else ctx.translate(x, y);
+                ctx.rotate(p.orient * Math.PI / 2);
+                ctx.drawImage(p.row.preview, 0, 0, w, h);
                 ctx.restore();
             });
         }
 
+        // Aproveitamento = pixels com tinta / área do arquivo
         function sheetUsage(sheet, widthPx) {
-            const printArea = sheet.placed.reduce((sum, p) => sum + p.row.widthPx * p.row.heightPx, 0);
-            return printArea / (widthPx * sheet.heightPx) * 100;
+            const ink = sheet.placed.reduce((sum, p) => sum + (p.row.shape ? p.row.shape.inkPixels : p.row.widthPx * p.row.heightPx), 0);
+            return ink / (widthPx * sheet.heightPx) * 100;
         }
 
         function renderPrintFilePreview(layouts) {
@@ -3824,8 +3980,10 @@
                 const key = `${row.dpi}|${row.colorKey}`;
                 (groups[key] = groups[key] || []).push(row);
             });
-            const layouts = Object.values(groups).map(group => packPrints(group, settings, group[0].dpi));
+            const layouts = Object.values(groups).map(group => layoutPrints(group, settings, group[0].dpi));
 
+            // Faixas com tinta (colagem sem apagar a vizinha) também para o encaixe retangular
+            items.forEach(r => { if (!r.shape) r.shape = { ...analyzePrintShape(r.pixels, 1e9), cellPx: 1e9 }; });
             renderPrintFilePreview(layouts);
             const copies = items.reduce((sum, r) => sum + r.copies, 0);
             const files = layouts.reduce((n, l) => n + l.sheets.length, 0);
@@ -3874,35 +4032,58 @@
             return chunk;
         }
 
-        // Copia uma cópia da estampa para as linhas [bandY, bandY + bandRows) da faixa.
-        // Sem escala: pixel a pixel (girada 90° no sentido horário quando rotated).
-        function blitPlacement(band, bandY, bandRows, rowLen, outBytes, p) {
+        // Cola uma cópia da estampa nas linhas [bandY, bandY + bandRows) da faixa, pixel a pixel e sem
+        // escala. Só os pixels com tinta são copiados: a área transparente nunca apaga a vizinha.
+        // orient: 0 sem giro · 1 90° horário · 2 180° · 3 270° horário. Recorta o que passar da borda
+        // (só pode ser área transparente).
+        function blitPlacement(band, bandY, bandRows, sheetWidth, outBytes, p) {
             const src = p.row.pixels;
+            const shape = p.row.shape;
+            const W = src.width, H = src.height;
             const srcBytes = src.depth / 8 * 4;
+            const alphaAt = src.depth === 16 ? 6 : 3;
             const expand = outBytes !== srcBytes; // 8 -> 16 bits: v -> v*257 (sem perda)
-            const placedH = p.rotated ? src.width : src.height;
-            const placedW = p.rotated ? src.height : src.width;
-            const y0 = Math.max(p.y, bandY);
+            const rowLen = sheetWidth * outBytes;
+            const [placedW, placedH] = orientedSize(p.row, p.orient);
+            const y0 = Math.max(p.y, bandY, 0);
             const y1 = Math.min(p.y + placedH, bandY + bandRows);
+            const lx0 = Math.max(0, -p.x);
+            const lx1 = Math.min(placedW, sheetWidth - p.x);
+
+            const copyPixel = (s, d) => {
+                if (expand) {
+                    for (let c = 0; c < 4; c++) { band[d + c * 2] = src.data[s + c]; band[d + c * 2 + 1] = src.data[s + c]; }
+                } else {
+                    for (let c = 0; c < srcBytes; c++) band[d + c] = src.data[s + c];
+                }
+            };
+
             for (let y = y0; y < y1; y++) {
                 const dstRow = (y - bandY) * rowLen + p.x * outBytes;
-                const localY = y - p.y;
-                if (!p.rotated && !expand) {
-                    const s = src.offset + localY * src.stride;
-                    band.set(src.data.subarray(s, s + src.width * srcBytes), dstRow);
+                const ly = y - p.y;
+                if (p.orient === 0) {
+                    // Faixas com tinta da linha da origem
+                    const rowStart = src.offset + ly * src.stride;
+                    for (let r = shape.runStarts[ly]; r < shape.runStarts[ly + 1]; r++) {
+                        const a = Math.max(shape.runs[r * 2], lx0);
+                        const b = Math.min(shape.runs[r * 2 + 1], lx1);
+                        if (a >= b) continue;
+                        if (!expand) {
+                            band.set(src.data.subarray(rowStart + a * srcBytes, rowStart + b * srcBytes), dstRow + a * outBytes);
+                        } else {
+                            for (let x = a; x < b; x++) copyPixel(rowStart + x * srcBytes, dstRow + x * outBytes);
+                        }
+                    }
                     continue;
                 }
-                for (let x = 0; x < placedW; x++) {
-                    // Girada: linha de saída = coluna da origem, lida de baixo para cima
-                    const sx = p.rotated ? localY : x;
-                    const sy = p.rotated ? src.height - 1 - x : localY;
+                for (let x = lx0; x < lx1; x++) {
+                    let sx, sy;
+                    if (p.orient === 1) { sx = ly; sy = H - 1 - x; }
+                    else if (p.orient === 2) { sx = W - 1 - x; sy = H - 1 - ly; }
+                    else { sx = W - 1 - ly; sy = x; }
                     const s = src.offset + sy * src.stride + sx * srcBytes;
-                    const d = dstRow + x * outBytes;
-                    if (expand) {
-                        for (let c = 0; c < 4; c++) { band[d + c * 2] = src.data[s + c]; band[d + c * 2 + 1] = src.data[s + c]; }
-                    } else {
-                        for (let c = 0; c < srcBytes; c++) band[d + c] = src.data[s + c];
-                    }
+                    if (src.data[s + alphaAt] === 0 && (src.depth === 8 || src.data[s + alphaAt + 1] === 0)) continue;
+                    copyPixel(s, dstRow + x * outBytes);
                 }
             }
         }
@@ -3951,8 +4132,8 @@
                 const rows = Math.min(bandRows, height - bandY);
                 const band = new Uint8Array(rows * rowLen); // fundo transparente
                 placed.forEach(p => {
-                    const placedH = p.rotated ? p.row.widthPx : p.row.heightPx;
-                    if (p.y < bandY + rows && p.y + placedH > bandY) blitPlacement(band, bandY, rows, rowLen, outBytes, p);
+                    const placedH = orientedSize(p.row, p.orient)[1];
+                    if (p.y < bandY + rows && p.y + placedH > bandY) blitPlacement(band, bandY, rows, width, outBytes, p);
                 });
 
                 // Filtro Paeth por linha (compressão sem perda)
