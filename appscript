@@ -109,7 +109,7 @@ function doPost(e) {
  * Download da imagem ORIGINAL em partes (usado para montar o arquivo de impressão):
  *   ?action=fileInfo&id=ID                     -> { result, name, mimeType, size }
  *   ?action=chunk&id=ID&start=0&length=N       -> { result, data }  (parte em base64)
- * Só entrega arquivos que estão na pasta de imagens do sistema.
+ * Só entrega arquivos da pasta de imagens do sistema ou imagens já públicas por link.
  */
 function doGet(e) {
   try {
@@ -119,7 +119,7 @@ function doGet(e) {
     if (params.action === 'fileInfo' || params.action === 'chunk') {
       if (!params.id) throw new Error('Parâmetro "id" ausente.');
       const file = DriveApp.getFileById(params.id);
-      if (!isInFolder_(file, folder)) throw new Error('Arquivo fora da pasta de imagens.');
+      if (!canServeFile_(file, folder)) throw new Error('Arquivo fora da pasta de imagens e não compartilhado por link.');
 
       if (params.action === 'fileInfo') {
         return json_({ result: 'success', name: file.getName(), mimeType: file.getMimeType(), size: file.getSize() });
@@ -298,6 +298,15 @@ function getFolder_() {
 
   props.setProperty('FOLDER_ID', folder.getId());
   return folder;
+}
+
+// Entrega arquivos da pasta do sistema, ou imagens que já são públicas por link
+// (estampas enviadas por versões anteriores do script podem estar em outra pasta).
+function canServeFile_(file, folder) {
+  if (isInFolder_(file, folder)) return true;
+  const isImage = String(file.getMimeType()).indexOf('image/') === 0;
+  const access = file.getSharingAccess();
+  return isImage && (access === DriveApp.Access.ANYONE_WITH_LINK || access === DriveApp.Access.ANYONE);
 }
 
 function isInFolder_(file, folder) {
