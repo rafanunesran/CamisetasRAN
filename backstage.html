@@ -782,12 +782,20 @@
             </div>
 
             <div id="inventoryImageContainer" class="space-y-2 hidden">
-                <label class="text-sm font-medium text-gray-700">Imagem da Estampa</label>
+                <label class="text-sm font-medium text-gray-700">Imagem da Estampa (PNG alta resolução)</label>
                 <div class="flex items-center gap-4">
-                    <input id="inventoryImage" type="file" accept="image/*" onchange="previewImage(this)" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary">
-                    <img id="inventoryImagePreview" src="" alt="Preview" class="h-10 w-10 object-cover rounded border hidden">
+                    <input id="inventoryImage" type="file" accept="image/png" onchange="previewImage(this)" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <img id="inventoryImagePreview" src="" alt="Preview" class="h-10 w-10 object-contain rounded border bg-gray-800 hidden">
                 </div>
-                <p class="text-xs text-muted-foreground">A imagem será salva no sistema.</p>
+                <p id="inventoryImageInfo" class="text-xs text-muted-foreground"></p>
+                <div class="flex items-end gap-4">
+                    <div class="space-y-1 w-32">
+                        <label class="text-xs font-medium text-gray-700">Resolução (DPI)</label>
+                        <input id="inventoryImageDpi" type="number" step="1" min="1" oninput="updatePrintSizeInfo()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary read-only:bg-gray-100 read-only:text-gray-500" placeholder="Ex: 300">
+                    </div>
+                    <p id="inventoryPrintSize" class="text-sm font-medium text-gray-700 pb-2"></p>
+                </div>
+                <p class="text-xs text-muted-foreground">O PNG é enviado exatamente como está, sem limite de tamanho e sem alteração. O tamanho de impressão vem dos pixels e do DPI do próprio arquivo.</p>
             </div>
 
             <div class="flex justify-end gap-2 pt-4">
@@ -911,11 +919,14 @@
                     </div>
 
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700">Estampa Associada (Estoque)</label>
-                        <select id="productPrint" class="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                            <option value="">Selecione uma estampa...</option>
-                        </select>
-                        <p class="text-xs text-muted-foreground">Define a imagem da estampa e baixa o estoque ao produzir.</p>
+                        <div class="flex justify-between items-center">
+                            <label class="text-sm font-medium text-gray-700">Estampas do Produto (Estoque)</label>
+                            <button type="button" onclick="addProductPrintRow()" class="text-xs bg-secondary hover:bg-gray-200 px-2 py-1 rounded border flex items-center gap-1">
+                                <i data-lucide="plus" class="h-3 w-3"></i> Add Estampa
+                            </button>
+                        </div>
+                        <div id="productPrintsList" class="space-y-2"></div>
+                        <p class="text-xs text-muted-foreground">Adicione todas as estampas usadas na peça (ex: frente, logo manga, logo costas) e quantas de cada por peça. A primeira define a imagem do produto; todas baixam o estoque ao produzir.</p>
                     </div>
 
                     <div class="space-y-2">
@@ -1221,6 +1232,7 @@
                             <tbody id="reportMissingBody" class="divide-y bg-white"></tbody>
                         </table>
                     </div>
+                    <button id="generatePrintFileBtn" onclick="openPrintFileModal()" class="hidden w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 flex items-center justify-center gap-2"><i data-lucide="image-down" class="h-4 w-4"></i> Gerar Arquivo</button>
                 </div>
             </div>
             
@@ -1230,6 +1242,59 @@
             
             <div class="flex justify-end pt-4 border-t">
                 <button onclick="window.print()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"><i data-lucide="printer" class="h-4 w-4"></i> Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Geração de Arquivo de Estampas -->
+    <div id="printFileModal" class="fixed inset-0 bg-black/50 items-center justify-center z-[99999] hidden">
+        <div class="bg-white rounded-lg p-6 w-full max-w-4xl space-y-4 shadow-xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 class="text-xl font-bold text-primary">Gerar Arquivo de Estampas</h2><button onclick="window.closeModalById('printFileModal')" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+
+            <div class="space-y-2">
+                <h3 class="font-semibold text-gray-700 text-sm">Estampas em falta</h3>
+                <div class="border rounded-md overflow-hidden">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-100 text-muted-foreground font-medium">
+                            <tr><th class="p-2 w-8"></th><th class="p-2">Estampa</th><th class="p-2 w-24">Cópias</th><th class="p-2">Tamanho (do arquivo)</th></tr>
+                        </thead>
+                        <tbody id="printFileItemsBody" class="divide-y bg-white"></tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-muted-foreground">As cópias vêm preenchidas com a quantidade em falta. Cada estampa é colada exatamente como o arquivo enviado (mesmos pixels e resolução), apenas duplicada e posicionada.</p>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-gray-700">Unidade</label>
+                    <select id="printFileUnit" onchange="convertPrintFileUnit()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="cm">cm</option>
+                        <option value="mm">mm</option>
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-gray-700">Largura do arquivo (<span class="pf-unit">cm</span>)</label>
+                    <input id="printFileWidth" type="number" step="0.1" min="1" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 58">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-gray-700">Espaçamento (<span class="pf-unit">cm</span>)</label>
+                    <input id="printFileGap" type="number" step="0.1" min="0" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 1">
+                </div>
+                <label class="flex items-center gap-2 text-xs font-medium text-gray-700 h-9">
+                    <input id="printFileRotate" type="checkbox" checked class="h-4 w-4"> Permitir girar 90°
+                </label>
+            </div>
+            <p class="text-xs text-muted-foreground">A altura do arquivo é calculada automaticamente, com as estampas organizadas para o menor desperdício. O arquivo final usa a mesma resolução (DPI) das estampas (até 600 DPI ou mais, sem limite de altura); estampas com DPI diferentes saem em arquivos separados.</p>
+
+            <div id="printFileStatus" class="text-sm text-gray-600"></div>
+            <div id="printFilePreview" class="space-y-4"></div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t">
+                <button onclick="window.closeModalById('printFileModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Fechar</button>
+                <button id="printFileLayoutBtn" onclick="previewPrintFileLayout()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"><i data-lucide="layout-grid" class="h-4 w-4"></i> Pré-visualizar</button>
+                <button id="printFileGenerateBtn" onclick="generatePrintFile()" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 flex items-center gap-2"><i data-lucide="download" class="h-4 w-4"></i> Gerar e Baixar PNG</button>
             </div>
         </div>
     </div>
@@ -1728,8 +1793,8 @@
                 let useBlackBackground = false;
                 if (prod.images && prod.images.length > 0) {
                     productImageUrl = prod.images[0]; // Usa a primeira imagem de referência
-                } else if (prod.printId) {
-                    const printItem = inventory.find(i => i.id === prod.printId);
+                } else if (getProductPrints(prod).length > 0) {
+                    const printItem = inventory.find(i => i.id === getProductPrints(prod)[0].printId);
                     if (printItem && printItem.image) {
                         productImageUrl = printItem.image; // Usa a imagem da estampa
                         useBlackBackground = true; // Aplica fundo preto para a estampa
@@ -1964,18 +2029,99 @@
             }
         }
 
-        window.previewImage = (input) => {
-            const preview = document.getElementById('inventoryImagePreview');
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    preview.classList.remove('hidden');
+        // Dados da imagem de estampa selecionada no modal de estoque (pixels/DPI)
+        let inventoryImageMeta = null;
+        const INVENTORY_IMAGE_HINT = 'Envie o PNG final de impressão (fundo transparente), no tamanho real.';
+
+        // Lê largura/altura (IHDR) e DPI (pHYs) direto dos bytes do PNG, sem decodificar a imagem
+        function readPngInfo(buffer) {
+            const view = new DataView(buffer);
+            if (view.byteLength < 24 || view.getUint32(0) !== 0x89504E47) return null;
+            const info = { width: view.getUint32(16), height: view.getUint32(20), dpi: null };
+            let offset = 8;
+            while (offset + 8 <= view.byteLength) {
+                const length = view.getUint32(offset);
+                const type = String.fromCharCode(view.getUint8(offset + 4), view.getUint8(offset + 5), view.getUint8(offset + 6), view.getUint8(offset + 7));
+                if (type === 'pHYs' && offset + 17 <= view.byteLength) {
+                    const ppuX = view.getUint32(offset + 8);
+                    const unit = view.getUint8(offset + 16);
+                    if (unit === 1 && ppuX > 0) {
+                        const dpi = ppuX * 0.0254; // pixels por metro -> DPI (ex.: 11811 -> 300)
+                        info.dpi = Math.abs(dpi - Math.round(dpi)) < 0.1 ? Math.round(dpi) : Math.round(dpi * 100) / 100;
+                    }
+                    break;
                 }
-                reader.readAsDataURL(input.files[0]);
-            } else {
-                preview.classList.add('hidden');
+                if (type === 'IDAT' || type === 'IEND') break; // pHYs sempre vem antes
+                offset += 12 + length;
             }
+            return info;
+        }
+        const readPngDpi = (buffer) => (readPngInfo(buffer) || {}).dpi || null;
+
+        // Lista os chunks do PNG até o primeiro IDAT: [{ type, start, end }]
+        function listPngHeadChunks(buffer) {
+            const view = new DataView(buffer);
+            const chunks = [];
+            let offset = 8;
+            while (offset + 8 <= view.byteLength) {
+                const length = view.getUint32(offset);
+                const type = String.fromCharCode(view.getUint8(offset + 4), view.getUint8(offset + 5), view.getUint8(offset + 6), view.getUint8(offset + 7));
+                chunks.push({ type, start: offset, end: offset + 12 + length });
+                if (type === 'IDAT' || type === 'IEND') break;
+                offset += 12 + length;
+            }
+            return chunks;
+        }
+        const PNG_COLOR_CHUNKS = ['iCCP', 'sRGB', 'gAMA', 'cHRM', 'cICP'];
+
+        window.updatePrintSizeInfo = () => {
+            const out = document.getElementById('inventoryPrintSize');
+            const dpi = parseFloat(document.getElementById('inventoryImageDpi').value);
+            let widthPx = null, heightPx = null;
+            if (inventoryImageMeta) {
+                widthPx = inventoryImageMeta.widthPx; heightPx = inventoryImageMeta.heightPx;
+            } else if (currentInventoryId) {
+                const item = inventory.find(i => i.id === currentInventoryId);
+                if (item) { widthPx = item.imageWidthPx; heightPx = item.imageHeightPx; }
+            }
+            out.textContent = widthPx && heightPx && dpi > 0
+                ? `Impressão: ${(widthPx / dpi * 2.54).toFixed(1)} × ${(heightPx / dpi * 2.54).toFixed(1)} cm`
+                : '';
+        }
+
+        window.previewImage = async (input) => {
+            const preview = document.getElementById('inventoryImagePreview');
+            const info = document.getElementById('inventoryImageInfo');
+            const dpiInput = document.getElementById('inventoryImageDpi');
+            inventoryImageMeta = null;
+            if (!(input.files && input.files[0])) {
+                preview.classList.add('hidden');
+                return;
+            }
+            const file = input.files[0];
+            // Os primeiros MB bastam para ler IHDR/pHYs, mesmo em arquivos enormes
+            const head = await file.slice(0, 4 * 1024 * 1024).arrayBuffer();
+            const png = readPngInfo(head);
+            if (!png) {
+                alert('Envie a estampa em PNG (de preferência com fundo transparente).');
+                input.value = '';
+                preview.classList.add('hidden');
+                return;
+            }
+            inventoryImageMeta = { widthPx: png.width, heightPx: png.height, dpi: png.dpi };
+            preview.src = URL.createObjectURL(file);
+            preview.classList.remove('hidden');
+
+            if (png.dpi) {
+                dpiInput.value = png.dpi;
+                dpiInput.readOnly = true;
+            } else {
+                dpiInput.value = '';
+                dpiInput.readOnly = false;
+            }
+            const dpiText = png.dpi ? `${png.dpi} DPI` : 'sem DPI gravado no arquivo: informe a resolução em que ele foi feito';
+            info.textContent = `${png.width} × ${png.height} px · ${dpiText} · ${(file.size / 1048576).toFixed(1)} MB`;
+            window.updatePrintSizeInfo();
         }
 
         // Funções para Estoque
@@ -1990,6 +2136,12 @@
             const schoolSelect = document.getElementById('inventorySchool');
             const imageInput = document.getElementById('inventoryImage');
             const imagePreview = document.getElementById('inventoryImagePreview');
+            const imageDpiInput = document.getElementById('inventoryImageDpi');
+            const imageInfo = document.getElementById('inventoryImageInfo');
+            inventoryImageMeta = null;
+            imageInput.value = '';
+            imageDpiInput.readOnly = false;
+            imageInfo.textContent = INVENTORY_IMAGE_HINT;
             
             const usageTypeSelect = document.getElementById('inventoryUsageType');
             const usageUnitQty = document.getElementById('usageUnitQty');
@@ -2033,9 +2185,14 @@
                     costInput.value = item.cost || '';
                     qtyInput.value = item.quantity || '';
                     schoolSelect.value = item.partnerId || '';
+                    imageDpiInput.value = item.imageDpi || '';
+                    if (item.imageWidthPx && item.imageHeightPx) {
+                        imageInfo.textContent = `Arquivo atual: ${item.imageWidthPx} × ${item.imageHeightPx} px${item.imageDpi ? ` · ${item.imageDpi} DPI` : ''}. Envie outro PNG para substituir.`;
+                        imageDpiInput.readOnly = !!item.imageDpiFromFile;
+                    }
                     // imageInput.value não pode ser definido programaticamente por segurança
                     if (item.image) {
-                        imagePreview.src = item.image;
+                        imagePreview.src = getDisplayUrl(item.image);
                         imagePreview.classList.remove('hidden');
                     } else {
                         imagePreview.classList.add('hidden');
@@ -2061,6 +2218,7 @@
                 schoolSelect.value = '';
                 imageInput.value = '';
                 imagePreview.classList.add('hidden');
+                imageDpiInput.value = '';
                 usageTypeSelect.value = 'unit';
                 usageUnitQty.value = '1';
                 usageBatchQty.value = '1';
@@ -2068,6 +2226,7 @@
                 usageOrderQty.value = '1';
             }
             
+            window.updatePrintSizeInfo();
             window.toggleInventoryFields(); // Atualiza visibilidade do campo de imagem
             window.openModalById('inventoryModal');
             lucide.createIcons(); // Atualiza ícones (para o botão de +)
@@ -2165,6 +2324,48 @@
             });
         }
 
+        // Envio em partes (estampas): sem limite de tamanho e sem alterar o arquivo.
+        // Cada parte vai para o Apps Script, que repassa à sessão de upload retomável do Drive.
+        const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024; // múltiplo de 256 KB (exigência do Drive)
+
+        function bytesToBase64(bytes) {
+            let binary = '';
+            for (let i = 0; i < bytes.length; i += 0x8000) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+            }
+            return btoa(binary);
+        }
+
+        async function postAppsScript(payload, attempts = 3) {
+            for (let attempt = 1; ; attempt++) {
+                try {
+                    const response = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`Falha na comunicação com o Google: ${response.status}`);
+                    const data = await response.json();
+                    if (data.result === 'error') throw Object.assign(new Error(data.error || 'Erro no Apps Script.'), { fatal: true });
+                    return data;
+                } catch (err) {
+                    if (err.fatal || attempt >= attempts) throw err;
+                    await new Promise(r => setTimeout(r, 1000 * attempt));
+                }
+            }
+        }
+
+        async function uploadLargeToDrive(file, onProgress) {
+            if (!file.size) throw new Error('Arquivo vazio.');
+            const session = await postAppsScript({ action: 'uploadStart', name: Date.now() + '_' + file.name, type: file.type || 'image/png', size: file.size });
+            if (!session.token) throw new Error('O Apps Script não abriu o envio em partes. Atualize o script (docs/apps-script/README.md).');
+
+            for (let start = 0; start < file.size; start += UPLOAD_CHUNK_BYTES) {
+                const end = Math.min(start + UPLOAD_CHUNK_BYTES, file.size);
+                const bytes = new Uint8Array(await file.slice(start, end).arrayBuffer());
+                const result = await postAppsScript({ action: 'uploadChunk', token: session.token, start, total: file.size, data: bytesToBase64(bytes) });
+                if (onProgress) onProgress(end / file.size);
+                if (result.result === 'success') return result.url;
+            }
+            throw new Error('O Drive não confirmou o fim do envio.');
+        }
+
         window.saveInventory = async () => {
             const type = document.getElementById('inventoryType').value;
             const name = document.getElementById('inventoryName').value;
@@ -2186,8 +2387,17 @@
                 // Upload se houver arquivo selecionado
                 if (imageInput.files.length > 0) {
                     const file = imageInput.files[0];
-                    // Substituindo Firebase Storage por Google Drive
-                    imageUrl = await uploadToDrive(file);
+                    if (type === 'Estampa') {
+                        const dpi = parseFloat(document.getElementById('inventoryImageDpi').value);
+                        if (!(dpi > 0)) throw new Error('Informe a resolução (DPI) do arquivo da estampa.');
+                        // Arquivo original, em partes, sem limite de tamanho
+                        imageUrl = await uploadLargeToDrive(file, (progress) => {
+                            saveBtn.textContent = `Enviando ${Math.round(progress * 100)}%...`;
+                        });
+                        saveBtn.textContent = 'Salvando...';
+                    } else {
+                        imageUrl = await uploadToDrive(file);
+                    }
                 } else if (currentInventoryId) {
                     // Manter imagem existente se estiver editando e não enviou nova
                     const currentItem = inventory.find(i => i.id === currentInventoryId);
@@ -2207,6 +2417,23 @@
                     type, name, cost, quantity, image: imageUrl, partnerId, category,
                     usageRule: usageRule // Salva a regra no objeto
                 };
+
+                // Estampa: dimensões do arquivo original (o tamanho de impressão vem daqui)
+                if (type === 'Estampa') {
+                    const currentItem = currentInventoryId ? inventory.find(i => i.id === currentInventoryId) : null;
+                    const meta = inventoryImageMeta || (currentItem && currentItem.imageWidthPx
+                        ? { widthPx: currentItem.imageWidthPx, heightPx: currentItem.imageHeightPx, dpi: currentItem.imageDpiFromFile ? currentItem.imageDpi : null }
+                        : null);
+                    const dpi = parseFloat(document.getElementById('inventoryImageDpi').value) || null;
+                    itemData.imageDpi = dpi;
+                    if (meta) {
+                        itemData.imageWidthPx = meta.widthPx;
+                        itemData.imageHeightPx = meta.heightPx;
+                        itemData.imageDpiFromFile = !!meta.dpi;
+                        itemData.printWidthCm = dpi ? +(meta.widthPx / dpi * 2.54).toFixed(2) : null;
+                        itemData.printHeightCm = dpi ? +(meta.heightPx / dpi * 2.54).toFixed(2) : null;
+                    }
+                }
                 
                 if (currentInventoryId) {
                     await updateDoc(doc(db, "inventory", currentInventoryId), itemData);
@@ -2428,6 +2655,23 @@
             window.closeModalById('movementsModal');
         }
 
+        // Estampas de um produto: [{ printId, qty }] (compatível com o campo antigo printId)
+        function getProductPrints(prod) {
+            if (!prod) return [];
+            if (Array.isArray(prod.prints) && prod.prints.length > 0) {
+                return prod.prints.filter(p => p && p.printId).map(p => ({ printId: p.printId, qty: parseInt(p.qty) || 1 }));
+            }
+            return prod.printId ? [{ printId: prod.printId, qty: 1 }] : [];
+        }
+        window.getProductPrints = getProductPrints;
+
+        // Soma no mapa as estampas consumidas por "pieces" peças do produto
+        function addProductPrintsToMap(prod, pieces, targetMap) {
+            getProductPrints(prod).forEach(p => {
+                targetMap[p.printId] = (targetMap[p.printId] || 0) + pieces * p.qty;
+            });
+        }
+
         // Helper para converter URLs do Drive para formato direto (lh3)
         function getDisplayUrl(url) {
             if (!url) return '';
@@ -2456,7 +2700,7 @@
         window.openProductModal = async (id = null) => {
             const title = document.getElementById('productModalTitle');
             const nameInput = document.getElementById('productName');
-            const printSelect = document.getElementById('productPrint');
+            const printsList = document.getElementById('productPrintsList');
             const partnerSelect = document.getElementById('productPartner');
             const imagesPreview = document.getElementById('productImagesPreview');
             const pricingBody = document.getElementById('productPricingBody');
@@ -2468,14 +2712,8 @@
             pricingBody.innerHTML = '';
             currentProductId = id;
 
-            // Popular Select de Estampas
-            printSelect.innerHTML = '<option value="">Selecione uma estampa...</option>';
-            inventory.filter(i => i.type === 'Estampa').forEach(est => {
-                const option = document.createElement('option');
-                option.value = est.id;
-                option.textContent = est.name;
-                printSelect.appendChild(option);
-            });
+            // Lista de Estampas
+            printsList.innerHTML = '';
 
             // Popular Select de Parceiros
             partnerSelect.innerHTML = '<option value="">Produto genérico (sem repasse)</option>';
@@ -2493,7 +2731,9 @@
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         nameInput.value = data.name || '';
-                        printSelect.value = data.printId || '';
+                        const savedPrints = getProductPrints(data);
+                        if (savedPrints.length > 0) savedPrints.forEach(p => addProductPrintRow(p));
+                        else addProductPrintRow();
                         partnerSelect.value = data.partnerId || '';
                         
                         // Limpar linhas vazias padrão e adicionar as salvas
@@ -2507,12 +2747,32 @@
                 } catch (e) { console.error("Erro ao carregar produto", e); }
             } else {
                 title.textContent = 'Novo Produto';
-                printSelect.value = '';
+                addProductPrintRow();
                 partnerSelect.value = '';
                 addProductCategoryRow(); // Adiciona uma linha vazia por padrão
             }
 
             window.openModalById('productModal');
+            lucide.createIcons();
+        }
+
+        window.addProductPrintRow = (data = null) => {
+            const list = document.getElementById('productPrintsList');
+            const row = document.createElement('div');
+            row.className = 'flex gap-2 items-center product-print-row';
+
+            let options = '<option value="">Selecione uma estampa...</option>';
+            inventory.filter(i => i.type === 'Estampa').forEach(est => {
+                const selected = data && data.printId === est.id ? 'selected' : '';
+                options += `<option value="${est.id}" ${selected}>${est.name}</option>`;
+            });
+
+            row.innerHTML = `
+                <select class="print-id flex h-9 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">${options}</select>
+                <input type="number" min="1" step="1" value="${data ? data.qty : 1}" title="Quantidade desta estampa por peça" class="print-qty w-16 h-9 rounded-md border border-gray-300 px-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary">
+                <button type="button" onclick="this.closest('.product-print-row').remove()" class="text-red-500 hover:text-red-700 p-1" title="Remover"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+            `;
+            list.appendChild(row);
             lucide.createIcons();
         }
 
@@ -2559,7 +2819,16 @@
 
         window.saveProduct = async () => {
             const name = document.getElementById('productName').value;
-            const printId = document.getElementById('productPrint').value;
+            const prints = [];
+            document.querySelectorAll('#productPrintsList .product-print-row').forEach(row => {
+                const id = row.querySelector('.print-id').value;
+                const qty = parseInt(row.querySelector('.print-qty').value) || 1;
+                if (!id) return;
+                const existing = prints.find(p => p.printId === id);
+                if (existing) existing.qty += qty;
+                else prints.push({ printId: id, qty });
+            });
+            const printId = prints.length > 0 ? prints[0].printId : ''; // compatibilidade (loja usa a primeira)
             const partnerId = document.getElementById('productPartner').value;
             const imageInput = document.getElementById('productImages');
             
@@ -2600,6 +2869,7 @@
                 const productData = {
                     name,
                     printId,
+                    prints,
                     partnerId,
                     pricing,
                     updatedAt: new Date().toISOString()
@@ -2966,9 +3236,7 @@
 
                         // Estampa
                         const prod = window.cachedProducts.find(p => p.id === item.productId);
-                        if (prod && prod.printId) {
-                            targetMap[prod.printId] = (targetMap[prod.printId] || 0) + item.qty;
-                        }
+                        addProductPrintsToMap(prod, item.qty, targetMap);
                     });
                     // Insumos (código repetido da lógica acima, simplificado aqui)
                     inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
@@ -3055,11 +3323,693 @@
                     missingBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-green-600 font-medium">Estoque suficiente para os pedidos selecionados!</td></tr>';
                 }
 
+                // Estampas em falta alimentam o botão "Gerar Arquivo"
+                window.lastMissingPrints = missingByType['Estampa'] || [];
+                document.getElementById('generatePrintFileBtn').classList.toggle('hidden', window.lastMissingPrints.length === 0);
+
                 window.openModalById('materialReportModal');
                 lucide.createIcons();
             } catch (e) {
                 console.error("Erro ao gerar relatório de materiais:", e);
                 alert("Erro ao gerar relatório: " + e.message);
+            }
+        }
+
+        // --- Arquivo de Estampas (duplicação + organização para impressão) ---
+        // As estampas NUNCA são redimensionadas: cada cópia é colada pixel a pixel,
+        // e o arquivo final tem a mesma resolução (DPI) dos PNGs enviados.
+        let printFileRows = [];
+        const printImageCache = {};
+        const PRINT_FILE_SETTINGS_KEY = 'printFileSettings';
+        const DOWNLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
+
+        const escapeHtml = (text) => String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const formatCm = (value) => (Math.round(value * 10) / 10).toLocaleString('pt-BR');
+        const pxToCm = (px, dpi) => px / dpi * 2.54;
+
+        window.openPrintFileModal = () => {
+            const missing = window.lastMissingPrints || [];
+            if (missing.length === 0) { alert('Nenhuma estampa em falta.'); return; }
+
+            printFileRows = missing.map(m => ({
+                item: m.item,
+                selected: !!m.item.image,
+                copies: Math.ceil(m.missing)
+            }));
+
+            // Preferências da última geração (apenas conveniência local)
+            let saved = {};
+            try { saved = JSON.parse(localStorage.getItem(PRINT_FILE_SETTINGS_KEY) || '{}'); } catch (e) { saved = {}; }
+            const unit = saved.unit || 'cm';
+            document.getElementById('printFileUnit').value = unit;
+            document.getElementById('printFileUnit').dataset.current = unit;
+            document.querySelectorAll('.pf-unit').forEach(el => el.textContent = unit);
+            document.getElementById('printFileWidth').value = saved.width ?? '';
+            document.getElementById('printFileGap').value = saved.gap ?? '';
+            document.getElementById('printFileRotate').checked = saved.rotate !== false;
+
+            document.getElementById('printFileStatus').textContent = '';
+            document.getElementById('printFilePreview').innerHTML = '';
+            renderPrintFileRows();
+            window.openModalById('printFileModal');
+            lucide.createIcons();
+        }
+
+        function describePrintSize(row) {
+            const item = row.item;
+            const widthPx = row.widthPx || item.imageWidthPx;
+            const heightPx = row.heightPx || item.imageHeightPx;
+            const dpi = row.dpi || item.imageDpi;
+            if (!widthPx || !heightPx) return '<span class="text-gray-400">lido ao gerar</span>';
+            const cm = dpi ? `${formatCm(pxToCm(widthPx, dpi))} × ${formatCm(pxToCm(heightPx, dpi))} cm · ` : '';
+            return `${cm}<span class="text-gray-500">${widthPx} × ${heightPx} px${dpi ? ` · ${dpi} DPI` : ''}</span>`;
+        }
+
+        function renderPrintFileRows() {
+            const tbody = document.getElementById('printFileItemsBody');
+            tbody.innerHTML = '';
+            printFileRows.forEach((row, index) => {
+                const hasImage = !!row.item.image;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-2"><input type="checkbox" ${row.selected ? 'checked' : ''} ${hasImage ? '' : 'disabled'} onchange="updatePrintFileRow(${index}, 'selected', this.checked)" class="h-4 w-4"></td>
+                    <td class="p-2">
+                        <div class="flex items-center gap-2">
+                            ${hasImage ? `<img src="${getDisplayUrl(row.item.image)}" referrerpolicy="no-referrer" class="h-8 w-8 object-contain rounded border bg-gray-800">` : ''}
+                            <span class="font-medium">${escapeHtml(row.item.name)}</span>
+                            ${hasImage ? '' : '<span class="text-xs text-red-500">(sem imagem)</span>'}
+                        </div>
+                    </td>
+                    <td class="p-2"><input type="number" min="0" step="1" value="${row.copies}" oninput="updatePrintFileRow(${index}, 'copies', this.value)" class="w-full h-8 border rounded px-2 text-sm"></td>
+                    <td class="p-2 text-xs">${describePrintSize(row)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.updatePrintFileRow = (index, field, value) => {
+            const row = printFileRows[index];
+            if (!row) return;
+            if (field === 'selected') row.selected = value;
+            if (field === 'copies') row.copies = Math.max(0, parseInt(value) || 0);
+        }
+
+        window.convertPrintFileUnit = () => {
+            const select = document.getElementById('printFileUnit');
+            const from = select.dataset.current || 'cm';
+            const to = select.value;
+            if (from !== to) {
+                const factor = to === 'mm' ? 10 : 0.1;
+                ['printFileWidth', 'printFileGap'].forEach(id => {
+                    const input = document.getElementById(id);
+                    const v = parseFloat(input.value);
+                    if (!isNaN(v)) input.value = +(v * factor).toFixed(2);
+                });
+            }
+            select.dataset.current = to;
+            document.querySelectorAll('.pf-unit').forEach(el => el.textContent = to);
+        }
+
+        function extractDriveId(url) {
+            const match = String(url || '').match(/[?&]id=([^&]+)/) || String(url || '').match(/\/d\/([^/=?]+)/);
+            return match ? match[1] : null;
+        }
+
+        function base64ToBytes(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes;
+        }
+
+        async function getAppsScript(params) {
+            const response = await fetch(`${APPS_SCRIPT_URL}?${new URLSearchParams(params)}`);
+            const data = await response.json();
+            if (data.result !== 'success') throw new Error(data.error || 'Resposta inesperada do Apps Script.');
+            return data;
+        }
+
+        // Baixa o arquivo ORIGINAL da estampa (bytes idênticos ao enviado), em partes
+        async function downloadOriginalPrint(url, onProgress) {
+            const driveId = extractDriveId(url);
+            if (!driveId) {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Não foi possível baixar a imagem.');
+                return res.blob();
+            }
+            const info = await getAppsScript({ action: 'fileInfo', id: driveId });
+            const parts = [];
+            for (let start = 0; start < info.size; start += DOWNLOAD_CHUNK_BYTES) {
+                const length = Math.min(DOWNLOAD_CHUNK_BYTES, info.size - start);
+                const chunk = await getAppsScript({ action: 'chunk', id: driveId, start, length });
+                parts.push(base64ToBytes(chunk.data));
+                if (onProgress) onProgress((start + length) / info.size);
+            }
+            return new Blob(parts, { type: info.mimeType || 'image/png' });
+        }
+
+        // ---- Leitura do PNG original (pixels exatos, sem passar pelo canvas) ----
+        async function inflateZlib(parts) {
+            const stream = new Blob(parts).stream().pipeThrough(new DecompressionStream('deflate'));
+            return new Uint8Array(await new Response(stream).arrayBuffer());
+        }
+
+        // Decodifica o PNG para RGBA (8 ou 16 bits por canal, big-endian), mantendo os valores
+        // exatos do arquivo. Retorna { width, height, depth, data, stride, offset }.
+        async function decodePng(buffer) {
+            const bytes = new Uint8Array(buffer);
+            const view = new DataView(buffer);
+            let ihdr = null, palette = null, trns = null;
+            const idat = [];
+            let offset = 8;
+            while (offset + 8 <= bytes.length) {
+                const length = view.getUint32(offset);
+                const type = String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]);
+                const data = bytes.subarray(offset + 8, offset + 8 + length);
+                if (type === 'IHDR') ihdr = { width: view.getUint32(offset + 8), height: view.getUint32(offset + 12), bitDepth: data[8], colorType: data[9], interlace: data[12] };
+                else if (type === 'PLTE') palette = data;
+                else if (type === 'tRNS') trns = data;
+                else if (type === 'IDAT') idat.push(data);
+                else if (type === 'IEND') break;
+                offset += 12 + length;
+            }
+            if (!ihdr) throw new Error('PNG inválido.');
+            if (ihdr.interlace) return null; // entrelaçado: usa o decodificador do navegador
+
+            const { width, height, bitDepth, colorType } = ihdr;
+            const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[colorType];
+            const bpp = Math.max(1, channels * bitDepth / 8);
+            const rowBytes = Math.ceil(width * channels * bitDepth / 8);
+            const stride = rowBytes + 1;
+            const raw = await inflateZlib(idat);
+            if (raw.length < stride * height) throw new Error('PNG incompleto ou corrompido.');
+
+            // Remove os filtros de linha (no próprio buffer)
+            for (let y = 0; y < height; y++) {
+                const start = y * stride + 1;
+                const prev = start - stride;
+                const filter = raw[start - 1];
+                if (filter === 0) continue;
+                if (filter > 4) throw new Error('PNG corrompido (filtro de linha inválido).');
+                for (let i = 0; i < rowBytes; i++) {
+                    const a = i >= bpp ? raw[start + i - bpp] : 0;
+                    const b = y > 0 ? raw[prev + i] : 0;
+                    const c = i >= bpp && y > 0 ? raw[prev + i - bpp] : 0;
+                    let add;
+                    if (filter === 1) add = a;
+                    else if (filter === 2) add = b;
+                    else if (filter === 3) add = (a + b) >> 1;
+                    else {
+                        const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+                        add = pa <= pb && pa <= pc ? a : (pb <= pc ? b : c);
+                    }
+                    raw[start + i] = (raw[start + i] + add) & 0xFF;
+                }
+            }
+
+            const depth = bitDepth === 16 ? 16 : 8;
+            // RGBA já no formato final: usa o próprio buffer (sem cópia)
+            if (colorType === 6) return { width, height, depth, data: raw, stride, offset: 1 };
+
+            const bytesPerSample = depth / 8;
+            const outStride = width * 4 * bytesPerSample;
+            const out = new Uint8Array(outStride * height);
+            const maxLow = (1 << bitDepth) - 1;
+            const sample = (rowStart, index) => {
+                if (bitDepth === 8) return raw[rowStart + index];
+                if (bitDepth === 16) return (raw[rowStart + index * 2] << 8) | raw[rowStart + index * 2 + 1];
+                const bit = index * bitDepth;
+                return (raw[rowStart + (bit >> 3)] >> (8 - bitDepth - (bit & 7))) & maxLow;
+            };
+            const toOut = (v) => bitDepth < 8 && colorType !== 3 ? Math.round(v * 255 / maxLow) : v;
+            const put = (o, v) => {
+                if (depth === 16) { out[o] = v >> 8; out[o + 1] = v & 0xFF; } else out[o] = v;
+            };
+            const opaque = depth === 16 ? 0xFFFF : 0xFF;
+            const key = (i) => trns ? (trns[i * 2] << 8) | trns[i * 2 + 1] : -1; // cor transparente (tRNS)
+
+            for (let y = 0; y < height; y++) {
+                const rowStart = y * stride + 1;
+                for (let x = 0; x < width; x++) {
+                    const o = y * outStride + x * 4 * bytesPerSample;
+                    let r, g, b, alpha = opaque;
+                    if (colorType === 0) {
+                        const v = sample(rowStart, x);
+                        if (v === key(0)) alpha = 0;
+                        r = g = b = toOut(v);
+                    } else if (colorType === 2) {
+                        r = sample(rowStart, x * 3); g = sample(rowStart, x * 3 + 1); b = sample(rowStart, x * 3 + 2);
+                        if (trns && r === key(0) && g === key(1) && b === key(2)) alpha = 0;
+                    } else if (colorType === 4) {
+                        r = g = b = sample(rowStart, x * 2);
+                        alpha = sample(rowStart, x * 2 + 1);
+                    } else { // 3: paleta
+                        const index = sample(rowStart, x);
+                        r = palette[index * 3]; g = palette[index * 3 + 1]; b = palette[index * 3 + 2];
+                        alpha = trns && index < trns.length ? trns[index] : 255;
+                    }
+                    put(o, r); put(o + bytesPerSample, g); put(o + 2 * bytesPerSample, b); put(o + 3 * bytesPerSample, alpha);
+                }
+            }
+            return { width, height, depth, data: out, stride: outStride, offset: 0 };
+        }
+
+        // PNG entrelaçado (raro): decodifica pelo navegador em 8 bits
+        async function decodePngWithBrowser(blob) {
+            const bitmap = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+            const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0);
+            const data = new Uint8Array(ctx.getImageData(0, 0, bitmap.width, bitmap.height).data.buffer);
+            return { width: bitmap.width, height: bitmap.height, depth: 8, data, stride: bitmap.width * 4, offset: 0 };
+        }
+
+        // Miniatura (até 600 px) só para a pré-visualização na tela
+        function makePreviewBitmap(pixels) {
+            const scale = Math.min(1, 600 / pixels.width);
+            const w = Math.max(1, Math.round(pixels.width * scale));
+            const h = Math.max(1, Math.round(pixels.height * scale));
+            const bytes = pixels.depth / 8;
+            const image = new ImageData(w, h);
+            for (let y = 0; y < h; y++) {
+                const sy = Math.min(pixels.height - 1, Math.floor(y / scale));
+                for (let x = 0; x < w; x++) {
+                    const sx = Math.min(pixels.width - 1, Math.floor(x / scale));
+                    const s = pixels.offset + sy * pixels.stride + sx * 4 * bytes;
+                    const d = (y * w + x) * 4;
+                    for (let c = 0; c < 4; c++) image.data[d + c] = pixels.data[s + c * bytes]; // 16 bits: byte alto
+                }
+            }
+            return createImageBitmap(image);
+        }
+
+        async function loadPrintImage(row, onProgress) {
+            const url = row.item.image;
+            if (!printImageCache[url]) {
+                const blob = await downloadOriginalPrint(url, onProgress);
+                const buffer = await blob.arrayBuffer();
+                const png = readPngInfo(buffer);
+                if (!png) throw new Error(`O arquivo da estampa "${row.item.name}" não é um PNG.`);
+                // Perfil de cor do arquivo original (copiado para o arquivo final)
+                const colorChunks = listPngHeadChunks(buffer)
+                    .filter(c => PNG_COLOR_CHUNKS.includes(c.type))
+                    .map(c => new Uint8Array(buffer.slice(c.start, c.end)));
+                const colorKey = colorChunks.map(c => crc32(c)).join('-') || 'none';
+                const pixels = (await decodePng(buffer)) || (await decodePngWithBrowser(blob));
+                const preview = await makePreviewBitmap(pixels);
+                printImageCache[url] = { pixels, preview, dpi: png.dpi, colorChunks, colorKey };
+            }
+            return printImageCache[url];
+        }
+
+        function readPrintFileSettings() {
+            const unit = document.getElementById('printFileUnit').value;
+            const toCm = (v) => unit === 'mm' ? v / 10 : v;
+            const width = parseFloat(document.getElementById('printFileWidth').value);
+            const gap = parseFloat(document.getElementById('printFileGap').value) || 0;
+            const rotate = document.getElementById('printFileRotate').checked;
+            if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
+            if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate };
+        }
+
+        // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
+        async function preparePrintFileItems(statusEl) {
+            const rows = printFileRows.filter(r => r.selected && r.copies > 0 && r.item.image);
+            if (rows.length === 0) throw new Error('Selecione pelo menos uma estampa com cópias.');
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const label = `Baixando estampas (${i + 1}/${rows.length}): ${row.item.name}`;
+                statusEl.textContent = label + '...';
+                await new Promise(r => setTimeout(r, 0));
+                const image = await loadPrintImage(row, (p) => { statusEl.textContent = `${label} ${Math.round(p * 100)}%`; });
+                row.pixels = image.pixels;
+                row.preview = image.preview;
+                row.widthPx = image.pixels.width;
+                row.heightPx = image.pixels.height;
+                row.dpi = image.dpi || parseFloat(row.item.imageDpi) || null;
+                row.colorChunks = image.colorChunks;
+                row.colorKey = image.colorKey;
+                if (!row.dpi) throw new Error(`A estampa "${row.item.name}" não tem DPI. Edite-a no Estoque e informe a resolução do arquivo.`);
+            }
+            renderPrintFileRows();
+            return rows;
+        }
+
+        // ---- Empacotamento (MaxRects, encaixe mais baixo), em pixels inteiros ----
+        const PACK_EPS = 1e-6;
+
+        function packSheet(rects, binW, binH, allowRotate) {
+            let free = [{ x: 0, y: 0, w: binW, h: binH }];
+            const placed = [];
+            const leftover = [];
+
+            rects.forEach(r => {
+                let best = null;
+                const orientations = allowRotate && r.w !== r.h ? [[r.w, r.h, false], [r.h, r.w, true]] : [[r.w, r.h, false]];
+                free.forEach(f => {
+                    orientations.forEach(([w, h, rotated]) => {
+                        if (w > f.w + PACK_EPS || h > f.h + PACK_EPS) return;
+                        const bottom = f.y + h;
+                        if (!best || bottom < best.bottom - PACK_EPS || (Math.abs(bottom - best.bottom) <= PACK_EPS && f.x < best.x - PACK_EPS)) {
+                            best = { x: f.x, y: f.y, w, h, rotated, bottom };
+                        }
+                    });
+                });
+                if (!best) { leftover.push(r); return; }
+                placed.push({ ...r, x: best.x, y: best.y, pw: best.w, ph: best.h, rotated: best.rotated });
+
+                // Divide os espaços livres que colidem com o item colocado
+                const next = [];
+                free.forEach(f => {
+                    if (best.x >= f.x + f.w - PACK_EPS || best.x + best.w <= f.x + PACK_EPS ||
+                        best.y >= f.y + f.h - PACK_EPS || best.y + best.h <= f.y + PACK_EPS) {
+                        next.push(f);
+                        return;
+                    }
+                    if (best.x > f.x + PACK_EPS) next.push({ x: f.x, y: f.y, w: best.x - f.x, h: f.h });
+                    if (best.x + best.w < f.x + f.w - PACK_EPS) next.push({ x: best.x + best.w, y: f.y, w: f.x + f.w - best.x - best.w, h: f.h });
+                    if (best.y > f.y + PACK_EPS) next.push({ x: f.x, y: f.y, w: f.w, h: best.y - f.y });
+                    if (best.y + best.h < f.y + f.h - PACK_EPS) next.push({ x: f.x, y: best.y + best.h, w: f.w, h: f.y + f.h - best.y - best.h });
+                });
+                // Remove espaços contidos em outros
+                free = next.filter((a, i) => !next.some((b, j) => j !== i &&
+                    a.x >= b.x - PACK_EPS && a.y >= b.y - PACK_EPS &&
+                    a.x + a.w <= b.x + b.w + PACK_EPS && a.y + a.h <= b.y + b.h + PACK_EPS &&
+                    (j < i || a.w < b.w - PACK_EPS || a.h < b.h - PACK_EPS)));
+            });
+
+            const usedHeight = placed.reduce((m, p) => Math.max(m, p.y + p.ph), 0);
+            return { placed, leftover, usedHeight };
+        }
+
+        // Testa várias ordenações e fica com a que gasta menos material.
+        // Tudo em pixels na resolução das estampas (dpi).
+        function packPrints(items, settings, dpi) {
+            const sheetWidthPx = Math.round(settings.widthCm / 2.54 * dpi);
+            const gapPx = Math.round(settings.gapCm / 2.54 * dpi);
+            const binW = sheetWidthPx + gapPx; // o espaçamento só existe ENTRE estampas
+            const binH = 2e9; // altura livre: o arquivo cresce o quanto precisar
+
+            const rects = [];
+            items.forEach(row => {
+                const fitsNormal = row.widthPx <= sheetWidthPx;
+                const fitsRotated = settings.rotate && row.heightPx <= sheetWidthPx;
+                if (!fitsNormal && !fitsRotated) {
+                    throw new Error(`A estampa "${row.item.name}" (${formatCm(pxToCm(row.widthPx, dpi))} × ${formatCm(pxToCm(row.heightPx, dpi))} cm) não cabe na largura do arquivo.`);
+                }
+                for (let c = 0; c < row.copies; c++) rects.push({ row, w: row.widthPx + gapPx, h: row.heightPx + gapPx });
+            });
+
+            const strategies = [
+                (a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.h - a.h,
+                (a, b) => b.h - a.h || b.w - a.w,
+                (a, b) => b.w - a.w || b.h - a.h,
+                (a, b) => b.w * b.h - a.w * a.h || b.h - a.h,
+                (a, b) => (b.w + b.h) - (a.w + a.h)
+            ];
+            const rotateOptions = settings.rotate ? [true, false] : [false];
+
+            let best = null;
+            strategies.forEach(sortFn => {
+                rotateOptions.forEach(allowRotate => {
+                    let remaining = [...rects].sort(sortFn);
+                    const sheets = [];
+                    while (remaining.length > 0) {
+                        const result = packSheet(remaining, binW, binH, allowRotate);
+                        if (result.placed.length === 0) return; // não cabe (sem rotação)
+                        sheets.push({ placed: result.placed, heightPx: Math.max(1, result.usedHeight - gapPx) });
+                        remaining = result.leftover;
+                    }
+                    const totalHeight = sheets.reduce((sum, sh) => sum + sh.heightPx, 0);
+                    if (!best || totalHeight < best.totalHeightPx) best = { sheets, totalHeightPx: totalHeight };
+                });
+            });
+            if (!best) throw new Error('Não foi possível organizar as estampas. Verifique a largura do arquivo.');
+            return { ...best, dpi, sheetWidthPx, items };
+        }
+
+        // Pré-visualização (miniaturas); o arquivo final é gravado por writePrintSheetPng
+        function drawSheet(ctx, sheet, scale) {
+            sheet.placed.forEach(p => {
+                const w = p.row.widthPx * scale;
+                const h = p.row.heightPx * scale;
+                ctx.save();
+                if (p.rotated) {
+                    ctx.translate(p.x * scale + h, p.y * scale);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.drawImage(p.row.preview, 0, 0, w, h);
+                } else {
+                    ctx.drawImage(p.row.preview, p.x * scale, p.y * scale, w, h);
+                }
+                ctx.restore();
+            });
+        }
+
+        function sheetUsage(sheet, widthPx) {
+            const printArea = sheet.placed.reduce((sum, p) => sum + p.row.widthPx * p.row.heightPx, 0);
+            return printArea / (widthPx * sheet.heightPx) * 100;
+        }
+
+        function renderPrintFilePreview(layouts) {
+            const container = document.getElementById('printFilePreview');
+            container.innerHTML = '';
+            const totalFiles = layouts.reduce((n, l) => n + l.sheets.length, 0);
+            let fileNumber = 0;
+            layouts.forEach(layout => {
+                layout.sheets.forEach(sheet => {
+                    fileNumber++;
+                    const previewWidth = 700;
+                    const scale = previewWidth / layout.sheetWidthPx;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = previewWidth;
+                    canvas.height = Math.max(1, Math.ceil(sheet.heightPx * scale));
+                    canvas.className = 'w-full border rounded';
+                    canvas.style.background = 'repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingQuality = 'high';
+                    drawSheet(ctx, sheet, scale);
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'space-y-1';
+                    const title = totalFiles > 1 ? `Arquivo ${fileNumber} de ${totalFiles}: ` : '';
+                    wrapper.innerHTML = `<div class="text-sm font-medium text-gray-700">${title}${formatCm(pxToCm(layout.sheetWidthPx, layout.dpi))} × ${formatCm(pxToCm(sheet.heightPx, layout.dpi))} cm · ${layout.sheetWidthPx} × ${sheet.heightPx} px · ${layout.dpi} DPI · ${sheet.placed.length} estampas · aproveitamento ${sheetUsage(sheet, layout.sheetWidthPx).toFixed(0)}%</div>`;
+                    wrapper.appendChild(canvas);
+                    container.appendChild(wrapper);
+                });
+            });
+        }
+
+        async function buildPrintFileLayouts() {
+            const statusEl = document.getElementById('printFileStatus');
+            const settings = readPrintFileSettings();
+            const items = await preparePrintFileItems(statusEl);
+            statusEl.textContent = 'Organizando estampas...';
+            await new Promise(r => setTimeout(r, 20)); // deixa a tela atualizar
+
+            // Um arquivo por resolução/perfil de cor, para nunca reamostrar nem converter as estampas
+            const groups = {};
+            items.forEach(row => {
+                const key = `${row.dpi}|${row.colorKey}`;
+                (groups[key] = groups[key] || []).push(row);
+            });
+            const layouts = Object.values(groups).map(group => packPrints(group, settings, group[0].dpi));
+
+            renderPrintFilePreview(layouts);
+            const copies = items.reduce((sum, r) => sum + r.copies, 0);
+            const files = layouts.reduce((n, l) => n + l.sheets.length, 0);
+            const heights = layouts.map(l => `${formatCm(pxToCm(l.totalHeightPx, l.dpi))} cm a ${l.dpi} DPI`).join(' + ');
+            statusEl.textContent = `${copies} estampas · largura ${formatCm(settings.widthCm)} cm · altura ${heights}${files > 1 ? ` · ${files} arquivos` : ''}.`;
+            return layouts;
+        }
+
+        window.previewPrintFileLayout = async () => {
+            const btn = document.getElementById('printFileLayoutBtn');
+            btn.disabled = true;
+            try {
+                await buildPrintFileLayouts();
+            } catch (e) {
+                console.error('Erro ao montar arquivo:', e);
+                document.getElementById('printFileStatus').textContent = '';
+                alert(e.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ---- Gravação do PNG final em faixas (sem limite de tamanho do canvas) ----
+        const crcTable = (() => {
+            const table = new Uint32Array(256);
+            for (let n = 0; n < 256; n++) {
+                let c = n;
+                for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+                table[n] = c >>> 0;
+            }
+            return table;
+        })();
+
+        function crc32(bytes, crc = 0xFFFFFFFF, finish = true) {
+            for (let i = 0; i < bytes.length; i++) crc = crcTable[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+            return finish ? (crc ^ 0xFFFFFFFF) >>> 0 : crc;
+        }
+
+        function pngChunk(type, data) {
+            const chunk = new Uint8Array(12 + data.length);
+            const view = new DataView(chunk.buffer);
+            view.setUint32(0, data.length);
+            for (let i = 0; i < 4; i++) chunk[4 + i] = type.charCodeAt(i);
+            chunk.set(data, 8);
+            view.setUint32(8 + data.length, crc32(chunk.subarray(4, 8 + data.length)));
+            return chunk;
+        }
+
+        // Copia uma cópia da estampa para as linhas [bandY, bandY + bandRows) da faixa.
+        // Sem escala: pixel a pixel (girada 90° no sentido horário quando rotated).
+        function blitPlacement(band, bandY, bandRows, rowLen, outBytes, p) {
+            const src = p.row.pixels;
+            const srcBytes = src.depth / 8 * 4;
+            const expand = outBytes !== srcBytes; // 8 -> 16 bits: v -> v*257 (sem perda)
+            const placedH = p.rotated ? src.width : src.height;
+            const placedW = p.rotated ? src.height : src.width;
+            const y0 = Math.max(p.y, bandY);
+            const y1 = Math.min(p.y + placedH, bandY + bandRows);
+            for (let y = y0; y < y1; y++) {
+                const dstRow = (y - bandY) * rowLen + p.x * outBytes;
+                const localY = y - p.y;
+                if (!p.rotated && !expand) {
+                    const s = src.offset + localY * src.stride;
+                    band.set(src.data.subarray(s, s + src.width * srcBytes), dstRow);
+                    continue;
+                }
+                for (let x = 0; x < placedW; x++) {
+                    // Girada: linha de saída = coluna da origem, lida de baixo para cima
+                    const sx = p.rotated ? localY : x;
+                    const sy = p.rotated ? src.height - 1 - x : localY;
+                    const s = src.offset + sy * src.stride + sx * srcBytes;
+                    const d = dstRow + x * outBytes;
+                    if (expand) {
+                        for (let c = 0; c < 4; c++) { band[d + c * 2] = src.data[s + c]; band[d + c * 2 + 1] = src.data[s + c]; }
+                    } else {
+                        for (let c = 0; c < srcBytes; c++) band[d + c] = src.data[s + c];
+                    }
+                }
+            }
+        }
+
+        async function writePrintSheetPng(layout, sheet, onProgress) {
+            const width = layout.sheetWidthPx;
+            const height = sheet.heightPx;
+            const depth = layout.items.some(r => r.pixels.depth === 16) ? 16 : 8;
+            const outBytes = depth / 8 * 4;
+            const rowLen = width * outBytes;
+            const bandRows = Math.max(1, Math.floor(16 * 1024 * 1024 / rowLen));
+
+            const ihdr = new Uint8Array(13);
+            const ihdrView = new DataView(ihdr.buffer);
+            ihdrView.setUint32(0, width);
+            ihdrView.setUint32(4, height);
+            ihdr[8] = depth; ihdr[9] = 6; // RGBA
+            const phys = new Uint8Array(9);
+            const ppm = Math.round(layout.dpi / 0.0254);
+            new DataView(phys.buffer).setUint32(0, ppm);
+            new DataView(phys.buffer).setUint32(4, ppm);
+            phys[8] = 1; // unidade: metro
+
+            const parts = [
+                new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+                pngChunk('IHDR', ihdr),
+                ...layout.items[0].colorChunks, // perfil de cor original
+                pngChunk('pHYs', phys)
+            ];
+
+            // Compressão nativa do navegador (zlib), em fluxo
+            const compressor = new CompressionStream('deflate');
+            const writer = compressor.writable.getWriter();
+            const reading = (async () => {
+                const reader = compressor.readable.getReader();
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    parts.push(pngChunk('IDAT', value));
+                }
+            })();
+
+            const placed = [...sheet.placed].sort((a, b) => a.y - b.y);
+            let prevRow = new Uint8Array(rowLen);
+            for (let bandY = 0; bandY < height; bandY += bandRows) {
+                const rows = Math.min(bandRows, height - bandY);
+                const band = new Uint8Array(rows * rowLen); // fundo transparente
+                placed.forEach(p => {
+                    const placedH = p.rotated ? p.row.widthPx : p.row.heightPx;
+                    if (p.y < bandY + rows && p.y + placedH > bandY) blitPlacement(band, bandY, rows, rowLen, outBytes, p);
+                });
+
+                // Filtro Paeth por linha (compressão sem perda)
+                const filtered = new Uint8Array(rows * (rowLen + 1));
+                for (let r = 0; r < rows; r++) {
+                    const cur = band.subarray(r * rowLen, (r + 1) * rowLen);
+                    const up = r === 0 ? prevRow : band.subarray((r - 1) * rowLen, r * rowLen);
+                    const o = r * (rowLen + 1);
+                    filtered[o] = 4;
+                    for (let i = 0; i < rowLen; i++) {
+                        const a = i >= outBytes ? cur[i - outBytes] : 0;
+                        const b = up[i];
+                        const c = i >= outBytes ? up[i - outBytes] : 0;
+                        const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+                        const pred = pa <= pb && pa <= pc ? a : (pb <= pc ? b : c);
+                        filtered[o + 1 + i] = (cur[i] - pred) & 0xFF;
+                    }
+                }
+                prevRow = band.slice((rows - 1) * rowLen);
+                await writer.write(filtered);
+                if (onProgress) onProgress((bandY + rows) / height);
+                await new Promise(r => setTimeout(r, 0)); // mantém a tela respondendo
+            }
+            await writer.close();
+            await reading;
+            parts.push(pngChunk('IEND', new Uint8Array(0)));
+            return new Blob(parts, { type: 'image/png' });
+        }
+
+        window.generatePrintFile = async () => {
+            const btn = document.getElementById('printFileGenerateBtn');
+            const statusEl = document.getElementById('printFileStatus');
+            btn.disabled = true;
+            try {
+                const layouts = await buildPrintFileLayouts();
+                const summary = statusEl.textContent;
+                const stamp = new Date().toISOString().slice(0, 10);
+                const totalFiles = layouts.reduce((n, l) => n + l.sheets.length, 0);
+                let fileNumber = 0;
+
+                for (const layout of layouts) {
+                    for (const sheet of layout.sheets) {
+                        fileNumber++;
+                        const label = `Gerando arquivo ${fileNumber} de ${totalFiles}`;
+                        const blob = await writePrintSheetPng(layout, sheet, (p) => {
+                            statusEl.textContent = `${label}... ${Math.round(p * 100)}%`;
+                        });
+
+                        const part = totalFiles > 1 ? `_${fileNumber}de${totalFiles}` : '';
+                        const size = `${formatCm(pxToCm(layout.sheetWidthPx, layout.dpi))}x${formatCm(pxToCm(sheet.heightPx, layout.dpi))}cm`.replace(/,/g, '.');
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `estampas_${stamp}_${size}_${layout.dpi}dpi${part}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+                    }
+                }
+                statusEl.textContent = `Pronto! ${totalFiles} arquivo(s) PNG baixado(s). ${summary}`;
+            } catch (e) {
+                console.error('Erro ao gerar arquivo de estampas:', e);
+                statusEl.textContent = '';
+                alert(e.message);
+            } finally {
+                btn.disabled = false;
             }
         }
 
@@ -3685,7 +4635,7 @@
 
                             // Estampa
                             const prod = window.cachedProducts.find(p => p.id === item.productId);
-                            if (prod && prod.printId) materialsMap[prod.printId] = (materialsMap[prod.printId] || 0) + item.qty;
+                            addProductPrintsToMap(prod, item.qty, materialsMap);
                         });
 
                         // Insumos
@@ -3798,9 +4748,7 @@
 
             // 2. Estampa
             const prod = window.cachedProducts.find(p => p.id === item.productId);
-            if (prod && prod.printId) {
-                updates[prod.printId] = (updates[prod.printId] || 0) + qty;
-            }
+            addProductPrintsToMap(prod, qty, updates);
 
             // 3. Insumos (unitários)
             inventory.filter(i => i.type === 'Insumo').forEach(insumo => {
