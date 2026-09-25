@@ -787,18 +787,15 @@
                     <input id="inventoryImage" type="file" accept="image/png" onchange="previewImage(this)" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary">
                     <img id="inventoryImagePreview" src="" alt="Preview" class="h-10 w-10 object-contain rounded border bg-gray-800 hidden">
                 </div>
-                <p id="inventoryImageInfo" class="text-xs text-muted-foreground">O arquivo original é salvo sem compressão (máx. 20 MB). Use PNG com fundo transparente.</p>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1">
-                        <label class="text-xs font-medium text-gray-700">Largura de impressão (cm)</label>
-                        <input id="inventoryPrintWidth" type="number" step="0.1" min="0" oninput="syncPrintSize('w')" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 28">
+                <p id="inventoryImageInfo" class="text-xs text-muted-foreground"></p>
+                <div class="flex items-end gap-4">
+                    <div class="space-y-1 w-32">
+                        <label class="text-xs font-medium text-gray-700">Resolução (DPI)</label>
+                        <input id="inventoryImageDpi" type="number" step="1" min="1" oninput="updatePrintSizeInfo()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary read-only:bg-gray-100 read-only:text-gray-500" placeholder="Ex: 300">
                     </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-medium text-gray-700">Altura de impressão (cm)</label>
-                        <input id="inventoryPrintHeight" type="number" step="0.1" min="0" oninput="syncPrintSize('h')" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 35">
-                    </div>
+                    <p id="inventoryPrintSize" class="text-sm font-medium text-gray-700 pb-2"></p>
                 </div>
-                <p class="text-xs text-muted-foreground">Tamanho real da estampa na peça (proporcional à imagem). Usado para montar o arquivo de impressão.</p>
+                <p class="text-xs text-muted-foreground">O PNG é enviado exatamente como está, sem limite de tamanho e sem alteração. O tamanho de impressão vem dos pixels e do DPI do próprio arquivo.</p>
             </div>
 
             <div class="flex justify-end gap-2 pt-4">
@@ -1261,15 +1258,15 @@
                 <div class="border rounded-md overflow-hidden">
                     <table class="w-full text-sm text-left">
                         <thead class="bg-gray-100 text-muted-foreground font-medium">
-                            <tr><th class="p-2 w-8"></th><th class="p-2">Estampa</th><th class="p-2 w-24">Cópias</th><th class="p-2 w-28">Largura (cm)</th><th class="p-2 w-28">Altura (cm)</th></tr>
+                            <tr><th class="p-2 w-8"></th><th class="p-2">Estampa</th><th class="p-2 w-24">Cópias</th><th class="p-2">Tamanho (do arquivo)</th></tr>
                         </thead>
                         <tbody id="printFileItemsBody" class="divide-y bg-white"></tbody>
                     </table>
                 </div>
-                <p class="text-xs text-muted-foreground">As cópias vêm preenchidas com a quantidade em falta. A altura acompanha a proporção da imagem.</p>
+                <p class="text-xs text-muted-foreground">As cópias vêm preenchidas com a quantidade em falta. Cada estampa é colada exatamente como o arquivo enviado (mesmos pixels e resolução), apenas duplicada e posicionada.</p>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-gray-700">Unidade</label>
                     <select id="printFileUnit" onchange="convertPrintFileUnit()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
@@ -1285,15 +1282,11 @@
                     <label class="text-xs font-medium text-gray-700">Espaçamento (<span class="pf-unit">cm</span>)</label>
                     <input id="printFileGap" type="number" step="0.1" min="0" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 1">
                 </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-medium text-gray-700">Resolução (DPI)</label>
-                    <input id="printFileDpi" type="number" step="1" min="72" value="300" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
                 <label class="flex items-center gap-2 text-xs font-medium text-gray-700 h-9">
                     <input id="printFileRotate" type="checkbox" checked class="h-4 w-4"> Permitir girar 90°
                 </label>
             </div>
-            <p class="text-xs text-muted-foreground">A altura do arquivo é calculada automaticamente, com as estampas organizadas para o menor desperdício.</p>
+            <p class="text-xs text-muted-foreground">A altura do arquivo é calculada automaticamente, com as estampas organizadas para o menor desperdício. O arquivo final usa a mesma resolução (DPI) das estampas; estampas com DPI diferentes saem em arquivos separados.</p>
 
             <div id="printFileStatus" class="text-sm text-gray-600"></div>
             <div id="printFilePreview" class="space-y-4"></div>
@@ -2038,12 +2031,13 @@
 
         // Dados da imagem de estampa selecionada no modal de estoque (pixels/DPI)
         let inventoryImageMeta = null;
-        const MAX_PRINT_UPLOAD_MB = 20;
+        const INVENTORY_IMAGE_HINT = 'Envie o PNG final de impressão (fundo transparente), no tamanho real.';
 
-        // Lê o DPI gravado no PNG (chunk pHYs). Retorna null se não houver.
-        function readPngDpi(buffer) {
+        // Lê largura/altura (IHDR) e DPI (pHYs) direto dos bytes do PNG, sem decodificar a imagem
+        function readPngInfo(buffer) {
             const view = new DataView(buffer);
-            if (view.byteLength < 8 || view.getUint32(0) !== 0x89504E47) return null;
+            if (view.byteLength < 24 || view.getUint32(0) !== 0x89504E47) return null;
+            const info = { width: view.getUint32(16), height: view.getUint32(20), dpi: null };
             let offset = 8;
             while (offset + 8 <= view.byteLength) {
                 const length = view.getUint32(offset);
@@ -2051,79 +2045,83 @@
                 if (type === 'pHYs' && offset + 17 <= view.byteLength) {
                     const ppuX = view.getUint32(offset + 8);
                     const unit = view.getUint8(offset + 16);
-                    return unit === 1 && ppuX > 0 ? ppuX * 0.0254 : null; // pixels por metro -> DPI
+                    if (unit === 1 && ppuX > 0) {
+                        const dpi = ppuX * 0.0254; // pixels por metro -> DPI (ex.: 11811 -> 300)
+                        info.dpi = Math.abs(dpi - Math.round(dpi)) < 0.1 ? Math.round(dpi) : Math.round(dpi * 100) / 100;
+                    }
+                    break;
                 }
-                if (type === 'IDAT' || type === 'IEND') return null; // pHYs sempre vem antes
+                if (type === 'IDAT' || type === 'IEND') break; // pHYs sempre vem antes
                 offset += 12 + length;
             }
-            return null;
+            return info;
         }
+        const readPngDpi = (buffer) => (readPngInfo(buffer) || {}).dpi || null;
 
-        window.previewImage = (input) => {
-            const preview = document.getElementById('inventoryImagePreview');
-            const info = document.getElementById('inventoryImageInfo');
-            inventoryImageMeta = null;
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                if (file.type !== 'image/png') {
-                    alert('Envie a estampa em PNG (de preferência com fundo transparente).');
-                    input.value = '';
-                    preview.classList.add('hidden');
-                    return;
-                }
-                if (file.size > MAX_PRINT_UPLOAD_MB * 1024 * 1024) {
-                    alert(`A imagem tem ${(file.size / 1048576).toFixed(1)} MB. O limite é ${MAX_PRINT_UPLOAD_MB} MB.`);
-                    input.value = '';
-                    preview.classList.add('hidden');
-                    return;
-                }
-                const objectUrl = URL.createObjectURL(file);
-                preview.src = objectUrl;
-                preview.classList.remove('hidden');
-
-                Promise.all([file.arrayBuffer(), new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.onload = () => resolve(img);
-                    img.onerror = reject;
-                    img.src = objectUrl;
-                })]).then(([buffer, img]) => {
-                    const dpi = readPngDpi(buffer);
-                    inventoryImageMeta = { widthPx: img.naturalWidth, heightPx: img.naturalHeight, dpi };
-                    const widthInput = document.getElementById('inventoryPrintWidth');
-                    const heightInput = document.getElementById('inventoryPrintHeight');
-                    if (dpi) {
-                        widthInput.value = (img.naturalWidth / dpi * 2.54).toFixed(1);
-                        heightInput.value = (img.naturalHeight / dpi * 2.54).toFixed(1);
-                    } else if (parseFloat(widthInput.value) > 0) {
-                        window.syncPrintSize('w');
-                    }
-                    const dpiText = dpi ? `${Math.round(dpi)} DPI` : 'sem DPI gravado (informe o tamanho)';
-                    info.textContent = `${img.naturalWidth} × ${img.naturalHeight} px, ${dpiText}, ${(file.size / 1048576).toFixed(1)} MB.`;
-                }).catch(err => console.error('Erro ao ler imagem:', err));
-            } else {
-                preview.classList.add('hidden');
+        // Lista os chunks do PNG até o primeiro IDAT: [{ type, start, end }]
+        function listPngHeadChunks(buffer) {
+            const view = new DataView(buffer);
+            const chunks = [];
+            let offset = 8;
+            while (offset + 8 <= view.byteLength) {
+                const length = view.getUint32(offset);
+                const type = String.fromCharCode(view.getUint8(offset + 4), view.getUint8(offset + 5), view.getUint8(offset + 6), view.getUint8(offset + 7));
+                chunks.push({ type, start: offset, end: offset + 12 + length });
+                if (type === 'IDAT' || type === 'IEND') break;
+                offset += 12 + length;
             }
+            return chunks;
         }
+        const PNG_COLOR_CHUNKS = ['iCCP', 'sRGB', 'gAMA', 'cHRM', 'cICP'];
 
-        // Mantém largura/altura de impressão proporcionais à imagem
-        window.syncPrintSize = (changed) => {
-            const widthInput = document.getElementById('inventoryPrintWidth');
-            const heightInput = document.getElementById('inventoryPrintHeight');
-            let ratio = null;
+        window.updatePrintSizeInfo = () => {
+            const out = document.getElementById('inventoryPrintSize');
+            const dpi = parseFloat(document.getElementById('inventoryImageDpi').value);
+            let widthPx = null, heightPx = null;
             if (inventoryImageMeta) {
-                ratio = inventoryImageMeta.heightPx / inventoryImageMeta.widthPx;
+                widthPx = inventoryImageMeta.widthPx; heightPx = inventoryImageMeta.heightPx;
             } else if (currentInventoryId) {
                 const item = inventory.find(i => i.id === currentInventoryId);
-                if (item && item.imageWidthPx && item.imageHeightPx) ratio = item.imageHeightPx / item.imageWidthPx;
+                if (item) { widthPx = item.imageWidthPx; heightPx = item.imageHeightPx; }
             }
-            if (!ratio) return;
-            if (changed === 'w') {
-                const w = parseFloat(widthInput.value);
-                heightInput.value = w > 0 ? (w * ratio).toFixed(1) : '';
+            out.textContent = widthPx && heightPx && dpi > 0
+                ? `Impressão: ${(widthPx / dpi * 2.54).toFixed(1)} × ${(heightPx / dpi * 2.54).toFixed(1)} cm`
+                : '';
+        }
+
+        window.previewImage = async (input) => {
+            const preview = document.getElementById('inventoryImagePreview');
+            const info = document.getElementById('inventoryImageInfo');
+            const dpiInput = document.getElementById('inventoryImageDpi');
+            inventoryImageMeta = null;
+            if (!(input.files && input.files[0])) {
+                preview.classList.add('hidden');
+                return;
+            }
+            const file = input.files[0];
+            // Os primeiros MB bastam para ler IHDR/pHYs, mesmo em arquivos enormes
+            const head = await file.slice(0, 4 * 1024 * 1024).arrayBuffer();
+            const png = readPngInfo(head);
+            if (!png) {
+                alert('Envie a estampa em PNG (de preferência com fundo transparente).');
+                input.value = '';
+                preview.classList.add('hidden');
+                return;
+            }
+            inventoryImageMeta = { widthPx: png.width, heightPx: png.height, dpi: png.dpi };
+            preview.src = URL.createObjectURL(file);
+            preview.classList.remove('hidden');
+
+            if (png.dpi) {
+                dpiInput.value = png.dpi;
+                dpiInput.readOnly = true;
             } else {
-                const h = parseFloat(heightInput.value);
-                widthInput.value = h > 0 ? (h / ratio).toFixed(1) : '';
+                dpiInput.value = '';
+                dpiInput.readOnly = false;
             }
+            const dpiText = png.dpi ? `${png.dpi} DPI` : 'sem DPI gravado no arquivo: informe a resolução em que ele foi feito';
+            info.textContent = `${png.width} × ${png.height} px · ${dpiText} · ${(file.size / 1048576).toFixed(1)} MB`;
+            window.updatePrintSizeInfo();
         }
 
         // Funções para Estoque
@@ -2138,11 +2136,12 @@
             const schoolSelect = document.getElementById('inventorySchool');
             const imageInput = document.getElementById('inventoryImage');
             const imagePreview = document.getElementById('inventoryImagePreview');
-            const printWidthInput = document.getElementById('inventoryPrintWidth');
-            const printHeightInput = document.getElementById('inventoryPrintHeight');
+            const imageDpiInput = document.getElementById('inventoryImageDpi');
+            const imageInfo = document.getElementById('inventoryImageInfo');
             inventoryImageMeta = null;
             imageInput.value = '';
-            document.getElementById('inventoryImageInfo').textContent = 'O arquivo original é salvo sem compressão (máx. 20 MB). Use PNG com fundo transparente.';
+            imageDpiInput.readOnly = false;
+            imageInfo.textContent = INVENTORY_IMAGE_HINT;
             
             const usageTypeSelect = document.getElementById('inventoryUsageType');
             const usageUnitQty = document.getElementById('usageUnitQty');
@@ -2186,8 +2185,11 @@
                     costInput.value = item.cost || '';
                     qtyInput.value = item.quantity || '';
                     schoolSelect.value = item.partnerId || '';
-                    printWidthInput.value = item.printWidthCm || '';
-                    printHeightInput.value = item.printHeightCm || '';
+                    imageDpiInput.value = item.imageDpi || '';
+                    if (item.imageWidthPx && item.imageHeightPx) {
+                        imageInfo.textContent = `Arquivo atual: ${item.imageWidthPx} × ${item.imageHeightPx} px${item.imageDpi ? ` · ${item.imageDpi} DPI` : ''}. Envie outro PNG para substituir.`;
+                        imageDpiInput.readOnly = !!item.imageDpiFromFile;
+                    }
                     // imageInput.value não pode ser definido programaticamente por segurança
                     if (item.image) {
                         imagePreview.src = getDisplayUrl(item.image);
@@ -2216,8 +2218,7 @@
                 schoolSelect.value = '';
                 imageInput.value = '';
                 imagePreview.classList.add('hidden');
-                printWidthInput.value = '';
-                printHeightInput.value = '';
+                imageDpiInput.value = '';
                 usageTypeSelect.value = 'unit';
                 usageUnitQty.value = '1';
                 usageBatchQty.value = '1';
@@ -2225,6 +2226,7 @@
                 usageOrderQty.value = '1';
             }
             
+            window.updatePrintSizeInfo();
             window.toggleInventoryFields(); // Atualiza visibilidade do campo de imagem
             window.openModalById('inventoryModal');
             lucide.createIcons(); // Atualiza ícones (para o botão de +)
@@ -2322,6 +2324,48 @@
             });
         }
 
+        // Envio em partes (estampas): sem limite de tamanho e sem alterar o arquivo.
+        // Cada parte vai para o Apps Script, que repassa à sessão de upload retomável do Drive.
+        const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024; // múltiplo de 256 KB (exigência do Drive)
+
+        function bytesToBase64(bytes) {
+            let binary = '';
+            for (let i = 0; i < bytes.length; i += 0x8000) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+            }
+            return btoa(binary);
+        }
+
+        async function postAppsScript(payload, attempts = 3) {
+            for (let attempt = 1; ; attempt++) {
+                try {
+                    const response = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`Falha na comunicação com o Google: ${response.status}`);
+                    const data = await response.json();
+                    if (data.result === 'error') throw Object.assign(new Error(data.error || 'Erro no Apps Script.'), { fatal: true });
+                    return data;
+                } catch (err) {
+                    if (err.fatal || attempt >= attempts) throw err;
+                    await new Promise(r => setTimeout(r, 1000 * attempt));
+                }
+            }
+        }
+
+        async function uploadLargeToDrive(file, onProgress) {
+            if (!file.size) throw new Error('Arquivo vazio.');
+            const session = await postAppsScript({ action: 'uploadStart', name: Date.now() + '_' + file.name, type: file.type || 'image/png', size: file.size });
+            if (!session.token) throw new Error('O Apps Script não abriu o envio em partes. Atualize o script (docs/apps-script/README.md).');
+
+            for (let start = 0; start < file.size; start += UPLOAD_CHUNK_BYTES) {
+                const end = Math.min(start + UPLOAD_CHUNK_BYTES, file.size);
+                const bytes = new Uint8Array(await file.slice(start, end).arrayBuffer());
+                const result = await postAppsScript({ action: 'uploadChunk', token: session.token, start, total: file.size, data: bytesToBase64(bytes) });
+                if (onProgress) onProgress(end / file.size);
+                if (result.result === 'success') return result.url;
+            }
+            throw new Error('O Drive não confirmou o fim do envio.');
+        }
+
         window.saveInventory = async () => {
             const type = document.getElementById('inventoryType').value;
             const name = document.getElementById('inventoryName').value;
@@ -2343,8 +2387,17 @@
                 // Upload se houver arquivo selecionado
                 if (imageInput.files.length > 0) {
                     const file = imageInput.files[0];
-                    // Substituindo Firebase Storage por Google Drive
-                    imageUrl = await uploadToDrive(file);
+                    if (type === 'Estampa') {
+                        const dpi = parseFloat(document.getElementById('inventoryImageDpi').value);
+                        if (!(dpi > 0)) throw new Error('Informe a resolução (DPI) do arquivo da estampa.');
+                        // Arquivo original, em partes, sem limite de tamanho
+                        imageUrl = await uploadLargeToDrive(file, (progress) => {
+                            saveBtn.textContent = `Enviando ${Math.round(progress * 100)}%...`;
+                        });
+                        saveBtn.textContent = 'Salvando...';
+                    } else {
+                        imageUrl = await uploadToDrive(file);
+                    }
                 } else if (currentInventoryId) {
                     // Manter imagem existente se estiver editando e não enviou nova
                     const currentItem = inventory.find(i => i.id === currentInventoryId);
@@ -2365,14 +2418,20 @@
                     usageRule: usageRule // Salva a regra no objeto
                 };
 
-                // Estampa: tamanho real de impressão e dimensões da imagem original
+                // Estampa: dimensões do arquivo original (o tamanho de impressão vem daqui)
                 if (type === 'Estampa') {
-                    itemData.printWidthCm = parseFloat(document.getElementById('inventoryPrintWidth').value) || null;
-                    itemData.printHeightCm = parseFloat(document.getElementById('inventoryPrintHeight').value) || null;
-                    if (inventoryImageMeta) {
-                        itemData.imageWidthPx = inventoryImageMeta.widthPx;
-                        itemData.imageHeightPx = inventoryImageMeta.heightPx;
-                        itemData.imageDpi = inventoryImageMeta.dpi ? Math.round(inventoryImageMeta.dpi) : null;
+                    const currentItem = currentInventoryId ? inventory.find(i => i.id === currentInventoryId) : null;
+                    const meta = inventoryImageMeta || (currentItem && currentItem.imageWidthPx
+                        ? { widthPx: currentItem.imageWidthPx, heightPx: currentItem.imageHeightPx, dpi: currentItem.imageDpiFromFile ? currentItem.imageDpi : null }
+                        : null);
+                    const dpi = parseFloat(document.getElementById('inventoryImageDpi').value) || null;
+                    itemData.imageDpi = dpi;
+                    if (meta) {
+                        itemData.imageWidthPx = meta.widthPx;
+                        itemData.imageHeightPx = meta.heightPx;
+                        itemData.imageDpiFromFile = !!meta.dpi;
+                        itemData.printWidthCm = dpi ? +(meta.widthPx / dpi * 2.54).toFixed(2) : null;
+                        itemData.printHeightCm = dpi ? +(meta.heightPx / dpi * 2.54).toFixed(2) : null;
                     }
                 }
                 
@@ -3276,40 +3335,37 @@
             }
         }
 
-        // --- Arquivo de Estampas (montagem otimizada para impressão) ---
+        // --- Arquivo de Estampas (duplicação + organização para impressão) ---
+        // As estampas NUNCA são redimensionadas: cada cópia é colada pixel a pixel,
+        // e o arquivo final tem a mesma resolução (DPI) dos PNGs enviados.
         let printFileRows = [];
         const printImageCache = {};
         const PRINT_FILE_SETTINGS_KEY = 'printFileSettings';
+        const DOWNLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
 
         const escapeHtml = (text) => String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const formatCm = (value) => (Math.round(value * 10) / 10).toLocaleString('pt-BR');
+        const pxToCm = (px, dpi) => px / dpi * 2.54;
 
         window.openPrintFileModal = () => {
             const missing = window.lastMissingPrints || [];
             if (missing.length === 0) { alert('Nenhuma estampa em falta.'); return; }
 
-            printFileRows = missing.map(m => {
-                const item = m.item;
-                const ratio = item.imageWidthPx && item.imageHeightPx ? item.imageHeightPx / item.imageWidthPx : null;
-                return {
-                    item,
-                    selected: !!item.image,
-                    copies: Math.ceil(m.missing),
-                    widthCm: parseFloat(item.printWidthCm) || null,
-                    heightCm: parseFloat(item.printHeightCm) || null,
-                    ratio
-                };
-            });
+            printFileRows = missing.map(m => ({
+                item: m.item,
+                selected: !!m.item.image,
+                copies: Math.ceil(m.missing)
+            }));
 
             // Preferências da última geração (apenas conveniência local)
             let saved = {};
             try { saved = JSON.parse(localStorage.getItem(PRINT_FILE_SETTINGS_KEY) || '{}'); } catch (e) { saved = {}; }
-            document.getElementById('printFileUnit').value = saved.unit || 'cm';
-            document.getElementById('printFileUnit').dataset.current = saved.unit || 'cm';
-            document.querySelectorAll('.pf-unit').forEach(el => el.textContent = saved.unit || 'cm');
+            const unit = saved.unit || 'cm';
+            document.getElementById('printFileUnit').value = unit;
+            document.getElementById('printFileUnit').dataset.current = unit;
+            document.querySelectorAll('.pf-unit').forEach(el => el.textContent = unit);
             document.getElementById('printFileWidth').value = saved.width ?? '';
             document.getElementById('printFileGap').value = saved.gap ?? '';
-            document.getElementById('printFileDpi').value = saved.dpi || 300;
             document.getElementById('printFileRotate').checked = saved.rotate !== false;
 
             document.getElementById('printFileStatus').textContent = '';
@@ -3317,6 +3373,16 @@
             renderPrintFileRows();
             window.openModalById('printFileModal');
             lucide.createIcons();
+        }
+
+        function describePrintSize(row) {
+            const item = row.item;
+            const widthPx = row.widthPx || item.imageWidthPx;
+            const heightPx = row.heightPx || item.imageHeightPx;
+            const dpi = row.dpi || item.imageDpi;
+            if (!widthPx || !heightPx) return '<span class="text-gray-400">lido ao gerar</span>';
+            const cm = dpi ? `${formatCm(pxToCm(widthPx, dpi))} × ${formatCm(pxToCm(heightPx, dpi))} cm · ` : '';
+            return `${cm}<span class="text-gray-500">${widthPx} × ${heightPx} px${dpi ? ` · ${dpi} DPI` : ''}</span>`;
         }
 
         function renderPrintFileRows() {
@@ -3335,8 +3401,7 @@
                         </div>
                     </td>
                     <td class="p-2"><input type="number" min="0" step="1" value="${row.copies}" oninput="updatePrintFileRow(${index}, 'copies', this.value)" class="w-full h-8 border rounded px-2 text-sm"></td>
-                    <td class="p-2"><input type="number" min="0" step="0.1" value="${row.widthCm ?? ''}" oninput="updatePrintFileRow(${index}, 'widthCm', this.value)" class="pf-w w-full h-8 border rounded px-2 text-sm"></td>
-                    <td class="p-2"><input type="number" min="0" step="0.1" value="${row.heightCm ?? ''}" oninput="updatePrintFileRow(${index}, 'heightCm', this.value)" class="pf-h w-full h-8 border rounded px-2 text-sm"></td>
+                    <td class="p-2 text-xs">${describePrintSize(row)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -3345,18 +3410,8 @@
         window.updatePrintFileRow = (index, field, value) => {
             const row = printFileRows[index];
             if (!row) return;
-            if (field === 'selected') { row.selected = value; return; }
-            if (field === 'copies') { row.copies = Math.max(0, parseInt(value) || 0); return; }
-
-            const num = parseFloat(value) || null;
-            const tr = document.getElementById('printFileItemsBody').children[index];
-            if (field === 'widthCm') {
-                row.widthCm = num;
-                if (row.ratio && num) { row.heightCm = +(num * row.ratio).toFixed(2); tr.querySelector('.pf-h').value = row.heightCm.toFixed(1); }
-            } else {
-                row.heightCm = num;
-                if (row.ratio && num) { row.widthCm = +(num / row.ratio).toFixed(2); tr.querySelector('.pf-w').value = row.widthCm.toFixed(1); }
-            }
+            if (field === 'selected') row.selected = value;
+            if (field === 'copies') row.copies = Math.max(0, parseInt(value) || 0);
         }
 
         window.convertPrintFileUnit = () => {
@@ -3380,43 +3435,56 @@
             return match ? match[1] : null;
         }
 
-        function base64ToBlob(base64, mimeType) {
+        function base64ToBytes(base64) {
             const binary = atob(base64);
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            return new Blob([bytes], { type: mimeType || 'image/png' });
+            return bytes;
         }
 
-        // Baixa a imagem ORIGINAL da estampa sem "sujar" o canvas (CORS).
-        // 1º pelo Apps Script (arquivo original do Drive); 2º direto pelo link público.
-        async function loadPrintImage(url) {
-            if (printImageCache[url]) return printImageCache[url];
+        async function getAppsScript(params) {
+            const response = await fetch(`${APPS_SCRIPT_URL}?${new URLSearchParams(params)}`);
+            const data = await response.json();
+            if (data.result !== 'success') throw new Error(data.error || 'Resposta inesperada do Apps Script.');
+            return data;
+        }
+
+        // Baixa o arquivo ORIGINAL da estampa (bytes idênticos ao enviado), em partes
+        async function downloadOriginalPrint(url, onProgress) {
             const driveId = extractDriveId(url);
-            let blob = null;
-
-            if (driveId) {
-                try {
-                    const res = await fetch(`${APPS_SCRIPT_URL}?action=file&id=${encodeURIComponent(driveId)}`);
-                    const data = await res.json();
-                    if (data.result === 'success' && data.data) blob = base64ToBlob(data.data, data.mimeType);
-                } catch (e) {
-                    console.warn('Apps Script não retornou a imagem, tentando link direto...', e);
-                }
+            if (!driveId) {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Não foi possível baixar a imagem.');
+                return res.blob();
             }
-            if (!blob) {
-                const directUrl = driveId ? `https://lh3.googleusercontent.com/d/${driveId}=s0` : url;
-                try {
-                    const res = await fetch(directUrl, { mode: 'cors', referrerPolicy: 'no-referrer' });
-                    if (res.ok) blob = await res.blob();
-                } catch (e) {
-                    console.warn('Falha ao baixar imagem direta:', e);
-                }
+            const info = await getAppsScript({ action: 'fileInfo', id: driveId });
+            const parts = [];
+            for (let start = 0; start < info.size; start += DOWNLOAD_CHUNK_BYTES) {
+                const length = Math.min(DOWNLOAD_CHUNK_BYTES, info.size - start);
+                const chunk = await getAppsScript({ action: 'chunk', id: driveId, start, length });
+                parts.push(base64ToBytes(chunk.data));
+                if (onProgress) onProgress((start + length) / info.size);
             }
-            if (!blob) throw new Error('Não foi possível baixar a imagem. Atualize o Apps Script (veja docs/apps-script/README.md).');
+            return new Blob(parts, { type: info.mimeType || 'image/png' });
+        }
 
-            const bitmap = await createImageBitmap(blob);
-            printImageCache[url] = bitmap;
-            return bitmap;
+        async function loadPrintImage(row, onProgress) {
+            const url = row.item.image;
+            if (!printImageCache[url]) {
+                const blob = await downloadOriginalPrint(url, onProgress);
+                const head = await blob.slice(0, 4 * 1024 * 1024).arrayBuffer();
+                const png = readPngInfo(head);
+                if (!png) throw new Error(`O arquivo da estampa "${row.item.name}" não é um PNG.`);
+                // Perfil de cor do arquivo original (copiado para o arquivo final)
+                const colorChunks = listPngHeadChunks(head)
+                    .filter(c => PNG_COLOR_CHUNKS.includes(c.type))
+                    .map(c => new Uint8Array(head.slice(c.start, c.end)));
+                const colorKey = colorChunks.map(c => crc32(c)).join('-') || 'none';
+                // Sem conversão de cor/alpha: pixels exatamente como no arquivo
+                const bitmap = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+                printImageCache[url] = { bitmap, dpi: png.dpi, colorChunks, colorKey };
+            }
+            return printImageCache[url];
         }
 
         function readPrintFileSettings() {
@@ -3424,38 +3492,36 @@
             const toCm = (v) => unit === 'mm' ? v / 10 : v;
             const width = parseFloat(document.getElementById('printFileWidth').value);
             const gap = parseFloat(document.getElementById('printFileGap').value) || 0;
-            const dpi = parseInt(document.getElementById('printFileDpi').value) || 300;
             const rotate = document.getElementById('printFileRotate').checked;
             if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
             if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
-            if (dpi < 72 || dpi > 1200) throw new Error('Use uma resolução entre 72 e 1200 DPI.');
-            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, dpi, rotate })); } catch (e) { /* sem armazenamento local */ }
-            return { widthCm: toCm(width), gapCm: toCm(gap), dpi, rotate };
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate };
         }
 
-        // Carrega imagens das estampas selecionadas e completa medidas faltantes
+        // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
         async function preparePrintFileItems(statusEl) {
             const rows = printFileRows.filter(r => r.selected && r.copies > 0 && r.item.image);
             if (rows.length === 0) throw new Error('Selecione pelo menos uma estampa com cópias.');
 
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
-                statusEl.textContent = `Baixando imagens (${i + 1}/${rows.length}): ${row.item.name}...`;
-                row.bitmap = await loadPrintImage(row.item.image);
-                row.ratio = row.bitmap.height / row.bitmap.width;
-                if (row.widthCm && !row.heightCm) row.heightCm = row.widthCm * row.ratio;
-                if (row.heightCm && !row.widthCm) row.widthCm = row.heightCm / row.ratio;
-                if (!row.widthCm && row.item.imageDpi) {
-                    row.widthCm = row.bitmap.width / row.item.imageDpi * 2.54;
-                    row.heightCm = row.bitmap.height / row.item.imageDpi * 2.54;
-                }
-                if (!row.widthCm || !row.heightCm) throw new Error(`Informe a largura da estampa "${row.item.name}".`);
+                const label = `Baixando estampas (${i + 1}/${rows.length}): ${row.item.name}`;
+                statusEl.textContent = label + '...';
+                const image = await loadPrintImage(row, (p) => { statusEl.textContent = `${label} ${Math.round(p * 100)}%`; });
+                row.bitmap = image.bitmap;
+                row.widthPx = image.bitmap.width;
+                row.heightPx = image.bitmap.height;
+                row.dpi = image.dpi || parseFloat(row.item.imageDpi) || null;
+                row.colorChunks = image.colorChunks;
+                row.colorKey = image.colorKey;
+                if (!row.dpi) throw new Error(`A estampa "${row.item.name}" não tem DPI. Edite-a no Estoque e informe a resolução do arquivo.`);
             }
             renderPrintFileRows();
             return rows;
         }
 
-        // ---- Empacotamento (MaxRects, encaixe mais baixo) ----
+        // ---- Empacotamento (MaxRects, encaixe mais baixo), em pixels inteiros ----
         const PACK_EPS = 1e-6;
 
         function packSheet(rects, binW, binH, allowRotate) {
@@ -3465,7 +3531,7 @@
 
             rects.forEach(r => {
                 let best = null;
-                const orientations = allowRotate && Math.abs(r.w - r.h) > PACK_EPS ? [[r.w, r.h, false], [r.h, r.w, true]] : [[r.w, r.h, false]];
+                const orientations = allowRotate && r.w !== r.h ? [[r.w, r.h, false], [r.h, r.w, true]] : [[r.w, r.h, false]];
                 free.forEach(f => {
                     orientations.forEach(([w, h, rotated]) => {
                         if (w > f.w + PACK_EPS || h > f.h + PACK_EPS) return;
@@ -3502,18 +3568,23 @@
             return { placed, leftover, usedHeight };
         }
 
-        // Testa várias ordenações e fica com a que gasta menos material
-        function packPrints(items, settings, maxSheetHeightCm) {
-            const gap = settings.gapCm;
-            const binW = settings.widthCm + gap; // o espaçamento só existe ENTRE estampas
-            const binH = maxSheetHeightCm + gap;
+        // Testa várias ordenações e fica com a que gasta menos material.
+        // Tudo em pixels na resolução das estampas (dpi).
+        function packPrints(items, settings, dpi) {
+            const sheetWidthPx = Math.round(settings.widthCm / 2.54 * dpi);
+            const gapPx = Math.round(settings.gapCm / 2.54 * dpi);
+            const maxHeightPx = getMaxSheetHeightPx(sheetWidthPx);
+            const binW = sheetWidthPx + gapPx; // o espaçamento só existe ENTRE estampas
+            const binH = maxHeightPx + gapPx;
 
             const rects = [];
             items.forEach(row => {
-                const fitsNormal = row.widthCm <= settings.widthCm + PACK_EPS;
-                const fitsRotated = settings.rotate && row.heightCm <= settings.widthCm + PACK_EPS;
-                if (!fitsNormal && !fitsRotated) throw new Error(`A estampa "${row.item.name}" (${formatCm(row.widthCm)} cm) é mais larga que o arquivo.`);
-                for (let c = 0; c < row.copies; c++) rects.push({ row, w: row.widthCm + gap, h: row.heightCm + gap });
+                const fitsNormal = row.widthPx <= sheetWidthPx && row.heightPx <= maxHeightPx;
+                const fitsRotated = settings.rotate && row.heightPx <= sheetWidthPx && row.widthPx <= maxHeightPx;
+                if (!fitsNormal && !fitsRotated) {
+                    throw new Error(`A estampa "${row.item.name}" (${formatCm(pxToCm(row.widthPx, dpi))} × ${formatCm(pxToCm(row.heightPx, dpi))} cm) não cabe na largura do arquivo.`);
+                }
+                for (let c = 0; c < row.copies; c++) rects.push({ row, w: row.widthPx + gapPx, h: row.heightPx + gapPx });
             });
 
             const strategies = [
@@ -3533,94 +3604,104 @@
                     while (remaining.length > 0) {
                         const result = packSheet(remaining, binW, binH, allowRotate);
                         if (result.placed.length === 0) return; // não cabe (sem rotação)
-                        sheets.push({ placed: result.placed, heightCm: Math.max(0, result.usedHeight - gap) });
+                        sheets.push({ placed: result.placed, heightPx: Math.max(1, result.usedHeight - gapPx) });
                         remaining = result.leftover;
                     }
-                    const totalHeight = sheets.reduce((sum, sh) => sum + sh.heightCm, 0);
-                    if (!best || totalHeight < best.totalHeight - PACK_EPS) best = { sheets, totalHeight };
+                    const totalHeight = sheets.reduce((sum, sh) => sum + sh.heightPx, 0);
+                    if (!best || totalHeight < best.totalHeightPx) best = { sheets, totalHeightPx: totalHeight };
                 });
             });
-            if (!best) throw new Error('Não foi possível organizar as estampas. Verifique as medidas.');
-            return best;
+            if (!best) throw new Error('Não foi possível organizar as estampas. Verifique a largura do arquivo.');
+            return { ...best, dpi, sheetWidthPx, items };
         }
 
-        // Limite de tamanho do canvas do navegador
-        function getMaxSheetHeightCm(settings) {
-            const widthPx = Math.round(settings.widthCm / 2.54 * settings.dpi);
-            if (widthPx > 32000) throw new Error('Largura muito grande para essa resolução. Reduza o DPI.');
+        // Limite de tamanho do canvas do navegador (acima disso o arquivo é dividido em partes)
+        function getMaxSheetHeightPx(widthPx) {
+            if (widthPx > 32000) throw new Error('Largura muito grande para a resolução das estampas (limite do navegador: 32000 px).');
             const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
             const maxArea = isSafari ? 16777216 : 250000000;
-            const maxHeightPx = Math.min(32000, Math.floor(maxArea / widthPx));
-            return maxHeightPx / settings.dpi * 2.54;
+            return Math.min(32000, Math.floor(maxArea / widthPx));
         }
 
-        function drawSheet(ctx, sheet, scale) {
+        // Cola cada cópia sem escala; scale só é usado na pré-visualização
+        function drawSheet(ctx, sheet, scale = 1) {
             sheet.placed.forEach(p => {
-                const row = p.row;
-                const x = p.x * scale;
-                const y = p.y * scale;
-                const w = row.widthCm * scale;
-                const h = row.heightCm * scale;
+                const bitmap = p.row.bitmap;
+                ctx.save();
+                ctx.scale(scale, scale);
                 if (p.rotated) {
-                    ctx.save();
-                    ctx.translate(x + h, y);
+                    ctx.translate(p.x + bitmap.height, p.y);
                     ctx.rotate(Math.PI / 2);
-                    ctx.drawImage(row.bitmap, 0, 0, w, h);
-                    ctx.restore();
+                    ctx.drawImage(bitmap, 0, 0);
                 } else {
-                    ctx.drawImage(row.bitmap, x, y, w, h);
+                    ctx.drawImage(bitmap, p.x, p.y);
                 }
+                ctx.restore();
             });
         }
 
-        function sheetUsage(sheet, widthCm) {
-            const printArea = sheet.placed.reduce((sum, p) => sum + p.row.widthCm * p.row.heightCm, 0);
-            return sheet.heightCm > 0 ? printArea / (widthCm * sheet.heightCm) * 100 : 0;
+        function sheetUsage(sheet, widthPx) {
+            const printArea = sheet.placed.reduce((sum, p) => sum + p.row.widthPx * p.row.heightPx, 0);
+            return printArea / (widthPx * sheet.heightPx) * 100;
         }
 
-        function renderPrintFilePreview(layout, settings) {
+        function renderPrintFilePreview(layouts) {
             const container = document.getElementById('printFilePreview');
             container.innerHTML = '';
-            layout.sheets.forEach((sheet, index) => {
-                const previewWidth = 700;
-                const scale = previewWidth / settings.widthCm;
-                const canvas = document.createElement('canvas');
-                canvas.width = previewWidth;
-                canvas.height = Math.max(1, Math.ceil(sheet.heightCm * scale));
-                canvas.className = 'w-full border rounded';
-                canvas.style.background = 'repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
-                const ctx = canvas.getContext('2d');
-                ctx.imageSmoothingQuality = 'high';
-                drawSheet(ctx, sheet, scale);
+            const totalFiles = layouts.reduce((n, l) => n + l.sheets.length, 0);
+            let fileNumber = 0;
+            layouts.forEach(layout => {
+                layout.sheets.forEach(sheet => {
+                    fileNumber++;
+                    const previewWidth = 700;
+                    const scale = previewWidth / layout.sheetWidthPx;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = previewWidth;
+                    canvas.height = Math.max(1, Math.ceil(sheet.heightPx * scale));
+                    canvas.className = 'w-full border rounded';
+                    canvas.style.background = 'repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingQuality = 'high';
+                    drawSheet(ctx, sheet, scale);
 
-                const wrapper = document.createElement('div');
-                wrapper.className = 'space-y-1';
-                const title = layout.sheets.length > 1 ? `Parte ${index + 1} de ${layout.sheets.length}: ` : '';
-                wrapper.innerHTML = `<div class="text-sm font-medium text-gray-700">${title}${formatCm(settings.widthCm)} × ${formatCm(sheet.heightCm)} cm · ${sheet.placed.length} estampas · aproveitamento ${sheetUsage(sheet, settings.widthCm).toFixed(0)}%</div>`;
-                wrapper.appendChild(canvas);
-                container.appendChild(wrapper);
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'space-y-1';
+                    const title = totalFiles > 1 ? `Arquivo ${fileNumber} de ${totalFiles}: ` : '';
+                    wrapper.innerHTML = `<div class="text-sm font-medium text-gray-700">${title}${formatCm(pxToCm(layout.sheetWidthPx, layout.dpi))} × ${formatCm(pxToCm(sheet.heightPx, layout.dpi))} cm · ${layout.sheetWidthPx} × ${sheet.heightPx} px · ${layout.dpi} DPI · ${sheet.placed.length} estampas · aproveitamento ${sheetUsage(sheet, layout.sheetWidthPx).toFixed(0)}%</div>`;
+                    wrapper.appendChild(canvas);
+                    container.appendChild(wrapper);
+                });
             });
         }
 
-        async function buildPrintFileLayout() {
+        async function buildPrintFileLayouts() {
             const statusEl = document.getElementById('printFileStatus');
             const settings = readPrintFileSettings();
             const items = await preparePrintFileItems(statusEl);
             statusEl.textContent = 'Organizando estampas...';
             await new Promise(r => setTimeout(r, 20)); // deixa a tela atualizar
-            const layout = packPrints(items, settings, getMaxSheetHeightCm(settings));
-            renderPrintFilePreview(layout, settings);
+
+            // Um arquivo por resolução/perfil de cor, para nunca reamostrar nem converter as estampas
+            const groups = {};
+            items.forEach(row => {
+                const key = `${row.dpi}|${row.colorKey}`;
+                (groups[key] = groups[key] || []).push(row);
+            });
+            const layouts = Object.values(groups).map(group => packPrints(group, settings, group[0].dpi));
+
+            renderPrintFilePreview(layouts);
             const copies = items.reduce((sum, r) => sum + r.copies, 0);
-            const parts = layout.sheets.length > 1 ? ` em ${layout.sheets.length} arquivos (limite do navegador)` : '';
-            statusEl.textContent = `${copies} estampas · ${formatCm(settings.widthCm)} × ${formatCm(layout.totalHeight)} cm${parts}.`;
-            return { layout, settings };
+            const files = layouts.reduce((n, l) => n + l.sheets.length, 0);
+            const heights = layouts.map(l => `${formatCm(pxToCm(l.totalHeightPx, l.dpi))} cm a ${l.dpi} DPI`).join(' + ');
+            statusEl.textContent = `${copies} estampas · largura ${formatCm(settings.widthCm)} cm · altura ${heights}${files > 1 ? ` · ${files} arquivos` : ''}.`;
+            return layouts;
         }
 
         window.previewPrintFileLayout = async () => {
             const btn = document.getElementById('printFileLayoutBtn');
             btn.disabled = true;
             try {
-                await buildPrintFileLayout();
+                await buildPrintFileLayouts();
             } catch (e) {
                 console.error('Erro ao montar arquivo:', e);
                 document.getElementById('printFileStatus').textContent = '';
@@ -3647,9 +3728,12 @@
             return (crc ^ 0xFFFFFFFF) >>> 0;
         }
 
-        async function setPngDpi(blob, dpi) {
-            const buffer = new Uint8Array(await blob.arrayBuffer());
-            if (readPngDpi(buffer.buffer)) return blob; // já possui DPI
+        // Grava no PNG gerado o DPI e o perfil de cor das estampas originais
+        async function finalizePng(blob, dpi, colorChunks) {
+            const head = await blob.slice(0, 1024 * 1024).arrayBuffer();
+            const chunks = listPngHeadChunks(head);
+            const idat = chunks.find(c => c.type === 'IDAT');
+            if (!idat) throw new Error('PNG gerado inválido.');
             const ppm = Math.round(dpi / 0.0254);
             const chunk = new Uint8Array(21);
             const view = new DataView(chunk.buffer);
@@ -3659,8 +3743,15 @@
             view.setUint32(12, ppm);
             chunk[16] = 1; // unidade: metro
             view.setUint32(17, crc32(chunk.subarray(4, 17)));
-            const ihdrEnd = 8 + 12 + new DataView(buffer.buffer).getUint32(8); // assinatura + IHDR
-            return new Blob([buffer.subarray(0, ihdrEnd), chunk, buffer.subarray(ihdrEnd)], { type: 'image/png' });
+
+            // assinatura + IHDR + cor original + pHYs + demais chunks do navegador (sem cor/pHYs) + dados
+            const parts = [blob.slice(0, chunks[0].end), ...colorChunks, chunk];
+            chunks.slice(1).forEach(c => {
+                if (c.type === 'IDAT' || PNG_COLOR_CHUNKS.includes(c.type) || c.type === 'pHYs') return;
+                parts.push(blob.slice(c.start, c.end));
+            });
+            parts.push(blob.slice(idat.start));
+            return new Blob(parts, { type: 'image/png' });
         }
 
         window.generatePrintFile = async () => {
@@ -3668,39 +3759,43 @@
             const statusEl = document.getElementById('printFileStatus');
             btn.disabled = true;
             try {
-                const { layout, settings } = await buildPrintFileLayout();
-                const pxPerCm = settings.dpi / 2.54;
-                const widthPx = Math.round(settings.widthCm * pxPerCm);
+                const layouts = await buildPrintFileLayouts();
+                const summary = statusEl.textContent;
                 const stamp = new Date().toISOString().slice(0, 10);
+                const totalFiles = layouts.reduce((n, l) => n + l.sheets.length, 0);
+                let fileNumber = 0;
 
-                for (let i = 0; i < layout.sheets.length; i++) {
-                    const sheet = layout.sheets[i];
-                    statusEl.textContent = `Gerando arquivo ${i + 1} de ${layout.sheets.length}...`;
-                    await new Promise(r => setTimeout(r, 20));
+                for (const layout of layouts) {
+                    for (const sheet of layout.sheets) {
+                        fileNumber++;
+                        statusEl.textContent = `Gerando arquivo ${fileNumber} de ${totalFiles}...`;
+                        await new Promise(r => setTimeout(r, 20));
 
-                    const canvas = document.createElement('canvas');
-                    canvas.width = widthPx;
-                    canvas.height = Math.max(1, Math.ceil(sheet.heightCm * pxPerCm));
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) throw new Error('O navegador não conseguiu criar uma imagem desse tamanho. Reduza o DPI.');
-                    ctx.imageSmoothingQuality = 'high';
-                    drawSheet(ctx, sheet, pxPerCm);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = layout.sheetWidthPx;
+                        canvas.height = sheet.heightPx;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) throw new Error('O navegador não conseguiu criar uma imagem desse tamanho.');
+                        ctx.imageSmoothingEnabled = false; // cópia 1:1, sem interpolação
+                        drawSheet(ctx, sheet);
 
-                    const rawBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                    canvas.width = canvas.height = 0; // libera memória
-                    if (!rawBlob) throw new Error('O navegador não conseguiu gerar o PNG. Reduza o DPI.');
-                    const blob = await setPngDpi(rawBlob, settings.dpi);
+                        const rawBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                        canvas.width = canvas.height = 0; // libera memória
+                        if (!rawBlob) throw new Error('O navegador não conseguiu gerar o PNG (arquivo grande demais).');
+                        const blob = await finalizePng(rawBlob, layout.dpi, layout.items[0].colorChunks);
 
-                    const part = layout.sheets.length > 1 ? `_parte${i + 1}` : '';
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `estampas_${stamp}_${formatCm(settings.widthCm)}x${formatCm(sheet.heightCm)}cm${part}.png`.replace(/,/g, '.');
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
-                    setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+                        const part = totalFiles > 1 ? `_${fileNumber}de${totalFiles}` : '';
+                        const size = `${formatCm(pxToCm(layout.sheetWidthPx, layout.dpi))}x${formatCm(pxToCm(sheet.heightPx, layout.dpi))}cm`.replace(/,/g, '.');
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `estampas_${stamp}_${size}_${layout.dpi}dpi${part}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+                    }
                 }
-                statusEl.textContent = `Pronto! ${layout.sheets.length} arquivo(s) PNG baixado(s) em ${settings.dpi} DPI · ${formatCm(settings.widthCm)} × ${formatCm(layout.totalHeight)} cm.`;
+                statusEl.textContent = `Pronto! ${totalFiles} arquivo(s) PNG baixado(s). ${summary}`;
             } catch (e) {
                 console.error('Erro ao gerar arquivo de estampas:', e);
                 statusEl.textContent = '';

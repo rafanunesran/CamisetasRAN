@@ -1,8 +1,12 @@
 /**
  * CamisetasRAN - Upload de imagens (estampas e mockups) para o Google Drive
  *
- * Recebe as imagens enviadas pelo backstage.html (função uploadToDrive),
- * salva no Google Drive e devolve a URL pública da imagem.
+ * Recebe as imagens enviadas pelo backstage.html, salva no Google Drive e
+ * devolve a URL pública da imagem.
+ *
+ * - Mockups: envio simples (uploadToDrive) em uma requisição.
+ * - Estampas: envio em partes (uploadLargeToDrive), sem limite de tamanho e
+ *   sem alterar o arquivo: os bytes do PNG chegam ao Drive exatamente como foram enviados.
  *
  * COMO USAR: veja docs/apps-script/README.md no repositório.
  * Copie e cole ESTE ARQUIVO INTEIRO no editor do Apps Script (Code.gs),
@@ -23,16 +27,23 @@ const CONFIG = {
   // E-mail que recebe o alerta quando o acesso ao Drive parar de funcionar.
   ALERT_EMAIL: 'rafaelnf93@gmail.com',
 
-  // Tamanho máximo por imagem (em MB).
+  // Tamanho máximo do envio simples (mockups), em MB.
+  // Estampas usam o envio em partes e não têm limite.
   MAX_SIZE_MB: 20
 };
+
+const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id';
+const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files/';
+const UPLOAD_SESSION_TTL = 6 * 60 * 60; // segundos (máximo do CacheService)
 // ======================================================
 
 
 /**
  * Recebe o upload vindo do site.
- * Corpo esperado (JSON): { name, type, image }  -> image = data URL em base64
- * Resposta: { result: 'success', url, id } ou { result: 'error', error }
+ * Envio simples (JSON): { name, type, image }  -> image = data URL em base64
+ * Envio em partes:      { action: 'uploadStart', name, type, size }
+ *                       { action: 'uploadChunk', token, start, total, data }  -> data = parte em base64
+ * Resposta: { result: 'success', url, id } | { result: 'continue' } | { result: 'error', error }
  */
 function doPost(e) {
   try {
@@ -41,6 +52,9 @@ function doPost(e) {
     }
 
     const payload = JSON.parse(e.postData.contents);
+    if (payload.action === 'uploadStart') return json_(startUpload_(payload));
+    if (payload.action === 'uploadChunk') return json_(uploadChunk_(payload));
+
     if (!payload.image) {
       throw new Error('Campo "image" ausente.');
     }
@@ -92,8 +106,9 @@ function doPost(e) {
  * Teste rápido pelo navegador: abra a URL do /exec.
  * Retorna { result: 'ok' } se o acesso ao Drive estiver funcionando.
  *
- * ?action=file&id=ID_DO_ARQUIVO -> devolve a imagem original em base64
- * (usado pelo backstage para montar o arquivo de impressão das estampas).
+ * Download da imagem ORIGINAL em partes (usado para montar o arquivo de impressão):
+ *   ?action=fileInfo&id=ID                     -> { result, name, mimeType, size }
+ *   ?action=chunk&id=ID&start=0&length=N       -> { result, data }  (parte em base64)
  * Só entrega arquivos que estão na pasta de imagens do sistema.
  */
 function doGet(e) {
@@ -101,17 +116,28 @@ function doGet(e) {
     const folder = getFolder_();
     const params = (e && e.parameter) || {};
 
-    if (params.action === 'file') {
+    if (params.action === 'fileInfo' || params.action === 'chunk') {
       if (!params.id) throw new Error('Parâmetro "id" ausente.');
       const file = DriveApp.getFileById(params.id);
       if (!isInFolder_(file, folder)) throw new Error('Arquivo fora da pasta de imagens.');
-      const blob = file.getBlob();
-      return json_({
-        result: 'success',
-        name: file.getName(),
-        mimeType: blob.getContentType(),
-        data: Utilities.base64Encode(blob.getBytes())
+
+      if (params.action === 'fileInfo') {
+        return json_({ result: 'success', name: file.getName(), mimeType: file.getMimeType(), size: file.getSize() });
+      }
+
+      const start = Number(params.start) || 0;
+      const length = Number(params.length) || 0;
+      if (length <= 0) throw new Error('Parâmetro "length" inválido.');
+      const response = UrlFetchApp.fetch(DRIVE_FILES_URL + encodeURIComponent(params.id) + '?alt=media&supportsAllDrives=true', {
+        headers: {
+          Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+          Range: 'bytes=' + start + '-' + (start + length - 1)
+        },
+        muteHttpExceptions: true
       });
+      const code = response.getResponseCode();
+      if (code !== 200 && code !== 206) throw new Error('Drive respondeu ' + code + ': ' + response.getContentText().slice(0, 200));
+      return json_({ result: 'success', data: Utilities.base64Encode(response.getContent()) });
     }
 
     return json_({ result: 'ok', folder: folder.getName() });
@@ -129,6 +155,10 @@ function doGet(e) {
 function autorizar() {
   const folder = getFolder_();
   MailApp.getRemainingDailyQuota();
+  // Garante a permissão de conexões externas (envio/download em partes via Drive API)
+  UrlFetchApp.fetch(DRIVE_FILES_URL + folder.getId() + '?fields=id&supportsAllDrives=true', {
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }
+  });
   instalarVerificacaoDiaria();
   console.log('Tudo autorizado! Pasta de imagens: ' + folder.getName() + ' (' + folder.getUrl() + ')');
 }
@@ -169,6 +199,74 @@ function instalarVerificacaoDiaria() {
 
 
 // ==================== FUNÇÕES INTERNAS ====================
+
+// Abre uma sessão de upload retomável no Drive e devolve um token para as partes
+function startUpload_(payload) {
+  const size = Number(payload.size);
+  if (!(size > 0)) throw new Error('Tamanho do arquivo inválido.');
+  const mimeType = payload.type || 'image/png';
+  if (mimeType.indexOf('image/') !== 0) throw new Error('Tipo de arquivo não permitido: ' + mimeType);
+
+  const folder = getFolder_();
+  const response = UrlFetchApp.fetch(DRIVE_UPLOAD_URL, {
+    method: 'post',
+    contentType: 'application/json; charset=UTF-8',
+    headers: {
+      Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+      'X-Upload-Content-Type': mimeType,
+      'X-Upload-Content-Length': String(size)
+    },
+    payload: JSON.stringify({
+      name: sanitizeName_(payload.name) || ('imagem_' + Date.now()),
+      mimeType: mimeType,
+      parents: [folder.getId()]
+    }),
+    muteHttpExceptions: true
+  });
+  if (response.getResponseCode() !== 200) {
+    throw new Error('Drive não abriu o envio (' + response.getResponseCode() + '): ' + response.getContentText().slice(0, 200));
+  }
+  const headers = response.getAllHeaders();
+  const location = headers.Location || headers.location;
+  if (!location) throw new Error('Drive não retornou o endereço de envio.');
+
+  const token = Utilities.getUuid();
+  CacheService.getScriptCache().put('upload_' + token, location, UPLOAD_SESSION_TTL);
+  return { result: 'success', token: token };
+}
+
+// Envia uma parte do arquivo para a sessão aberta em startUpload_
+function uploadChunk_(payload) {
+  const location = CacheService.getScriptCache().get('upload_' + payload.token);
+  if (!location) throw new Error('Sessão de envio expirada. Envie a imagem novamente.');
+
+  const bytes = Utilities.base64Decode(payload.data || '');
+  const start = Number(payload.start);
+  const total = Number(payload.total);
+  const end = start + bytes.length - 1;
+
+  const response = UrlFetchApp.fetch(location, {
+    method: 'put',
+    contentType: 'application/octet-stream',
+    headers: { 'Content-Range': 'bytes ' + start + '-' + end + '/' + total },
+    payload: bytes,
+    muteHttpExceptions: true
+  });
+  const code = response.getResponseCode();
+  if (code === 308) return { result: 'continue' };
+  if (code !== 200 && code !== 201) {
+    throw new Error('Drive recusou a parte (' + code + '): ' + response.getContentText().slice(0, 200));
+  }
+
+  const fileId = JSON.parse(response.getContentText()).id;
+  CacheService.getScriptCache().remove('upload_' + payload.token);
+  try {
+    DriveApp.getFileById(fileId).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (shareErr) {
+    console.warn('Não foi possível compartilhar o arquivo: ' + shareErr);
+  }
+  return { result: 'success', url: 'https://drive.google.com/uc?export=view&id=' + fileId, id: fileId };
+}
 
 function getFolder_() {
   const props = PropertiesService.getScriptProperties();
