@@ -2336,13 +2336,21 @@
             return btoa(binary);
         }
 
+        const APPS_SCRIPT_OUTDATED_MSG = 'O Apps Script chamado pelo site ainda é a versão antiga.\n\n' +
+            'Se você criou uma NOVA implantação, ela ganhou uma URL nova que o site não usa. ' +
+            'Em Implantar > Gerenciar implantações, edite (lápis) a implantação que já existia, escolha "Nova versão" e clique em Implantar. ' +
+            'Ou envie a nova URL /exec para atualizar o site.';
+
         async function postAppsScript(payload, attempts = 3) {
             for (let attempt = 1; ; attempt++) {
                 try {
                     const response = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
                     if (!response.ok) throw new Error(`Falha na comunicação com o Google: ${response.status}`);
                     const data = await response.json();
-                    if (data.result === 'error') throw Object.assign(new Error(data.error || 'Erro no Apps Script.'), { fatal: true });
+                    if (data.result === 'error') {
+                        const outdated = payload.action && /Campo "image" ausente/.test(data.error || '');
+                        throw Object.assign(new Error(outdated ? APPS_SCRIPT_OUTDATED_MSG : (data.error || 'Erro no Apps Script.')), { fatal: true });
+                    }
                     return data;
                 } catch (err) {
                     if (err.fatal || attempt >= attempts) throw err;
@@ -3445,6 +3453,7 @@
         async function getAppsScript(params) {
             const response = await fetch(`${APPS_SCRIPT_URL}?${new URLSearchParams(params)}`);
             const data = await response.json();
+            if (data.result === 'ok') throw new Error(APPS_SCRIPT_OUTDATED_MSG); // versão antiga só responde "ok"
             if (data.result !== 'success') throw new Error(data.error || 'Resposta inesperada do Apps Script.');
             return data;
         }
