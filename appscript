@@ -91,10 +91,29 @@ function doPost(e) {
 /**
  * Teste rápido pelo navegador: abra a URL do /exec.
  * Retorna { result: 'ok' } se o acesso ao Drive estiver funcionando.
+ *
+ * ?action=file&id=ID_DO_ARQUIVO -> devolve a imagem original em base64
+ * (usado pelo backstage para montar o arquivo de impressão das estampas).
+ * Só entrega arquivos que estão na pasta de imagens do sistema.
  */
-function doGet() {
+function doGet(e) {
   try {
     const folder = getFolder_();
+    const params = (e && e.parameter) || {};
+
+    if (params.action === 'file') {
+      if (!params.id) throw new Error('Parâmetro "id" ausente.');
+      const file = DriveApp.getFileById(params.id);
+      if (!isInFolder_(file, folder)) throw new Error('Arquivo fora da pasta de imagens.');
+      const blob = file.getBlob();
+      return json_({
+        result: 'success',
+        name: file.getName(),
+        mimeType: blob.getContentType(),
+        data: Utilities.base64Encode(blob.getBytes())
+      });
+    }
+
     return json_({ result: 'ok', folder: folder.getName() });
   } catch (err) {
     return json_({ result: 'error', error: String(err && err.message ? err.message : err) });
@@ -181,6 +200,14 @@ function getFolder_() {
 
   props.setProperty('FOLDER_ID', folder.getId());
   return folder;
+}
+
+function isInFolder_(file, folder) {
+  const parents = file.getParents();
+  while (parents.hasNext()) {
+    if (parents.next().getId() === folder.getId()) return true;
+  }
+  return false;
 }
 
 function sanitizeName_(name) {
