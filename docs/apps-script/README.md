@@ -41,3 +41,25 @@ Você vai receber um e-mail "CamisetasRAN: upload de imagens parou de funcionar"
 Para resolver, repita o **passo 4** (executar `autorizar`).
 
 Regra de ouro: **sempre que editar o script, execute `autorizar` antes de implantar.**
+
+## Erro "Você não tem permissão para chamar UrlFetchApp.fetch"
+
+O script ganhou uma permissão nova (conectar a serviço externo) e ela ainda não foi autorizada.
+
+1. No editor, selecione a função **`autorizar`**, clique em **Executar** e aceite todas as permissões.
+2. Se a janela de permissões não aparecer, o projeto tem um manifesto com escopos fixos:
+   em **Configurações do projeto** marque **"Mostrar o arquivo de manifesto appsscript.json no editor"**,
+   abra o `appscript.json` e garanta que `oauthScopes` contenha:
+
+   ```json
+   "oauthScopes": [
+     "https://www.googleapis.com/auth/drive",
+     "https://www.googleapis.com/auth/script.external_request",
+     "https://www.googleapis.com/auth/script.send_mail",
+     "https://www.googleapis.com/auth/script.scriptapp"
+   ]
+   ```
+
+   Salve e execute `autorizar` de novo.
+3. Não é preciso reimplantar só por causa da autorização.
+
