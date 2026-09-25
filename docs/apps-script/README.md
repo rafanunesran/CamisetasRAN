@@ -2,7 +2,7 @@
 
 O `backstage.html` envia as imagens de **estampas** (Estoque) e **mockups** (Produtos)
 para um Google Apps Script, que salva no Google Drive. O código completo desse script
-está em [`Code.gs`](./Code.gs).
+está em [`appscript`](../../appscript) (na raiz do repositório).
 
 ## O que esta versão faz
 
@@ -16,7 +16,7 @@ está em [`Code.gs`](./Code.gs).
 ## Instalação (copiar e colar)
 
 1. Abra o projeto do script em https://script.google.com (com a conta dona da implantação atual).
-2. Abra o arquivo `Código.gs` / `Code.gs`, **apague todo o conteúdo** e cole o conteúdo inteiro de [`Code.gs`](./Code.gs).
+2. Abra o arquivo `Código.gs` / `Code.gs`, **apague todo o conteúdo** e cole o conteúdo inteiro do arquivo [`appscript`](../../appscript).
    - Opcional: se quiser continuar salvando na pasta antiga, coloque o ID dela em `FOLDER_ID`.
 3. Clique em **Salvar** (ícone de disquete).
 4. No seletor de funções (ao lado de "Depurar"), escolha **`autorizar`** e clique em **Executar**.
