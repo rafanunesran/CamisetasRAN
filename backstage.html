@@ -782,9 +782,9 @@
             </div>
 
             <div id="inventoryImageContainer" class="space-y-2 hidden">
-                <label class="text-sm font-medium text-gray-700">Imagem da Estampa (PNG alta resolução)</label>
+                <label class="text-sm font-medium text-gray-700">Imagem da Estampa (PNG ou TIFF, alta resolução)</label>
                 <div class="flex items-center gap-4">
-                    <input id="inventoryImage" type="file" accept="image/png" onchange="previewImage(this)" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input id="inventoryImage" type="file" accept="image/png,image/tiff,.png,.tif,.tiff" onchange="previewImage(this)" class="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary">
                     <img id="inventoryImagePreview" src="" alt="Preview" class="h-10 w-10 object-contain rounded border bg-gray-800 hidden">
                 </div>
                 <p id="inventoryImageInfo" class="text-xs text-muted-foreground"></p>
@@ -795,7 +795,7 @@
                     </div>
                     <p id="inventoryPrintSize" class="text-sm font-medium text-gray-700 pb-2"></p>
                 </div>
-                <p class="text-xs text-muted-foreground">O PNG é enviado exatamente como está, sem limite de tamanho e sem alteração. O tamanho de impressão vem dos pixels e do DPI do próprio arquivo.</p>
+                <p class="text-xs text-muted-foreground">O arquivo (PNG ou TIFF em RGB) é enviado exatamente como está, sem limite de tamanho e sem alteração. O tamanho de impressão vem dos pixels e do DPI do próprio arquivo.</p>
             </div>
 
             <div class="flex justify-end gap-2 pt-4">
@@ -2036,7 +2036,7 @@
 
         // Dados da imagem de estampa selecionada no modal de estoque (pixels/DPI)
         let inventoryImageMeta = null;
-        const INVENTORY_IMAGE_HINT = 'Envie o PNG final de impressão (fundo transparente), no tamanho real.';
+        const INVENTORY_IMAGE_HINT = 'Envie o PNG ou TIFF (RGB) final de impressão, com fundo transparente, no tamanho real.';
 
         // Lê largura/altura (IHDR) e DPI (pHYs) direto dos bytes do PNG, sem decodificar a imagem
         function readPngInfo(buffer) {
@@ -2079,6 +2079,303 @@
         }
         const PNG_COLOR_CHUNKS = ['iCCP', 'sRGB', 'gAMA', 'cHRM', 'cICP'];
 
+        // ---- TIFF: leitura própria (o navegador não abre TIFF) ----
+        // Os valores de cor são mantidos exatamente; o perfil ICC do TIFF vai embutido no PNG final.
+        const TIFF_TYPE_SIZES = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8, 13: 4 };
+        // Só as tags necessárias (evita carregar camadas/XMP do Photoshop, que podem ter centenas de MB)
+        const TIFF_TAGS_USED = new Set([256, 257, 258, 259, 262, 273, 277, 278, 279, 282, 284, 296, 317, 320, 322, 323, 324, 325, 338, 339, 34675]);
+
+        function isTiff(bytes) {
+            return bytes.length >= 4 && ((bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 42 && bytes[3] === 0) ||
+                (bytes[0] === 0x4D && bytes[1] === 0x4D && bytes[2] === 0 && bytes[3] === 42));
+        }
+
+        // Lê o primeiro IFD (imagem principal, já achatada) buscando só os trechos necessários do arquivo
+        async function readTiffMeta(blob) {
+            const read = async (offset, length) => new DataView(await blob.slice(offset, offset + length).arrayBuffer());
+            const head = await read(0, 8);
+            const le = head.getUint8(0) === 0x49;
+            const version = head.getUint16(2, le);
+            if (version === 43) throw new Error('TIFF grande (BigTIFF) não é suportado. Salve como TIFF comum ou PNG.');
+            const ifdOffset = head.getUint32(4, le);
+            const count = (await read(ifdOffset, 2)).getUint16(0, le);
+            const entries = await read(ifdOffset + 2, count * 12);
+            const tags = {};
+            for (let i = 0; i < count; i++) {
+                const e = i * 12;
+                const tag = entries.getUint16(e, le);
+                const type = entries.getUint16(e + 2, le);
+                const n = entries.getUint32(e + 4, le);
+                const size = TIFF_TYPE_SIZES[type];
+                if (!size || !TIFF_TAGS_USED.has(tag)) continue;
+                const total = size * n;
+                const view = total <= 4
+                    ? new DataView(entries.buffer, entries.byteOffset + e + 8, 4)
+                    : await read(entries.getUint32(e + 8, le), total);
+                if (type === 1 || type === 2 || type === 7) { tags[tag] = new Uint8Array(view.buffer, view.byteOffset, total); continue; }
+                const values = new Array(n);
+                for (let k = 0; k < n; k++) {
+                    const o = k * size;
+                    if (type === 3) values[k] = view.getUint16(o, le);
+                    else if (type === 4 || type === 13) values[k] = view.getUint32(o, le);
+                    else if (type === 5) values[k] = view.getUint32(o, le) / (view.getUint32(o + 4, le) || 1);
+                    else if (type === 8) values[k] = view.getInt16(o, le);
+                    else if (type === 9) values[k] = view.getInt32(o, le);
+                    else if (type === 10) values[k] = view.getInt32(o, le) / (view.getInt32(o + 4, le) || 1);
+                    else if (type === 11) values[k] = view.getFloat32(o, le);
+                    else if (type === 12) values[k] = view.getFloat64(o, le);
+                    else values[k] = view.getUint8(o);
+                }
+                tags[tag] = values;
+            }
+            const first = (tag, fallback) => tags[tag] && tags[tag].length ? tags[tag][0] : fallback;
+            const unit = first(296, 2);
+            const xres = first(282, 0);
+            let dpi = xres > 0 && unit !== 1 ? (unit === 3 ? xres * 2.54 : xres) : null;
+            if (dpi) dpi = Math.abs(dpi - Math.round(dpi)) < 0.1 ? Math.round(dpi) : Math.round(dpi * 100) / 100;
+            return {
+                le, tags, dpi,
+                width: first(256, 0), height: first(257, 0),
+                bps: first(258, 1), spp: first(277, 1),
+                compression: first(259, 1), photometric: first(262, -1),
+                planar: first(284, 1), predictor: first(317, 1),
+                extra: tags[338] || [], sampleFormat: first(339, 1),
+                icc: tags[34675] ? new Uint8Array(tags[34675]) : null
+            };
+        }
+
+        // Motivo para recusar o TIFF (ou null se for suportado)
+        function tiffSupportError(info) {
+            if (info.photometric === 5) return 'TIFF em CMYK não pode virar PNG sem converter as cores. Exporte o arquivo em RGB (ex.: Photoshop > Imagem > Modo > Cor RGB).';
+            if ([8, 9, 10].includes(info.photometric)) return 'TIFF em Lab não é suportado. Exporte em RGB.';
+            if (![0, 1, 2, 3].includes(info.photometric)) return 'Modo de cor do TIFF não suportado. Exporte em RGB.';
+            if (info.sampleFormat === 3 || info.predictor === 3) return 'TIFF de 32 bits (ponto flutuante) não é suportado. Salve em 8 ou 16 bits.';
+            const bpsList = info.tags[258] || [info.bps];
+            if (bpsList.some(b => b !== info.bps)) return 'TIFF com canais de profundidades diferentes não é suportado.';
+            if (info.photometric === 2 ? ![8, 16].includes(info.bps) : ![1, 2, 4, 8, 16].includes(info.bps)) return `TIFF de ${info.bps} bits não é suportado. Salve em 8 ou 16 bits.`;
+            if (![1, 5, 8, 32946, 32773].includes(info.compression)) return 'Compressão do TIFF não suportada (ex.: JPEG). Salve sem compressão, LZW ou ZIP.';
+            if (!info.width || !info.height || !(info.tags[273] || info.tags[324])) return 'TIFF inválido ou incompleto.';
+            return null;
+        }
+
+        // Descompressão LZW do TIFF (MSB primeiro, com "early change")
+        function tiffLzwDecode(input, expected) {
+            let out = new Uint8Array(Math.max(expected, 1024));
+            const prefix = new Uint16Array(4096), suffix = new Uint8Array(4096), lengths = new Uint16Array(4096);
+            for (let i = 0; i < 256; i++) { suffix[i] = i; lengths[i] = 1; }
+            const totalBits = input.length * 8;
+            let bitPos = 0, codeLen = 9, next = 258, prev = -1, op = 0;
+            const ensure = (n) => {
+                if (op + n <= out.length) return;
+                const bigger = new Uint8Array(Math.max(out.length * 2, op + n));
+                bigger.set(out); out = bigger;
+            };
+            while (bitPos + codeLen <= totalBits) {
+                const byte = bitPos >> 3;
+                const chunk = (input[byte] << 16) | ((input[byte + 1] || 0) << 8) | (input[byte + 2] || 0);
+                const code = (chunk >> (24 - (bitPos & 7) - codeLen)) & ((1 << codeLen) - 1);
+                bitPos += codeLen;
+                if (code === 257) break; // fim
+                if (code === 256) { codeLen = 9; next = 258; prev = -1; continue; } // limpar tabela
+                if (prev === -1) { ensure(1); out[op++] = code; prev = code; continue; }
+                let len, firstByte;
+                if (code < next) {
+                    len = lengths[code]; ensure(len);
+                    for (let i = len - 1, c = code; i >= 0; i--) { out[op + i] = suffix[c]; c = prefix[c]; }
+                    firstByte = out[op];
+                } else { // código ainda não existe: string(prev) + 1º byte de string(prev)
+                    len = lengths[prev] + 1; ensure(len);
+                    for (let i = len - 2, c = prev; i >= 0; i--) { out[op + i] = suffix[c]; c = prefix[c]; }
+                    firstByte = out[op];
+                    out[op + len - 1] = firstByte;
+                }
+                op += len;
+                if (next < 4096) { prefix[next] = prev; suffix[next] = firstByte; lengths[next] = lengths[prev] + 1; next++; }
+                if (next + 1 >= (1 << codeLen) && codeLen < 12) codeLen++;
+                prev = code;
+            }
+            return out.subarray(0, op);
+        }
+
+        function tiffPackBitsDecode(input, expected) {
+            const out = new Uint8Array(expected);
+            let ip = 0, op = 0;
+            while (ip < input.length && op < expected) {
+                const n = (input[ip++] << 24) >> 24;
+                if (n >= 0) {
+                    const len = Math.min(n + 1, expected - op);
+                    out.set(input.subarray(ip, ip + len), op);
+                    ip += n + 1; op += len;
+                } else if (n !== -128) {
+                    const len = Math.min(1 - n, expected - op);
+                    out.fill(input[ip++], op, op + len);
+                    op += len;
+                }
+            }
+            return out;
+        }
+
+        async function tiffDecompress(data, compression, expected) {
+            if (compression === 1) return data;
+            if (compression === 5) return tiffLzwDecode(data, expected);
+            if (compression === 32773) return tiffPackBitsDecode(data, expected);
+            return inflateZlib([data]); // 8 / 32946: ZIP (zlib)
+        }
+
+        // Desfaz o "predictor" horizontal (diferença entre amostras vizinhas)
+        function undoTiffPredictor(block, rowBytes, rows, samples, bps, le) {
+            if (bps === 8) {
+                for (let r = 0; r < rows; r++) {
+                    const start = r * rowBytes;
+                    for (let i = samples; i < rowBytes; i++) block[start + i] = (block[start + i] + block[start + i - samples]) & 0xFF;
+                }
+            } else if (bps === 16) {
+                const step = samples * 2;
+                for (let r = 0; r < rows; r++) {
+                    const start = r * rowBytes;
+                    for (let i = step; i + 1 < rowBytes; i += 2) {
+                        const a = start + i, b = a - step;
+                        const prevValue = le ? block[b] | (block[b + 1] << 8) : (block[b] << 8) | block[b + 1];
+                        const diff = le ? block[a] | (block[a + 1] << 8) : (block[a] << 8) | block[a + 1];
+                        const v = (prevValue + diff) & 0xFFFF;
+                        if (le) { block[a] = v & 0xFF; block[a + 1] = v >> 8; } else { block[a] = v >> 8; block[a + 1] = v & 0xFF; }
+                    }
+                }
+            }
+        }
+
+        // Decodifica para RGBA (8 ou 16 bits, big-endian), no mesmo formato do decodificador de PNG
+        async function decodeTiff(buffer, info, onProgress) {
+            const bytes = new Uint8Array(buffer);
+            const { width, height, spp, bps, le, photometric } = info;
+            const planar = spp > 1 && info.planar === 2;
+            const planes = planar ? spp : 1;
+            const samplesPerPlane = planar ? 1 : spp;
+            const rowBytes = Math.ceil(width * samplesPerPlane * bps / 8);
+            const raw = Array.from({ length: planes }, () => new Uint8Array(rowBytes * height));
+
+            const tiled = !!info.tags[322];
+            const blockW = tiled ? info.tags[322][0] : width;
+            const blockH = tiled ? info.tags[323][0] : Math.min(height, (info.tags[278] || [height])[0]);
+            const offsets = info.tags[tiled ? 324 : 273];
+            const counts = info.tags[tiled ? 325 : 279] || [];
+            const across = Math.ceil(width / blockW);
+            const perPlane = across * Math.ceil(height / blockH);
+            const blockRowBytes = Math.ceil(blockW * samplesPerPlane * bps / 8);
+
+            for (let i = 0; i < offsets.length; i++) {
+                const plane = Math.floor(i / perPlane);
+                if (plane >= planes) break;
+                const idx = i % perPlane;
+                const bx = (idx % across) * blockW;
+                const by = Math.floor(idx / across) * blockH;
+                if (by >= height) continue;
+                const rows = tiled ? blockH : Math.min(blockH, height - by);
+                const length = counts[i] !== undefined ? counts[i] : bytes.length - offsets[i];
+                const block = await tiffDecompress(bytes.subarray(offsets[i], offsets[i] + length), info.compression, blockRowBytes * rows);
+                if (info.predictor === 2) undoTiffPredictor(block, blockRowBytes, rows, samplesPerPlane, bps, le);
+                const dstX = bx * samplesPerPlane * bps / 8;
+                const copyBytes = Math.min(blockRowBytes, rowBytes - dstX);
+                for (let r = 0; r < rows && by + r < height; r++) {
+                    raw[plane].set(block.subarray(r * blockRowBytes, r * blockRowBytes + copyBytes), (by + r) * rowBytes + dstX);
+                }
+                if (onProgress && i % 16 === 0) onProgress(i / offsets.length);
+            }
+
+            const colorChannels = photometric === 2 ? 3 : 1;
+            const alphaType = spp > colorChannels ? info.extra[0] : undefined;
+            // ExtraSamples: 2 = transparência normal, 1 = pré-multiplicada; 0 = canal extra (não é transparência)
+            const hasAlpha = alphaType === 1 || alphaType === 2;
+            const depth = bps === 16 ? 16 : 8;
+
+            // Caminho rápido: RGBA 8 bits intercalado com transparência normal = já está no formato final
+            if (!planar && bps === 8 && photometric === 2 && spp === 4 && alphaType === 2) {
+                return { width, height, depth: 8, data: raw[0], stride: rowBytes, offset: 0 };
+            }
+
+            const B = depth / 8;
+            const outStride = width * 4 * B;
+            const out = new Uint8Array(outStride * height);
+            const maxOut = depth === 16 ? 0xFFFF : 0xFF;
+            const maxIn = (1 << bps) - 1;
+            const colormap = info.tags[320];
+            const sample = (k, x, y) => {
+                const plane = planar ? raw[k] : raw[0];
+                const index = planar ? x : x * spp + k;
+                const rowStart = y * rowBytes;
+                if (bps === 8) return plane[rowStart + index];
+                if (bps === 16) {
+                    const i = rowStart + index * 2;
+                    return le ? plane[i] | (plane[i + 1] << 8) : (plane[i] << 8) | plane[i + 1];
+                }
+                const bit = index * bps;
+                return (plane[rowStart + (bit >> 3)] >> (8 - bps - (bit & 7))) & maxIn;
+            };
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r, g, b;
+                    let a = hasAlpha ? sample(colorChannels, x, y) : maxOut;
+                    if (photometric === 2) {
+                        r = sample(0, x, y); g = sample(1, x, y); b = sample(2, x, y);
+                    } else if (photometric === 3) {
+                        const i = sample(0, x, y), n = 1 << bps;
+                        r = Math.round(colormap[i] / 257); g = Math.round(colormap[n + i] / 257); b = Math.round(colormap[2 * n + i] / 257);
+                    } else {
+                        let v = sample(0, x, y);
+                        if (photometric === 0) v = maxIn - v; // branco = 0
+                        if (bps < 8) v = Math.round(v * 255 / maxIn);
+                        r = g = b = v;
+                    }
+                    if (hasAlpha && bps < 8) a = Math.round(a * 255 / maxIn);
+                    if (alphaType === 1) { // pré-multiplicada -> normal (exigido pelo PNG)
+                        if (a === 0) r = g = b = 0;
+                        else if (a < maxOut) {
+                            r = Math.min(maxOut, Math.round(r * maxOut / a));
+                            g = Math.min(maxOut, Math.round(g * maxOut / a));
+                            b = Math.min(maxOut, Math.round(b * maxOut / a));
+                        }
+                    }
+                    const o = y * outStride + x * 4 * B;
+                    if (B === 2) {
+                        out[o] = r >> 8; out[o + 1] = r & 0xFF; out[o + 2] = g >> 8; out[o + 3] = g & 0xFF;
+                        out[o + 4] = b >> 8; out[o + 5] = b & 0xFF; out[o + 6] = a >> 8; out[o + 7] = a & 0xFF;
+                    } else {
+                        out[o] = r; out[o + 1] = g; out[o + 2] = b; out[o + 3] = a;
+                    }
+                }
+                if (onProgress && y % 512 === 0) onProgress(y / height);
+            }
+            return { width, height, depth, data: out, stride: outStride, offset: 0 };
+        }
+
+        const iccColorSpace = (profile) => profile && profile.length >= 20 ? String.fromCharCode(...profile.subarray(16, 20)) : '';
+
+        // Chunk iCCP do PNG com o perfil ICC original (comprimido, sem alteração)
+        async function makeIccpChunk(profile) {
+            const stream = new Blob([profile]).stream().pipeThrough(new CompressionStream('deflate'));
+            const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
+            const name = 'ICC Profile';
+            const data = new Uint8Array(name.length + 2 + compressed.length);
+            for (let i = 0; i < name.length; i++) data[i] = name.charCodeAt(i);
+            data.set(compressed, name.length + 2); // separador 0 + método de compressão 0
+            return pngChunk('iCCP', data);
+        }
+
+        // Identifica o perfil de cor (mesmo perfil = mesmo arquivo final, seja de PNG ou TIFF)
+        async function colorKeyForChunks(chunks) {
+            const keys = [];
+            for (const chunk of chunks) {
+                const type = String.fromCharCode(chunk[4], chunk[5], chunk[6], chunk[7]);
+                if (type === 'iCCP') {
+                    const body = chunk.subarray(8, chunk.length - 4);
+                    const nameEnd = body.indexOf(0);
+                    try { keys.push('icc' + crc32(await inflateZlib([body.subarray(nameEnd + 2)]))); continue; } catch (e) { /* usa o chunk */ }
+                }
+                keys.push(type + crc32(chunk));
+            }
+            return keys.join('-') || 'none';
+        }
+
         window.updatePrintSizeInfo = () => {
             const out = document.getElementById('inventoryPrintSize');
             const dpi = parseFloat(document.getElementById('inventoryImageDpi').value);
@@ -2104,18 +2401,36 @@
                 return;
             }
             const file = input.files[0];
-            // Os primeiros MB bastam para ler IHDR/pHYs, mesmo em arquivos enormes
-            const head = await file.slice(0, 4 * 1024 * 1024).arrayBuffer();
-            const png = readPngInfo(head);
-            if (!png) {
-                alert('Envie a estampa em PNG (de preferência com fundo transparente).');
+            const reject = (message) => {
+                alert(message);
                 input.value = '';
                 preview.classList.add('hidden');
-                return;
+                info.textContent = INVENTORY_IMAGE_HINT;
+            };
+            // Os primeiros MB bastam para ler IHDR/pHYs, mesmo em arquivos enormes
+            const head = await file.slice(0, 4 * 1024 * 1024).arrayBuffer();
+            let png = readPngInfo(head);
+            let format = 'PNG';
+            if (!png && isTiff(new Uint8Array(head, 0, 4))) {
+                format = 'TIFF';
+                try {
+                    const tiff = await readTiffMeta(file);
+                    const problem = tiffSupportError(tiff);
+                    if (problem) { reject(problem); return; }
+                    png = { width: tiff.width, height: tiff.height, dpi: tiff.dpi };
+                } catch (e) {
+                    reject('Não foi possível ler o TIFF: ' + e.message);
+                    return;
+                }
             }
-            inventoryImageMeta = { widthPx: png.width, heightPx: png.height, dpi: png.dpi };
-            preview.src = URL.createObjectURL(file);
-            preview.classList.remove('hidden');
+            if (!png) { reject('Envie a estampa em PNG ou TIFF (RGB, de preferência com fundo transparente).'); return; }
+            inventoryImageMeta = { widthPx: png.width, heightPx: png.height, dpi: png.dpi, format };
+            if (format === 'PNG') {
+                preview.src = URL.createObjectURL(file);
+                preview.classList.remove('hidden');
+            } else {
+                preview.classList.add('hidden'); // o navegador não exibe TIFF
+            }
 
             if (png.dpi) {
                 dpiInput.value = png.dpi;
@@ -2125,7 +2440,7 @@
                 dpiInput.readOnly = false;
             }
             const dpiText = png.dpi ? `${png.dpi} DPI` : 'sem DPI gravado no arquivo: informe a resolução em que ele foi feito';
-            info.textContent = `${png.width} × ${png.height} px · ${dpiText} · ${(file.size / 1048576).toFixed(1)} MB`;
+            info.textContent = `${format} · ${png.width} × ${png.height} px · ${dpiText} · ${(file.size / 1048576).toFixed(1)} MB`;
             window.updatePrintSizeInfo();
         }
 
@@ -2366,7 +2681,8 @@
 
         async function uploadLargeToDrive(file, onProgress) {
             if (!file.size) throw new Error('Arquivo vazio.');
-            const session = await postAppsScript({ action: 'uploadStart', name: Date.now() + '_' + file.name, type: file.type || 'image/png', size: file.size });
+            const type = file.type || (/\.tiff?$/i.test(file.name) ? 'image/tiff' : 'image/png');
+            const session = await postAppsScript({ action: 'uploadStart', name: Date.now() + '_' + file.name, type, size: file.size });
             if (!session.token) throw new Error('O Apps Script não abriu o envio em partes. Atualize o script (docs/apps-script/README.md).');
 
             for (let start = 0; start < file.size; start += UPLOAD_CHUNK_BYTES) {
@@ -3623,16 +3939,28 @@
             if (!printImageCache[url]) {
                 const blob = await downloadOriginalPrint(url, onProgress);
                 const buffer = await blob.arrayBuffer();
-                const png = readPngInfo(buffer);
-                if (!png) throw new Error(`O arquivo da estampa "${row.item.name}" não é um PNG.`);
-                // Perfil de cor do arquivo original (copiado para o arquivo final)
-                const colorChunks = listPngHeadChunks(buffer)
-                    .filter(c => PNG_COLOR_CHUNKS.includes(c.type))
-                    .map(c => new Uint8Array(buffer.slice(c.start, c.end)));
-                const colorKey = colorChunks.map(c => crc32(c)).join('-') || 'none';
-                const pixels = (await decodePng(buffer)) || (await decodePngWithBrowser(blob));
+                let pixels, dpi, colorChunks;
+                if (isTiff(new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength)))) {
+                    const info = await readTiffMeta(blob);
+                    const problem = tiffSupportError(info);
+                    if (problem) throw new Error(`Estampa "${row.item.name}": ${problem}`);
+                    pixels = await decodeTiff(buffer, info);
+                    dpi = info.dpi;
+                    // Perfil ICC do TIFF vai para o PNG (só perfis RGB são válidos em PNG colorido)
+                    colorChunks = info.icc && iccColorSpace(info.icc) === 'RGB ' ? [await makeIccpChunk(info.icc)] : [];
+                } else {
+                    const png = readPngInfo(buffer);
+                    if (!png) throw new Error(`O arquivo da estampa "${row.item.name}" não é PNG nem TIFF.`);
+                    dpi = png.dpi;
+                    // Perfil de cor do arquivo original (copiado para o arquivo final)
+                    colorChunks = listPngHeadChunks(buffer)
+                        .filter(c => PNG_COLOR_CHUNKS.includes(c.type))
+                        .map(c => new Uint8Array(buffer.slice(c.start, c.end)));
+                    pixels = (await decodePng(buffer)) || (await decodePngWithBrowser(blob));
+                }
+                const colorKey = await colorKeyForChunks(colorChunks);
                 const preview = await makePreviewBitmap(pixels);
-                printImageCache[url] = { pixels, preview, dpi: png.dpi, colorChunks, colorKey };
+                printImageCache[url] = { pixels, preview, dpi, colorChunks, colorKey };
             }
             return printImageCache[url];
         }
