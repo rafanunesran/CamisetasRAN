@@ -1294,7 +1294,7 @@
                 </div>
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-gray-700">Altura máxima por arquivo (m)</label>
-                    <input id="printFileMaxHeight" type="number" step="0.1" min="0.1" value="10" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input id="printFileMaxHeight" type="number" step="0.1" min="0.1" value="4.5" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
                 <div class="space-y-1">
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700">
@@ -1308,7 +1308,7 @@
                     </label>
                 </div>
             </div>
-            <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). O arquivo sai na resolução informada (padrão 350 DPI): artes com outro DPI são reamostradas por média de área, mantendo o tamanho em cm (deixe o campo vazio para usar o DPI original das artes). Estampas diferentes são intercaladas para aproveitar os espaços. Só uma arte com perfil de cor diferente de sRGB (ex.: Adobe RGB) sai em arquivo separado, para não alterar as cores.</p>
+            <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). Para ser aceito pelos RIPs, cada arquivo tem no máximo 65.000 px de altura (≈ 4,7 m a 350 DPI). O arquivo sai na resolução informada (padrão 350 DPI): artes com outro DPI são reamostradas por média de área, mantendo o tamanho em cm (deixe o campo vazio para usar o DPI original das artes). Estampas diferentes são intercaladas para aproveitar os espaços. Só uma arte com perfil de cor diferente de sRGB (ex.: Adobe RGB) sai em arquivo separado, para não alterar as cores.</p>
 
             <div id="printFileStatus" class="text-sm text-gray-600"></div>
             <div id="printFilePreview" class="space-y-4"></div>
@@ -3756,7 +3756,7 @@
             document.getElementById('printFileRotate').checked = saved.rotate !== false;
             document.getElementById('printFileNest').checked = saved.nest !== false;
             document.getElementById('printFile16').checked = saved.keep16 === true;
-            document.getElementById('printFileMaxHeight').value = saved.maxHeight || 10;
+            document.getElementById('printFileMaxHeight').value = saved.maxHeight || 4.5;
             document.getElementById('printFileDpi').value = saved.dpi === '' ? '' : (saved.dpi || 350);
 
             document.getElementById('printFileStatus').textContent = '';
@@ -4515,6 +4515,9 @@
             });
         }
 
+        const MAX_RIP_PIXELS = 65000;  // por lado
+        const MAX_PDF_PAGE_CM = 508;   // 200 polegadas, sem precisar de UserUnit
+
         async function buildPrintFileLayouts() {
             const statusEl = document.getElementById('printFileStatus');
             const settings = readPrintFileSettings();
@@ -4526,6 +4529,7 @@
             const groups = {};
             items.forEach(row => { (groups[row.colorKey] = groups[row.colorKey] || []).push(row); });
             const layouts = [];
+            let ripLimited = null;
             for (const group of Object.values(groups)) {
                 // Resolução do arquivo: a informada (ex.: 350) ou, se vazia, o maior DPI das artes
                 const dpi = settings.dpi || Math.max(...group.map(r => r.dpi));
@@ -4555,7 +4559,14 @@
                 group.forEach(r => { r.outputColorChunks = withColor ? withColor.colorChunks : []; });
                 statusEl.textContent = 'Organizando estampas...';
                 await new Promise(r => setTimeout(r, 0));
-                layouts.push(layoutPrints(group, settings, dpi));
+                // Limite de compatibilidade com RIPs: no máximo 65.000 px por lado (vários RIPs e
+                // bibliotecas de imagem não aceitam mais que 65.535) e página PDF até 200" (5,08 m)
+                const groupSettings = { ...settings, maxHeightCm: Math.min(settings.maxHeightCm, MAX_RIP_PIXELS / dpi * 2.54, MAX_PDF_PAGE_CM) };
+                if (Math.round(settings.widthCm / 2.54 * dpi) > MAX_RIP_PIXELS) {
+                    throw new Error(`Largura de ${formatCm(settings.widthCm)} cm a ${dpi} DPI passa de ${MAX_RIP_PIXELS.toLocaleString('pt-BR')} px. Reduza a largura ou o DPI.`);
+                }
+                if (groupSettings.maxHeightCm < settings.maxHeightCm) ripLimited = groupSettings.maxHeightCm;
+                layouts.push(layoutPrints(group, groupSettings, dpi));
             }
 
             // Faixas com tinta (colagem sem apagar a vizinha) também para o encaixe retangular
@@ -4564,8 +4575,9 @@
             const copies = items.reduce((sum, r) => sum + r.copies, 0);
             const files = layouts.reduce((n, l) => n + l.sheets.length, 0);
             const heights = layouts.map(l => `${formatCm(pxToCm(l.totalHeightPx, l.dpi))} cm a ${l.dpi} DPI`).join(' + ');
-            if (layouts.length > 1) statusEl.dataset.note = ' Artes com perfil de cor diferente de sRGB ficaram em arquivo separado para não alterar as cores.';
-            else statusEl.dataset.note = '';
+            statusEl.dataset.note = '';
+            if (layouts.length > 1) statusEl.dataset.note += ' Artes com perfil de cor diferente de sRGB ficaram em arquivo separado para não alterar as cores.';
+            if (ripLimited) statusEl.dataset.note += ` Cada arquivo foi limitado a ${formatCm(ripLimited / 100)} m de altura para ser aceito pelo RIP (até ${MAX_RIP_PIXELS.toLocaleString('pt-BR')} px).`;
             statusEl.textContent = `${copies} estampas · largura ${formatCm(settings.widthCm)} cm · altura ${heights}${files > 1 ? ` · ${files} arquivos` : ''}.${statusEl.dataset.note}`;
             return layouts;
         }
