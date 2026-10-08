@@ -1303,6 +1303,9 @@
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Áreas 100% transparentes de uma estampa podem ficar sobre outra; o espaçamento vale entre as partes com tinta">
                         <input id="printFileNest" type="checkbox" checked class="h-4 w-4"> Encaixar nas áreas transparentes
                     </label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Por padrão o arquivo sai em 8 bits por canal, o formato que os RIPs esperam. Marque só se o seu RIP aceitar 16 bits.">
+                        <input id="printFile16" type="checkbox" class="h-4 w-4"> Manter 16 bits
+                    </label>
                 </div>
             </div>
             <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). O arquivo sai na resolução informada (padrão 350 DPI): artes com outro DPI são reamostradas por média de área, mantendo o tamanho em cm (deixe o campo vazio para usar o DPI original das artes). Estampas diferentes são intercaladas para aproveitar os espaços. Só uma arte com perfil de cor diferente de sRGB (ex.: Adobe RGB) sai em arquivo separado, para não alterar as cores.</p>
@@ -2287,7 +2290,9 @@
                 if (by >= height) continue;
                 const rows = tiled ? blockH : Math.min(blockH, height - by);
                 const length = counts[i] !== undefined ? counts[i] : bytes.length - offsets[i];
+                if (offsets[i] + length > bytes.length) throw new Error('TIFF incompleto ou corrompido (faltam dados da imagem).');
                 const block = await tiffDecompress(bytes.subarray(offsets[i], offsets[i] + length), info.compression, blockRowBytes * rows);
+                if (block.length < blockRowBytes * rows) throw new Error('TIFF incompleto ou corrompido (faixa de imagem menor que o esperado).');
                 if (info.predictor === 2) undoTiffPredictor(block, blockRowBytes, rows, samplesPerPlane, bps, le);
                 const dstX = bx * samplesPerPlane * bps / 8;
                 const copyBytes = Math.min(blockRowBytes, rowBytes - dstX);
@@ -3750,6 +3755,7 @@
             document.getElementById('printFileGap').value = saved.gap ?? '';
             document.getElementById('printFileRotate').checked = saved.rotate !== false;
             document.getElementById('printFileNest').checked = saved.nest !== false;
+            document.getElementById('printFile16').checked = saved.keep16 === true;
             document.getElementById('printFileMaxHeight').value = saved.maxHeight || 10;
             document.getElementById('printFileDpi').value = saved.dpi === '' ? '' : (saved.dpi || 350);
 
@@ -3847,11 +3853,25 @@
             const parts = [];
             for (let start = 0; start < info.size; start += DOWNLOAD_CHUNK_BYTES) {
                 const length = Math.min(DOWNLOAD_CHUNK_BYTES, info.size - start);
-                const chunk = await getAppsScript({ action: 'chunk', id: driveId, start, length });
-                parts.push(base64ToBytes(chunk.data));
+                // Confere o tamanho de cada parte: parte incompleta é baixada de novo
+                let bytes = null;
+                for (let attempt = 1; attempt <= 3 && !bytes; attempt++) {
+                    try {
+                        const chunk = await getAppsScript({ action: 'chunk', id: driveId, start, length });
+                        const received = base64ToBytes(chunk.data || '');
+                        if (received.length === length) bytes = received;
+                        else console.warn(`Parte incompleta (${received.length} de ${length} bytes), tentando de novo...`);
+                    } catch (e) {
+                        if (attempt === 3) throw e;
+                    }
+                }
+                if (!bytes) throw new Error('O download da estampa veio incompleto do Google Drive. Tente gerar de novo.');
+                parts.push(bytes);
                 if (onProgress) onProgress((start + length) / info.size);
             }
-            return new Blob(parts, { type: info.mimeType || 'image/png' });
+            const blob = new Blob(parts, { type: info.mimeType || 'image/png' });
+            if (blob.size !== info.size) throw new Error('O download da estampa veio incompleto do Google Drive. Tente gerar de novo.');
+            return blob;
         }
 
         // ---- Leitura do PNG original (pixels exatos, sem passar pelo canvas) ----
@@ -4073,6 +4093,19 @@
             return { width: W2, height: H2, depth, data: out, stride: outStride, offset: 0 };
         }
 
+        // 16 -> 8 bits por canal com arredondamento correto (v/257). Os RIPs trabalham em 8 bits;
+        // arquivo de 16 bits é lido errado (áreas pretas) por muitos deles.
+        function pixelsTo8Bit(pixels) {
+            if (pixels.depth === 8) return pixels;
+            const { width: W, height: H, data, stride, offset } = pixels;
+            const out = new Uint8Array(W * H * 4);
+            for (let y = 0; y < H; y++) {
+                const s = offset + y * stride, d = y * W * 4;
+                for (let i = 0; i < W * 4; i++) out[d + i] = Math.round(((data[s + i * 2] << 8) | data[s + i * 2 + 1]) / 257);
+            }
+            return { width: W, height: H, depth: 8, data: out, stride: W * 4, offset: 0 };
+        }
+
         async function loadPrintImage(row, onProgress) {
             const url = row.item.image;
             if (!printImageCache[url]) {
@@ -4111,6 +4144,7 @@
             const gap = parseFloat(document.getElementById('printFileGap').value) || 0;
             const rotate = document.getElementById('printFileRotate').checked;
             const nest = document.getElementById('printFileNest').checked;
+            const keep16 = document.getElementById('printFile16').checked;
             const maxHeight = parseFloat(document.getElementById('printFileMaxHeight').value);
             const dpiText = document.getElementById('printFileDpi').value.trim();
             const dpi = dpiText === '' ? null : parseFloat(dpiText);
@@ -4119,8 +4153,8 @@
             if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
             if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
             if (!(maxHeight > 0)) throw new Error('Informe a altura máxima por arquivo (em metros).');
-            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, maxHeight, dpi: dpiText === '' ? '' : dpi, source })); } catch (e) { /* sem armazenamento local */ }
-            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, maxHeightCm: maxHeight * 100, dpi };
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, keep16, maxHeight, dpi: dpiText === '' ? '' : dpi, source })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, keep16, maxHeightCm: maxHeight * 100, dpi };
         }
 
         // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
@@ -4497,15 +4531,21 @@
                 const dpi = settings.dpi || Math.max(...group.map(r => r.dpi));
                 for (const row of group) {
                     row.shape = null;
-                    if (row.dpi === dpi) continue;
+                    const to8 = !settings.keep16 && row.pixels.depth === 16;
+                    if (row.dpi === dpi && !to8) continue;
                     const cached = printImageCache[row.item.image];
                     cached.scaled = cached.scaled || {};
-                    if (!cached.scaled[dpi]) {
-                        statusEl.textContent = `Ajustando "${row.item.name}" de ${row.dpi} para ${dpi} DPI...`;
+                    const key = `${dpi}|${to8 ? 8 : row.pixels.depth}`;
+                    if (!cached.scaled[key]) {
+                        statusEl.textContent = row.dpi === dpi
+                            ? `Convertendo "${row.item.name}" para 8 bits...`
+                            : `Ajustando "${row.item.name}" de ${row.dpi} para ${dpi} DPI...`;
                         await new Promise(r => setTimeout(r, 0));
-                        cached.scaled[dpi] = resamplePixelsArea(row.pixels, dpi / row.dpi);
+                        let pixels = row.dpi === dpi ? row.pixels : resamplePixelsArea(row.pixels, dpi / row.dpi);
+                        if (to8) pixels = pixelsTo8Bit(pixels);
+                        cached.scaled[key] = pixels;
                     }
-                    row.pixels = cached.scaled[dpi];
+                    row.pixels = cached.scaled[key];
                     row.widthPx = row.pixels.width;
                     row.heightPx = row.pixels.height;
                     row.dpi = dpi;
