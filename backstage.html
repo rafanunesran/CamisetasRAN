@@ -1303,6 +1303,12 @@
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Áreas 100% transparentes de uma estampa podem ficar sobre outra; o espaçamento vale entre as partes com tinta">
                         <input id="printFileNest" type="checkbox" checked class="h-4 w-4"> Encaixar nas áreas transparentes
                     </label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Depois de organizar, encaixa nos espaços que sobram estampas de outros pedidos ativos (sem aumentar a altura do arquivo)">
+                        <input id="printFileFillOrders" type="checkbox" checked class="h-4 w-4"> Sobras: outros pedidos
+                    </label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Depois de organizar, encaixa nos espaços que ainda sobram estampas pequenas do estoque, para repor (sem aumentar a altura do arquivo)">
+                        <input id="printFileFillStock" type="checkbox" checked class="h-4 w-4"> Sobras: repor estoque
+                    </label>
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Por padrão o arquivo sai em 8 bits por canal, o formato que os RIPs esperam. Marque só se o seu RIP aceitar 16 bits.">
                         <input id="printFile16" type="checkbox" class="h-4 w-4"> Manter 16 bits
                     </label>
@@ -3696,6 +3702,10 @@
                 // Estampas em falta alimentam o botão "Gerar Arquivo"
                 window.lastMissingPrints = missingByType['Estampa'] || [];
                 window.lastNeededPrints = needsByType['Estampa'] || [];
+                // Estampas dos OUTROS pedidos ativos (usadas para preencher sobras do arquivo)
+                window.lastOtherOrderPrints = Object.entries(reserved)
+                    .map(([id, qty]) => ({ item: inventory.find(i => i.id === id), qty }))
+                    .filter(e => e.item && e.item.type === 'Estampa');
                 document.getElementById('generatePrintFileBtn').classList.toggle('hidden', window.lastNeededPrints.length === 0);
 
                 window.openModalById('materialReportModal');
@@ -3756,6 +3766,8 @@
             document.getElementById('printFileRotate').checked = saved.rotate !== false;
             document.getElementById('printFileNest').checked = saved.nest !== false;
             document.getElementById('printFile16').checked = saved.keep16 === true;
+            document.getElementById('printFileFillOrders').checked = saved.fillOrders !== false;
+            document.getElementById('printFileFillStock').checked = saved.fillStock !== false;
             document.getElementById('printFileMaxHeight').value = saved.maxHeight || 4.5;
             document.getElementById('printFileDpi').value = saved.dpi === '' ? '' : (saved.dpi || 350);
 
@@ -4145,6 +4157,8 @@
             const rotate = document.getElementById('printFileRotate').checked;
             const nest = document.getElementById('printFileNest').checked;
             const keep16 = document.getElementById('printFile16').checked;
+            const fillOrders = document.getElementById('printFileFillOrders').checked;
+            const fillStock = document.getElementById('printFileFillStock').checked;
             const maxHeight = parseFloat(document.getElementById('printFileMaxHeight').value);
             const dpiText = document.getElementById('printFileDpi').value.trim();
             const dpi = dpiText === '' ? null : parseFloat(dpiText);
@@ -4153,8 +4167,8 @@
             if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
             if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
             if (!(maxHeight > 0)) throw new Error('Informe a altura máxima por arquivo (em metros).');
-            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, keep16, maxHeight, dpi: dpiText === '' ? '' : dpi, source })); } catch (e) { /* sem armazenamento local */ }
-            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, keep16, maxHeightCm: maxHeight * 100, dpi };
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, keep16, fillOrders, fillStock, maxHeight, dpi: dpiText === '' ? '' : dpi, source })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, keep16, fillOrders, fillStock, maxHeightCm: maxHeight * 100, dpi };
         }
 
         // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
@@ -4276,7 +4290,7 @@
                 });
             });
             if (!best) throw new Error('Não foi possível organizar as estampas. Verifique a largura do arquivo.');
-            return { ...best, dpi, sheetWidthPx, items };
+            return { ...best, dpi, sheetWidthPx, items, kind: 'rect' };
         }
 
         // ---- Encaixe pelas áreas com tinta (as transparentes podem se sobrepor) ----
@@ -4445,7 +4459,7 @@
                 const candidate = { sheets, totalHeightPx: sheets.reduce((sum, sh) => sum + sh.heightPx, 0) };
                 if (isBetterLayout(candidate, best)) best = candidate;
             }
-            return { ...best, dpi, sheetWidthPx, items };
+            return { ...best, dpi, sheetWidthPx, items, kind: 'nest', cellPx };
         }
 
         // Escolhe entre o encaixe por contorno e o retangular, o que gastar menos altura
@@ -4515,6 +4529,173 @@
             });
         }
 
+        // Ajusta a arte ao DPI do arquivo (reamostragem por média de área) e, se pedido, a 8 bits
+        async function fitRowToDpi(row, dpi, force8, statusEl) {
+            row.shape = null;
+            const to8 = force8 && row.pixels.depth === 16;
+            if (row.dpi === dpi && !to8) return;
+            const cached = printImageCache[row.item.image];
+            cached.scaled = cached.scaled || {};
+            const key = `${dpi}|${to8 ? 8 : row.pixels.depth}`;
+            if (!cached.scaled[key]) {
+                statusEl.textContent = row.dpi === dpi
+                    ? `Convertendo "${row.item.name}" para 8 bits...`
+                    : `Ajustando "${row.item.name}" de ${row.dpi} para ${dpi} DPI...`;
+                await new Promise(r => setTimeout(r, 0));
+                let pixels = row.dpi === dpi ? row.pixels : resamplePixelsArea(row.pixels, dpi / row.dpi);
+                if (to8) pixels = pixelsTo8Bit(pixels);
+                cached.scaled[key] = pixels;
+            }
+            row.pixels = cached.scaled[key];
+            row.widthPx = row.pixels.width;
+            row.heightPx = row.pixels.height;
+            row.dpi = dpi;
+        }
+
+        // ---- Preencher as sobras com estampas pequenas do projeto ----
+        // Depois de organizar as estampas pedidas, encaixa nos espaços livres (sem aumentar a altura
+        // do arquivo) estampas de outros pedidos ativos e, se ainda sobrar espaço, do estoque.
+        const MAX_FILL_CANDIDATES = 16;
+
+        function fillCandidateList(settings) {
+            const byId = new Map();
+            if (settings.fillOrders) {
+                (window.lastOtherOrderPrints || []).forEach(e => {
+                    if (!e.item.image) return;
+                    byId.set(e.item.id, { item: e.item, orderQuota: Math.ceil(e.qty), stock: false });
+                });
+            }
+            if (settings.fillStock) {
+                const area = (i) => (parseFloat(i.printWidthCm) * parseFloat(i.printHeightCm)) || Infinity;
+                inventory.filter(i => i.type === 'Estampa' && i.image)
+                    .sort((a, b) => area(a) - area(b)) // as menores primeiro: cabem nos vãos
+                    .forEach(i => {
+                        const existing = byId.get(i.id);
+                        if (existing) existing.stock = true;
+                        else byId.set(i.id, { item: i, orderQuota: 0, stock: true });
+                    });
+            }
+            return [...byId.values()].slice(0, MAX_FILL_CANDIDATES);
+        }
+
+        // Melhor posição (mais acima) para um contorno, sem passar da altura Hc
+        function findNestSpot(orients, sky, Wc, Hc) {
+            let pick = null;
+            for (const o of orients) {
+                for (let xs = -o.minC; xs + o.maxC < Wc; xs++) {
+                    let y = -o.minTop;
+                    for (let c = o.minC; c <= o.maxC; c++) {
+                        const t = o.top[c];
+                        if (t >= 0) { const need = sky[xs + c] - t; if (need > y) y = need; }
+                    }
+                    const bottom = y + o.maxBottom;
+                    if (bottom >= Hc) continue;
+                    if (!pick || bottom < pick.bottom || (bottom === pick.bottom && (y < pick.y || (y === pick.y && xs < pick.xs)))) {
+                        pick = { o, xs, y, bottom };
+                    }
+                }
+            }
+            return pick;
+        }
+
+        function dilatedBottom(o, g) {
+            const bottomD = new Int32Array(o.cols + 2 * g).fill(-1);
+            for (let c = o.minC; c <= o.maxC; c++) {
+                if (o.bottom[c] < 0) continue;
+                for (let d = c - g; d <= c + g; d++) bottomD[d + g] = Math.max(bottomD[d + g], o.bottom[c] + g);
+            }
+            return bottomD;
+        }
+
+        function raiseSky(sky, Wc, xs, y, bottomD, g) {
+            for (let d = 0; d < bottomD.length; d++) {
+                const col = xs + d - g;
+                if (bottomD[d] < 0 || col < 0 || col >= Wc) continue;
+                sky[col] = Math.max(sky[col], y + bottomD[d] + 1);
+            }
+        }
+
+        async function fillLeftoverSpace(layouts, groupKeys, settings, statusEl) {
+            const candidates = fillCandidateList(settings);
+            const summary = new Map(); // item.id -> { name, pedidos, estoque }
+            if (candidates.length === 0) return summary;
+
+            for (let li = 0; li < layouts.length; li++) {
+                const layout = layouts[li];
+                const dpi = layout.dpi;
+                const cellPx = Math.max(1, Math.round(dpi * NEST_CELL_MM / 25.4));
+                const Wc = Math.floor(layout.sheetWidthPx / cellPx);
+                const gapPx = Math.round(settings.gapCm / 2.54 * dpi);
+                const g = Math.ceil(gapPx / cellPx);
+                const outDepth = layout.items.some(r => r.pixels.depth === 16) ? 16 : 8;
+
+                // Prepara as candidatas para este arquivo (mesmo perfil de cor e DPI)
+                const ready = [];
+                for (let i = 0; i < candidates.length; i++) {
+                    const cand = candidates[i];
+                    const row = { item: cand.item, copies: 0, selected: true };
+                    try {
+                        statusEl.textContent = `Procurando estampas para as sobras (${i + 1}/${candidates.length}): ${cand.item.name}...`;
+                        const image = await loadPrintImage(row);
+                        if (image.colorKey !== groupKeys[li]) continue;
+                        row.pixels = image.pixels; row.preview = image.preview;
+                        row.widthPx = image.pixels.width; row.heightPx = image.pixels.height;
+                        row.dpi = image.dpi || parseFloat(cand.item.imageDpi) || null;
+                        if (!row.dpi) continue;
+                        await fitRowToDpi(row, dpi, outDepth === 8, statusEl);
+                        row.shape = getPrintShape(row.pixels, cellPx);
+                        if (row.shape.empty) continue;
+                        const orients = (settings.rotate ? row.shape.orients : [row.shape.orients[0]])
+                            .filter(o => o.minC >= 0 && o.maxC - o.minC + 1 <= Wc)
+                            .map(o => ({ ...o, bottomD: dilatedBottom(o, g) }));
+                        if (orients.length) ready.push({ cand, row, orients, placed: 0, done: false });
+                    } catch (e) {
+                        console.warn('Estampa ignorada no preenchimento:', cand.item.name, e);
+                    }
+                }
+                if (ready.length === 0) continue;
+
+                for (const sheet of layout.sheets) {
+                    const Hc = Math.floor(sheet.heightPx / cellPx); // não aumenta a altura do arquivo
+                    // Reconstrói o "chão" de cada coluna a partir do que já foi colocado
+                    const sky = new Int32Array(Wc);
+                    sheet.placed.forEach(p => {
+                        const aligned = layout.kind === 'nest' && p.x % cellPx === 0 && p.y % cellPx === 0 && p.row.shape && p.row.shape.cellPx === cellPx;
+                        if (aligned) {
+                            const o = p.row.shape.orients[p.orient];
+                            raiseSky(sky, Wc, p.x / cellPx, p.y / cellPx, dilatedBottom(o, g), g);
+                        } else { // retângulo da estampa (conservador)
+                            const [w, h] = orientedSize(p.row, p.orient);
+                            const c0 = Math.floor(p.x / cellPx), c1 = Math.floor((p.x + w - 1) / cellPx);
+                            const bottomCell = Math.floor((p.y + h - 1) / cellPx);
+                            for (let c = c0 - g; c <= c1 + g; c++) if (c >= 0 && c < Wc) sky[c] = Math.max(sky[c], bottomCell + g + 1);
+                        }
+                    });
+                    ready.forEach(r => { r.done = false; });
+                    // Uma de cada estampa por rodada (intercaladas), até não caber mais nada
+                    let placedSomething = true, total = 0;
+                    while (placedSomething && total < 2000) {
+                        placedSomething = false;
+                        for (const r of ready) {
+                            if (r.done) continue;
+                            const limit = r.cand.stock ? Infinity : r.cand.orderQuota;
+                            if (r.placed >= limit) { r.done = true; continue; }
+                            const pick = findNestSpot(r.orients, sky, Wc, Hc);
+                            if (!pick) { r.done = true; continue; }
+                            raiseSky(sky, Wc, pick.xs, pick.y, pick.o.bottomD, g);
+                            sheet.placed.push({ row: r.row, x: pick.xs * cellPx, y: pick.y * cellPx, orient: pick.o.orient, extra: true });
+                            const source = r.placed < r.cand.orderQuota ? 'pedidos' : 'estoque';
+                            r.placed++; total++; placedSomething = true;
+                            const entry = summary.get(r.cand.item.id) || { name: r.cand.item.name, pedidos: 0, estoque: 0 };
+                            entry[source]++;
+                            summary.set(r.cand.item.id, entry);
+                        }
+                    }
+                }
+            }
+            return summary;
+        }
+
         const MAX_RIP_PIXELS = 65000;  // por lado
         const MAX_PDF_PAGE_CM = 508;   // 200 polegadas, sem precisar de UserUnit
 
@@ -4529,31 +4710,13 @@
             const groups = {};
             items.forEach(row => { (groups[row.colorKey] = groups[row.colorKey] || []).push(row); });
             const layouts = [];
+            const groupKeys = [];
             let ripLimited = null;
-            for (const group of Object.values(groups)) {
+            for (const [groupKey, group] of Object.entries(groups)) {
+                groupKeys.push(groupKey);
                 // Resolução do arquivo: a informada (ex.: 350) ou, se vazia, o maior DPI das artes
                 const dpi = settings.dpi || Math.max(...group.map(r => r.dpi));
-                for (const row of group) {
-                    row.shape = null;
-                    const to8 = !settings.keep16 && row.pixels.depth === 16;
-                    if (row.dpi === dpi && !to8) continue;
-                    const cached = printImageCache[row.item.image];
-                    cached.scaled = cached.scaled || {};
-                    const key = `${dpi}|${to8 ? 8 : row.pixels.depth}`;
-                    if (!cached.scaled[key]) {
-                        statusEl.textContent = row.dpi === dpi
-                            ? `Convertendo "${row.item.name}" para 8 bits...`
-                            : `Ajustando "${row.item.name}" de ${row.dpi} para ${dpi} DPI...`;
-                        await new Promise(r => setTimeout(r, 0));
-                        let pixels = row.dpi === dpi ? row.pixels : resamplePixelsArea(row.pixels, dpi / row.dpi);
-                        if (to8) pixels = pixelsTo8Bit(pixels);
-                        cached.scaled[key] = pixels;
-                    }
-                    row.pixels = cached.scaled[key];
-                    row.widthPx = row.pixels.width;
-                    row.heightPx = row.pixels.height;
-                    row.dpi = dpi;
-                }
+                for (const row of group) await fitRowToDpi(row, dpi, !settings.keep16, statusEl);
                 // Perfil de cor do arquivo: o da primeira arte que tiver um
                 const withColor = group.find(r => r.colorChunks.length > 0);
                 group.forEach(r => { r.outputColorChunks = withColor ? withColor.colorChunks : []; });
@@ -4571,6 +4734,17 @@
 
             // Faixas com tinta (colagem sem apagar a vizinha) também para o encaixe retangular
             items.forEach(r => { if (!r.shape) r.shape = getPrintShape(r.pixels, 1e9); });
+
+            // Sobras do arquivo: estampas de outros pedidos e do estoque
+            let extrasText = '';
+            if (settings.fillOrders || settings.fillStock) {
+                const extras = await fillLeftoverSpace(layouts, groupKeys, settings, statusEl);
+                const parts = [...extras.values()].map(e => {
+                    const from = [e.pedidos ? `${e.pedidos} p/ pedidos` : '', e.estoque ? `${e.estoque} p/ estoque` : ''].filter(Boolean).join(', ');
+                    return `${e.pedidos + e.estoque}× ${e.name} (${from})`;
+                });
+                if (parts.length) extrasText = ` Encaixadas nas sobras, sem aumentar o arquivo: ${parts.join('; ')}.`;
+            }
             renderPrintFilePreview(layouts);
             const copies = items.reduce((sum, r) => sum + r.copies, 0);
             const files = layouts.reduce((n, l) => n + l.sheets.length, 0);
@@ -4578,6 +4752,7 @@
             statusEl.dataset.note = '';
             if (layouts.length > 1) statusEl.dataset.note += ' Artes com perfil de cor diferente de sRGB ficaram em arquivo separado para não alterar as cores.';
             if (ripLimited) statusEl.dataset.note += ` Cada arquivo foi limitado a ${formatCm(ripLimited / 100)} m de altura para ser aceito pelo RIP (até ${MAX_RIP_PIXELS.toLocaleString('pt-BR')} px).`;
+            statusEl.dataset.note += extrasText;
             statusEl.textContent = `${copies} estampas · largura ${formatCm(settings.widthCm)} cm · altura ${heights}${files > 1 ? ` · ${files} arquivos` : ''}.${statusEl.dataset.note}`;
             return layouts;
         }
