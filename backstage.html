@@ -1313,7 +1313,8 @@
             <div class="flex justify-end gap-2 pt-4 border-t">
                 <button onclick="window.closeModalById('printFileModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Fechar</button>
                 <button id="printFileLayoutBtn" onclick="previewPrintFileLayout()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"><i data-lucide="layout-grid" class="h-4 w-4"></i> Pré-visualizar</button>
-                <button id="printFileGenerateBtn" onclick="generatePrintFile()" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 flex items-center gap-2"><i data-lucide="download" class="h-4 w-4"></i> Gerar e Baixar PNG</button>
+                <button id="printFileGenerateBtn" onclick="generatePrintFile('png')" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 flex items-center gap-2"><i data-lucide="download" class="h-4 w-4"></i> Gerar e Baixar PNG</button>
+                <button id="printFileGeneratePdfBtn" onclick="generatePrintFile('pdf')" class="px-4 py-2 text-sm font-medium text-white bg-purple-800 rounded-md hover:bg-purple-900 flex items-center gap-2"><i data-lucide="file-down" class="h-4 w-4"></i> Gerar e Baixar PDF</button>
             </div>
         </div>
     </div>
@@ -4625,13 +4626,72 @@
             }
         }
 
-        async function writePrintSheetPng(layout, sheet, onProgress) {
+        // Monta o arquivo em faixas de linhas (RGBA, fundo transparente) e entrega cada faixa a onBand
+        async function composePrintSheetBands(layout, sheet, onBand, onProgress) {
             const width = layout.sheetWidthPx;
             const height = sheet.heightPx;
             const depth = layout.items.some(r => r.pixels.depth === 16) ? 16 : 8;
             const outBytes = depth / 8 * 4;
             const rowLen = width * outBytes;
             const bandRows = Math.max(1, Math.floor(16 * 1024 * 1024 / rowLen));
+            const placed = [...sheet.placed].sort((a, b) => a.y - b.y);
+            for (let bandY = 0; bandY < height; bandY += bandRows) {
+                const rows = Math.min(bandRows, height - bandY);
+                const band = new Uint8Array(rows * rowLen);
+                placed.forEach(p => {
+                    const placedH = orientedSize(p.row, p.orient)[1];
+                    if (p.y < bandY + rows && p.y + placedH > bandY) blitPlacement(band, bandY, rows, width, outBytes, p);
+                });
+                await onBand(band, rows);
+                if (onProgress) onProgress((bandY + rows) / height);
+                await new Promise(r => setTimeout(r, 0)); // mantém a tela respondendo
+            }
+        }
+
+        // Filtro Paeth (PNG) por linha, sem perda; usado no PNG e no PDF (Predictor 15)
+        function paethFilterRows(data, rows, rowLen, bpp, prevRow) {
+            const filtered = new Uint8Array(rows * (rowLen + 1));
+            for (let r = 0; r < rows; r++) {
+                const cur = data.subarray(r * rowLen, (r + 1) * rowLen);
+                const up = r === 0 ? prevRow : data.subarray((r - 1) * rowLen, r * rowLen);
+                const o = r * (rowLen + 1);
+                filtered[o] = 4;
+                for (let i = 0; i < rowLen; i++) {
+                    const a = i >= bpp ? cur[i - bpp] : 0;
+                    const b = up[i];
+                    const c = i >= bpp ? up[i - bpp] : 0;
+                    const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+                    const pred = pa <= pb && pa <= pc ? a : (pb <= pc ? b : c);
+                    filtered[o + 1 + i] = (cur[i] - pred) & 0xFF;
+                }
+            }
+            return { filtered, lastRow: data.slice((rows - 1) * rowLen, rows * rowLen) };
+        }
+
+        // Compressão zlib em fluxo; onChunk recebe os pedaços comprimidos
+        function deflateSink(onChunk) {
+            const compressor = new CompressionStream('deflate');
+            const writer = compressor.writable.getWriter();
+            const reading = (async () => {
+                const reader = compressor.readable.getReader();
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    onChunk(value);
+                }
+            })();
+            return {
+                write: (data) => writer.write(data),
+                finish: async () => { await writer.close(); await reading; }
+            };
+        }
+
+        async function writePrintSheetPng(layout, sheet, onProgress) {
+            const width = layout.sheetWidthPx;
+            const height = sheet.heightPx;
+            const depth = layout.items.some(r => r.pixels.depth === 16) ? 16 : 8;
+            const outBytes = depth / 8 * 4;
+            const rowLen = width * outBytes;
 
             const ihdr = new Uint8Array(13);
             const ihdrView = new DataView(ihdr.buffer);
@@ -4650,60 +4710,124 @@
                 ...layout.items[0].outputColorChunks, // perfil de cor original
                 pngChunk('pHYs', phys)
             ];
-
-            // Compressão nativa do navegador (zlib), em fluxo
-            const compressor = new CompressionStream('deflate');
-            const writer = compressor.writable.getWriter();
-            const reading = (async () => {
-                const reader = compressor.readable.getReader();
-                for (;;) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    parts.push(pngChunk('IDAT', value));
-                }
-            })();
-
-            const placed = [...sheet.placed].sort((a, b) => a.y - b.y);
+            const sink = deflateSink(value => parts.push(pngChunk('IDAT', value)));
             let prevRow = new Uint8Array(rowLen);
-            for (let bandY = 0; bandY < height; bandY += bandRows) {
-                const rows = Math.min(bandRows, height - bandY);
-                const band = new Uint8Array(rows * rowLen); // fundo transparente
-                placed.forEach(p => {
-                    const placedH = orientedSize(p.row, p.orient)[1];
-                    if (p.y < bandY + rows && p.y + placedH > bandY) blitPlacement(band, bandY, rows, width, outBytes, p);
-                });
-
-                // Filtro Paeth por linha (compressão sem perda)
-                const filtered = new Uint8Array(rows * (rowLen + 1));
-                for (let r = 0; r < rows; r++) {
-                    const cur = band.subarray(r * rowLen, (r + 1) * rowLen);
-                    const up = r === 0 ? prevRow : band.subarray((r - 1) * rowLen, r * rowLen);
-                    const o = r * (rowLen + 1);
-                    filtered[o] = 4;
-                    for (let i = 0; i < rowLen; i++) {
-                        const a = i >= outBytes ? cur[i - outBytes] : 0;
-                        const b = up[i];
-                        const c = i >= outBytes ? up[i - outBytes] : 0;
-                        const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
-                        const pred = pa <= pb && pa <= pc ? a : (pb <= pc ? b : c);
-                        filtered[o + 1 + i] = (cur[i] - pred) & 0xFF;
-                    }
-                }
-                prevRow = band.slice((rows - 1) * rowLen);
-                await writer.write(filtered);
-                if (onProgress) onProgress((bandY + rows) / height);
-                await new Promise(r => setTimeout(r, 0)); // mantém a tela respondendo
-            }
-            await writer.close();
-            await reading;
+            await composePrintSheetBands(layout, sheet, async (band, rows) => {
+                const { filtered, lastRow } = paethFilterRows(band, rows, rowLen, outBytes, prevRow);
+                prevRow = lastRow;
+                await sink.write(filtered);
+            }, onProgress);
+            await sink.finish();
             parts.push(pngChunk('IEND', new Uint8Array(0)));
             return new Blob(parts, { type: 'image/png' });
         }
 
-        window.generatePrintFile = async () => {
-            const btn = document.getElementById('printFileGenerateBtn');
+        // ---- PDF: a mesma imagem, sem perda, com perfil ICC e transparência (SMask) ----
+        // Perfil sRGB (588 bytes, gerado pelo LittleCMS) para artes sem perfil: PNG sem perfil é sRGB
+        const SRGB_ICC_BASE64 = 'AAACTGxjbXMEQAAAbW50clJHQiBYWVogB+oACgAIAA4ALQAHYWNzcEFQUEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPbWAAEAAAAA0y1sY21zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALZGVzYwAAAQgAAAA2Y3BydAAAAUAAAABMd3RwdAAAAYwAAAAUY2hhZAAAAaAAAAAsclhZWgAAAcwAAAAUYlhZWgAAAeAAAAAUZ1hZWgAAAfQAAAAUclRSQwAAAggAAAAgZ1RSQwAAAggAAAAgYlRSQwAAAggAAAAgY2hybQAAAigAAAAkbWx1YwAAAAAAAAABAAAADGVuVVMAAAAaAAAAHABzAFIARwBCACAAYgB1AGkAbAB0AC0AaQBuAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAADAAAAAcAE4AbwAgAGMAbwBwAHkAcgBpAGcAaAB0ACwAIAB1AHMAZQAgAGYAcgBlAGUAbAB5WFlaIAAAAAAAAPbWAAEAAAAA0y1zZjMyAAAAAAABDEIAAAXe///zJQAAB5MAAP2Q///7of///aIAAAPcAADAblhZWiAAAAAAAABvoAAAOPUAAAOQWFlaIAAAAAAAACSfAAAPhAAAtsNYWVogAAAAAAAAYpcAALeHAAAY2XBhcmEAAAAAAAMAAAACZmYAAPKnAAANWQAAE9AAAApbY2hybQAAAAAAAwAAAACj1wAAVHsAAEzNAACZmgAAJmYAAA9c';
+
+        async function getOutputIccProfile(layout) {
+            for (const chunk of layout.items[0].outputColorChunks) {
+                const type = String.fromCharCode(chunk[4], chunk[5], chunk[6], chunk[7]);
+                if (type !== 'iCCP') continue;
+                const body = chunk.subarray(8, chunk.length - 4);
+                const nameEnd = body.indexOf(0);
+                try { return await inflateZlib([body.subarray(nameEnd + 2)]); } catch (e) { /* usa sRGB */ }
+            }
+            return base64ToBytes(SRGB_ICC_BASE64);
+        }
+
+        async function writePrintSheetPdf(layout, sheet, onProgress) {
+            const width = layout.sheetWidthPx;
+            const height = sheet.heightPx;
+            const depth = layout.items.some(r => r.pixels.depth === 16) ? 16 : 8;
+            const B = depth / 8;
+            const rgbRowLen = width * 3 * B;
+            const alphaRowLen = width * B;
+            const maxV = depth === 16 ? 0xFFFF : 0xFF;
+
+            // Separa cor (RGB) e transparência (alfa) e comprime cada um sem perda
+            const rgbParts = [], alphaParts = [];
+            let rgbLength = 0, alphaLength = 0;
+            const rgbSink = deflateSink(v => { rgbParts.push(v); rgbLength += v.length; });
+            const alphaSink = deflateSink(v => { alphaParts.push(v); alphaLength += v.length; });
+            let prevRgb = new Uint8Array(rgbRowLen), prevAlpha = new Uint8Array(alphaRowLen);
+            let hasTransparency = false;
+            await composePrintSheetBands(layout, sheet, async (band, rows) => {
+                const rgb = new Uint8Array(rows * rgbRowLen);
+                const alpha = new Uint8Array(rows * alphaRowLen);
+                const pixels = rows * width;
+                for (let i = 0; i < pixels; i++) {
+                    const s = i * 4 * B, c = i * 3 * B, a = i * B;
+                    for (let k = 0; k < 3 * B; k++) rgb[c + k] = band[s + k];
+                    for (let k = 0; k < B; k++) alpha[a + k] = band[s + 3 * B + k];
+                    if (!hasTransparency && (B === 1 ? band[s + 3] : (band[s + 6] << 8) | band[s + 7]) !== maxV) hasTransparency = true;
+                }
+                const fr = paethFilterRows(rgb, rows, rgbRowLen, 3 * B, prevRgb);
+                const fa = paethFilterRows(alpha, rows, alphaRowLen, B, prevAlpha);
+                prevRgb = fr.lastRow; prevAlpha = fa.lastRow;
+                await Promise.all([rgbSink.write(fr.filtered), alphaSink.write(fa.filtered)]);
+            }, onProgress);
+            await Promise.all([rgbSink.finish(), alphaSink.finish()]);
+
+            const profile = await getOutputIccProfile(layout);
+            const profileCompressed = new Uint8Array(await new Response(new Blob([profile]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+
+            // Tamanho físico exato: pontos (1/72") no DPI do arquivo. Acima de 200" (limite comum
+            // de página), usa UserUnit para que a página continue com o tamanho real.
+            const widthPt = width / layout.dpi * 72;
+            const heightPt = height / layout.dpi * 72;
+            const userUnit = Math.max(1, Math.ceil(Math.max(widthPt, heightPt) / 14400));
+            const fmt = (n) => (Math.round(n * 10000) / 10000).toString();
+            const pageW = fmt(widthPt / userUnit), pageH = fmt(heightPt / userUnit);
+
+            const encoder = new TextEncoder();
+            const parts = [];
+            const offsets = [];
+            let position = 0;
+            const push = (part) => {
+                const bytes = typeof part === 'string' ? encoder.encode(part) : part;
+                parts.push(bytes);
+                position += bytes.length;
+            };
+            const startObject = (n) => { offsets[n] = position; push(`${n} 0 obj\n`); };
+            const predictor = (colors) => `/DecodeParms << /Predictor 15 /Colors ${colors} /BitsPerComponent ${depth} /Columns ${width} >>`;
+
+            push('%PDF-1.6\n');
+            push(new Uint8Array([0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A])); // marca de arquivo binário
+            startObject(1); push('<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+            startObject(2); push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+            startObject(3);
+            push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}]${userUnit > 1 ? ` /UserUnit ${userUnit}` : ''} /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`);
+            startObject(4);
+            push(`<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace 6 0 R /BitsPerComponent ${depth} /Interpolate false /Filter /FlateDecode ${predictor(3)}${hasTransparency ? ' /SMask 7 0 R' : ''} /Length ${rgbLength} >>\nstream\n`);
+            rgbParts.forEach(push);
+            push('\nendstream\nendobj\n');
+            const content = `q ${pageW} 0 0 ${pageH} 0 0 cm /Im0 Do Q`;
+            startObject(5); push(`<< /Length ${encoder.encode(content).length} >>\nstream\n${content}\nendstream\nendobj\n`);
+            startObject(6); push('[/ICCBased 8 0 R]\nendobj\n');
+            startObject(7);
+            push(`<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceGray /BitsPerComponent ${depth} /Interpolate false /Filter /FlateDecode ${predictor(1)} /Length ${alphaLength} >>\nstream\n`);
+            alphaParts.forEach(push);
+            push('\nendstream\nendobj\n');
+            startObject(8);
+            push(`<< /N 3 /Alternate /DeviceRGB /Filter /FlateDecode /Length ${profileCompressed.length} >>\nstream\n`);
+            push(profileCompressed);
+            push('\nendstream\nendobj\n');
+            startObject(9); push(`<< /Producer (CamisetasRAN) /Title (Estampas ${layout.dpi} DPI) >>\nendobj\n`);
+
+            const xref = position;
+            let table = `xref\n0 10\n0000000000 65535 f \n`;
+            for (let n = 1; n <= 9; n++) table += `${String(offsets[n]).padStart(10, '0')} 00000 n \n`;
+            push(table);
+            push(`trailer\n<< /Size 10 /Root 1 0 R /Info 9 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+            return new Blob(parts, { type: 'application/pdf' });
+        }
+
+        window.generatePrintFile = async (format = 'png') => {
+            const buttons = [document.getElementById('printFileGenerateBtn'), document.getElementById('printFileGeneratePdfBtn')];
             const statusEl = document.getElementById('printFileStatus');
-            btn.disabled = true;
+            buttons.forEach(b => { b.disabled = true; });
             try {
                 const layouts = await buildPrintFileLayouts();
                 const summary = statusEl.textContent;
@@ -4715,7 +4839,8 @@
                     for (const sheet of layout.sheets) {
                         fileNumber++;
                         const label = `Gerando arquivo ${fileNumber} de ${totalFiles}`;
-                        const blob = await writePrintSheetPng(layout, sheet, (p) => {
+                        const writer = format === 'pdf' ? writePrintSheetPdf : writePrintSheetPng;
+                        const blob = await writer(layout, sheet, (p) => {
                             statusEl.textContent = `${label}... ${Math.round(p * 100)}%`;
                         });
 
@@ -4723,20 +4848,20 @@
                         const size = `${formatCm(pxToCm(layout.sheetWidthPx, layout.dpi))}x${formatCm(pxToCm(sheet.heightPx, layout.dpi))}cm`.replace(/,/g, '.');
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = `estampas_${stamp}_${size}_${layout.dpi}dpi${part}.png`;
+                        link.download = `estampas_${stamp}_${size}_${layout.dpi}dpi${part}.${format}`;
                         document.body.appendChild(link);
                         link.click();
                         link.remove();
                         setTimeout(() => URL.revokeObjectURL(link.href), 60000);
                     }
                 }
-                statusEl.textContent = `Pronto! ${totalFiles} arquivo(s) PNG baixado(s). ${summary}`;
+                statusEl.textContent = `Pronto! ${totalFiles} arquivo(s) ${format.toUpperCase()} baixado(s). ${summary}`;
             } catch (e) {
                 console.error('Erro ao gerar arquivo de estampas:', e);
                 statusEl.textContent = '';
                 alert(e.message);
             } finally {
-                btn.disabled = false;
+                buttons.forEach(b => { b.disabled = false; });
             }
         }
 
