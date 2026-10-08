@@ -1266,7 +1266,7 @@
                 <p class="text-xs text-muted-foreground">As cópias vêm preenchidas com a quantidade em falta. Cada estampa é colada exatamente como o arquivo enviado (mesmos pixels e resolução), apenas duplicada e posicionada.</p>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-gray-700">Unidade</label>
                     <select id="printFileUnit" onchange="convertPrintFileUnit()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
@@ -1283,6 +1283,10 @@
                     <input id="printFileGap" type="number" step="0.1" min="0" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 1">
                 </div>
                 <div class="space-y-1">
+                    <label class="text-xs font-medium text-gray-700">Altura máxima por arquivo (m)</label>
+                    <input id="printFileMaxHeight" type="number" step="0.1" min="0.1" value="10" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div class="space-y-1">
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700">
                         <input id="printFileRotate" type="checkbox" checked class="h-4 w-4"> Permitir girar
                     </label>
@@ -1291,7 +1295,7 @@
                     </label>
                 </div>
             </div>
-            <p class="text-xs text-muted-foreground">A altura do arquivo é calculada automaticamente, com as estampas organizadas para o menor desperdício. O arquivo final usa a mesma resolução (DPI) das estampas (até 600 DPI ou mais, sem limite de altura); estampas com DPI diferentes saem em arquivos separados.</p>
+            <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). O arquivo usa o maior DPI entre as artes; as de DPI menor são ampliadas repetindo pixels (sem criar cores novas e mantendo o tamanho em cm). Só uma arte com perfil de cor diferente de sRGB (ex.: Adobe RGB) sai em arquivo separado, para não alterar as cores.</p>
 
             <div id="printFileStatus" class="text-sm text-gray-600"></div>
             <div id="printFilePreview" class="space-y-4"></div>
@@ -2361,19 +2365,40 @@
             return pngChunk('iCCP', data);
         }
 
-        // Identifica o perfil de cor (mesmo perfil = mesmo arquivo final, seja de PNG ou TIFF)
+        // Perfil ICC sRGB (ex.: "sRGB IEC61966-2.1"), procurando o nome em ASCII ou UTF-16
+        function isSrgbProfile(profile) {
+            const head = profile.subarray(0, Math.min(profile.length, 8192));
+            let ascii = '';
+            for (let i = 0; i < head.length; i++) ascii += String.fromCharCode(head[i]);
+            if (ascii.includes('sRGB')) return true;
+            for (const start of [0, 1]) { // UTF-16 pode começar em byte par ou ímpar
+                let utf16 = '';
+                for (let i = start; i + 1 < head.length; i += 2) utf16 += String.fromCharCode((head[i] << 8) | head[i + 1]);
+                if (utf16.includes('sRGB')) return true;
+            }
+            return false;
+        }
+
+        // Identifica o espaço de cor. Sem perfil, marcação sRGB/gama ou perfil ICC sRGB = "srgb"
+        // (todas essas artes vão para a mesma imagem). Outro perfil (ex.: Adobe RGB) = chave própria.
         async function colorKeyForChunks(chunks) {
             const keys = [];
             for (const chunk of chunks) {
                 const type = String.fromCharCode(chunk[4], chunk[5], chunk[6], chunk[7]);
+                if (type === 'sRGB' || type === 'gAMA' || type === 'cHRM') continue;
                 if (type === 'iCCP') {
                     const body = chunk.subarray(8, chunk.length - 4);
                     const nameEnd = body.indexOf(0);
-                    try { keys.push('icc' + crc32(await inflateZlib([body.subarray(nameEnd + 2)]))); continue; } catch (e) { /* usa o chunk */ }
+                    try {
+                        const profile = await inflateZlib([body.subarray(nameEnd + 2)]);
+                        if (isSrgbProfile(profile)) continue;
+                        keys.push('icc' + crc32(profile));
+                        continue;
+                    } catch (e) { /* usa o chunk */ }
                 }
                 keys.push(type + crc32(chunk));
             }
-            return keys.join('-') || 'none';
+            return keys.join('-') || 'srgb';
         }
 
         window.updatePrintSizeInfo = () => {
@@ -3697,6 +3722,7 @@
             document.getElementById('printFileGap').value = saved.gap ?? '';
             document.getElementById('printFileRotate').checked = saved.rotate !== false;
             document.getElementById('printFileNest').checked = saved.nest !== false;
+            document.getElementById('printFileMaxHeight').value = saved.maxHeight || 10;
 
             document.getElementById('printFileStatus').textContent = '';
             document.getElementById('printFilePreview').innerHTML = '';
@@ -3934,6 +3960,30 @@
             return createImageBitmap(image);
         }
 
+        // Amplia repetindo pixels (vizinho mais próximo): nenhuma cor nova, só o DPI muda
+        function scalePixelsNearest(pixels, factor) {
+            const W = Math.max(1, Math.round(pixels.width * factor));
+            const H = Math.max(1, Math.round(pixels.height * factor));
+            const bytes = pixels.depth / 8 * 4;
+            const outStride = W * bytes;
+            const out = new Uint8Array(outStride * H);
+            const xMap = new Int32Array(W);
+            for (let x = 0; x < W; x++) xMap[x] = Math.min(pixels.width - 1, Math.floor((x + 0.5) / factor)) * bytes;
+            let prevSy = -1;
+            for (let y = 0; y < H; y++) {
+                const sy = Math.min(pixels.height - 1, Math.floor((y + 0.5) / factor));
+                const d = y * outStride;
+                if (sy === prevSy) { out.copyWithin(d, d - outStride, d); continue; } // mesma linha da origem
+                const s = pixels.offset + sy * pixels.stride;
+                for (let x = 0; x < W; x++) {
+                    const si = s + xMap[x], di = d + x * bytes;
+                    for (let c = 0; c < bytes; c++) out[di + c] = pixels.data[si + c];
+                }
+                prevSy = sy;
+            }
+            return { width: W, height: H, depth: pixels.depth, data: out, stride: outStride, offset: 0 };
+        }
+
         async function loadPrintImage(row, onProgress) {
             const url = row.item.image;
             if (!printImageCache[url]) {
@@ -3972,10 +4022,12 @@
             const gap = parseFloat(document.getElementById('printFileGap').value) || 0;
             const rotate = document.getElementById('printFileRotate').checked;
             const nest = document.getElementById('printFileNest').checked;
+            const maxHeight = parseFloat(document.getElementById('printFileMaxHeight').value);
             if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
             if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
-            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest })); } catch (e) { /* sem armazenamento local */ }
-            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest };
+            if (!(maxHeight > 0)) throw new Error('Informe a altura máxima por arquivo (em metros).');
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, maxHeight })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, maxHeightCm: maxHeight * 100 };
         }
 
         // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
@@ -4051,18 +4103,23 @@
 
         // Testa várias ordenações e fica com a que gasta menos material.
         // Tudo em pixels na resolução das estampas (dpi).
+        // Melhor resultado: menos arquivos e, depois, menor altura total
+        const isBetterLayout = (a, b) => !b || a.sheets.length < b.sheets.length ||
+            (a.sheets.length === b.sheets.length && a.totalHeightPx < b.totalHeightPx);
+
         function packPrints(items, settings, dpi) {
             const sheetWidthPx = Math.round(settings.widthCm / 2.54 * dpi);
+            const maxHeightPx = Math.round(settings.maxHeightCm / 2.54 * dpi);
             const gapPx = Math.round(settings.gapCm / 2.54 * dpi);
             const binW = sheetWidthPx + gapPx; // o espaçamento só existe ENTRE estampas
-            const binH = 2e9; // altura livre: o arquivo cresce o quanto precisar
+            const binH = maxHeightPx + gapPx; // altura máxima por arquivo
 
             const rects = [];
             items.forEach(row => {
-                const fitsNormal = row.widthPx <= sheetWidthPx;
-                const fitsRotated = settings.rotate && row.heightPx <= sheetWidthPx;
+                const fitsNormal = row.widthPx <= sheetWidthPx && row.heightPx <= maxHeightPx;
+                const fitsRotated = settings.rotate && row.heightPx <= sheetWidthPx && row.widthPx <= maxHeightPx;
                 if (!fitsNormal && !fitsRotated) {
-                    throw new Error(`A estampa "${row.item.name}" (${formatCm(pxToCm(row.widthPx, dpi))} × ${formatCm(pxToCm(row.heightPx, dpi))} cm) não cabe na largura do arquivo.`);
+                    throw new Error(`A estampa "${row.item.name}" (${formatCm(pxToCm(row.widthPx, dpi))} × ${formatCm(pxToCm(row.heightPx, dpi))} cm) não cabe no arquivo (largura ${formatCm(settings.widthCm)} cm, altura máx. ${formatCm(settings.maxHeightCm)} cm).`);
                 }
                 for (let c = 0; c < row.copies; c++) rects.push({ row, w: row.widthPx + gapPx, h: row.heightPx + gapPx });
             });
@@ -4087,8 +4144,8 @@
                         sheets.push({ placed: result.placed, heightPx: Math.max(1, result.usedHeight - gapPx) });
                         remaining = result.leftover;
                     }
-                    const totalHeight = sheets.reduce((sum, sh) => sum + sh.heightPx, 0);
-                    if (!best || totalHeight < best.totalHeightPx) best = { sheets, totalHeightPx: totalHeight };
+                    const candidate = { sheets, totalHeightPx: sheets.reduce((sum, sh) => sum + sh.heightPx, 0) };
+                    if (isBetterLayout(candidate, best)) best = candidate;
                 });
             });
             if (!best) throw new Error('Não foi possível organizar as estampas. Verifique a largura do arquivo.');
@@ -4159,16 +4216,24 @@
             return { runs, runStarts, inkPixels, orients, empty: runCount === 0 };
         }
 
+        // Análise de tinta guardada junto dos pixels (reaproveitada entre gerações)
+        function getPrintShape(pixels, cellPx) {
+            pixels.shapes = pixels.shapes || {};
+            if (!pixels.shapes[cellPx]) pixels.shapes[cellPx] = { ...analyzePrintShape(pixels, cellPx), cellPx };
+            return pixels.shapes[cellPx];
+        }
+
         function nestPrints(items, settings, dpi) {
             const sheetWidthPx = Math.round(settings.widthCm / 2.54 * dpi);
             const gapPx = Math.round(settings.gapCm / 2.54 * dpi);
             const cellPx = Math.max(1, Math.round(dpi * NEST_CELL_MM / 25.4));
             const Wc = Math.floor(sheetWidthPx / cellPx);
+            const Hc = Math.floor(Math.round(settings.maxHeightCm / 2.54 * dpi) / cellPx); // altura máx. em células
             const g = Math.ceil(gapPx / cellPx);
 
             const shapes = items.map(row => {
                 const orients = (settings.rotate ? row.shape.orients : [row.shape.orients[0]])
-                    .filter(o => o.minC >= 0 && o.maxC - o.minC + 1 <= Wc)
+                    .filter(o => o.minC >= 0 && o.maxC - o.minC + 1 <= Wc && o.maxBottom - o.minTop + 1 <= Hc)
                     .map(o => {
                         // Base "engordada" pelo espaçamento: o que a próxima estampa não pode invadir
                         const bottomD = new Int32Array(o.cols + 2 * g).fill(-1);
@@ -4179,7 +4244,7 @@
                         return { ...o, bottomD };
                     });
                 if (orients.length === 0) {
-                    throw new Error(`A estampa "${row.item.name}" (${formatCm(pxToCm(row.widthPx, dpi))} × ${formatCm(pxToCm(row.heightPx, dpi))} cm) não cabe na largura do arquivo.`);
+                    throw new Error(`A estampa "${row.item.name}" (${formatCm(pxToCm(row.widthPx, dpi))} × ${formatCm(pxToCm(row.heightPx, dpi))} cm) não cabe no arquivo (largura ${formatCm(settings.widthCm)} cm, altura máx. ${formatCm(settings.maxHeightCm)} cm).`);
                 }
                 return { row, orients, ink: row.shape.inkPixels };
             });
@@ -4193,37 +4258,46 @@
 
             let best = null;
             strategies.forEach(sortFn => {
-                const order = [...copies].sort(sortFn);
-                const sky = new Int32Array(Wc); // por coluna: primeira linha livre abaixo do que já foi colocado
-                const placed = [];
-                let extent = 0;
-                for (const shape of order) {
-                    let pick = null;
-                    for (const o of shape.orients) {
-                        for (let xs = -o.minC; xs + o.maxC < Wc; xs++) {
-                            // "Sobe" a estampa até encostar (respeitando o espaçamento) no que já existe
-                            let y = -o.minTop;
-                            for (let c = o.minC; c <= o.maxC; c++) {
-                                const t = o.top[c];
-                                if (t >= 0) { const need = sky[xs + c] - t; if (need > y) y = need; }
-                            }
-                            const bottom = y + o.maxBottom;
-                            if (!pick || bottom < pick.bottom || (bottom === pick.bottom && (y < pick.y || (y === pick.y && xs < pick.xs)))) {
-                                pick = { o, xs, y, bottom };
+                let remaining = [...copies].sort(sortFn);
+                const sheets = [];
+                while (remaining.length > 0) {
+                    const sky = new Int32Array(Wc); // por coluna: primeira linha livre abaixo do que já foi colocado
+                    const placed = [];
+                    const leftover = []; // não coube neste arquivo: vai para o próximo
+                    let extent = 0;
+                    for (const shape of remaining) {
+                        let pick = null;
+                        for (const o of shape.orients) {
+                            for (let xs = -o.minC; xs + o.maxC < Wc; xs++) {
+                                // "Sobe" a estampa até encostar (respeitando o espaçamento) no que já existe
+                                let y = -o.minTop;
+                                for (let c = o.minC; c <= o.maxC; c++) {
+                                    const t = o.top[c];
+                                    if (t >= 0) { const need = sky[xs + c] - t; if (need > y) y = need; }
+                                }
+                                const bottom = y + o.maxBottom;
+                                if (bottom >= Hc) continue; // passaria da altura máxima
+                                if (!pick || bottom < pick.bottom || (bottom === pick.bottom && (y < pick.y || (y === pick.y && xs < pick.xs)))) {
+                                    pick = { o, xs, y, bottom };
+                                }
                             }
                         }
+                        if (!pick) { leftover.push(shape); continue; }
+                        const { o, xs, y } = pick;
+                        for (let d = 0; d < o.bottomD.length; d++) {
+                            const col = xs + d - g;
+                            if (o.bottomD[d] < 0 || col < 0 || col >= Wc) continue;
+                            sky[col] = Math.max(sky[col], y + o.bottomD[d] + 1);
+                        }
+                        extent = Math.max(extent, pick.bottom + 1);
+                        placed.push({ row: shape.row, x: xs * cellPx, y: y * cellPx, orient: o.orient });
                     }
-                    const { o, xs, y } = pick;
-                    for (let d = 0; d < o.bottomD.length; d++) {
-                        const col = xs + d - g;
-                        if (o.bottomD[d] < 0 || col < 0 || col >= Wc) continue;
-                        sky[col] = Math.max(sky[col], y + o.bottomD[d] + 1);
-                    }
-                    extent = Math.max(extent, pick.bottom + 1);
-                    placed.push({ row: shape.row, x: xs * cellPx, y: y * cellPx, orient: o.orient });
+                    if (placed.length === 0) throw new Error('Não foi possível organizar as estampas na altura máxima.');
+                    sheets.push({ placed, heightPx: Math.max(1, extent * cellPx) });
+                    remaining = leftover;
                 }
-                const heightPx = Math.max(1, extent * cellPx);
-                if (!best || heightPx < best.totalHeightPx) best = { sheets: [{ placed, heightPx }], totalHeightPx: heightPx };
+                const candidate = { sheets, totalHeightPx: sheets.reduce((sum, sh) => sum + sh.heightPx, 0) };
+                if (isBetterLayout(candidate, best)) best = candidate;
             });
             return { ...best, dpi, sheetWidthPx, items };
         }
@@ -4234,11 +4308,11 @@
             if (!settings.nest) return rect;
             const cellPx = Math.max(1, Math.round(dpi * NEST_CELL_MM / 25.4));
             group.forEach(row => {
-                if (!row.shape || row.shape.cellPx !== cellPx) row.shape = { ...analyzePrintShape(row.pixels, cellPx), cellPx };
+                row.shape = getPrintShape(row.pixels, cellPx);
                 if (row.shape.empty) throw new Error(`A estampa "${row.item.name}" é totalmente transparente.`);
             });
             const nested = nestPrints(group, settings, dpi);
-            return nested.totalHeightPx < rect.totalHeightPx ? nested : rect;
+            return isBetterLayout(nested, rect) ? nested : rect;
         }
 
         const orientedSize = (row, orient) => orient % 2 ? [row.heightPx, row.widthPx] : [row.widthPx, row.heightPx];
@@ -4302,21 +4376,45 @@
             statusEl.textContent = 'Organizando estampas...';
             await new Promise(r => setTimeout(r, 20)); // deixa a tela atualizar
 
-            // Um arquivo por resolução/perfil de cor, para nunca reamostrar nem converter as estampas
+            // Todas as artes na mesma imagem; só um perfil de cor diferente de sRGB fica em arquivo à parte
             const groups = {};
-            items.forEach(row => {
-                const key = `${row.dpi}|${row.colorKey}`;
-                (groups[key] = groups[key] || []).push(row);
-            });
-            const layouts = Object.values(groups).map(group => layoutPrints(group, settings, group[0].dpi));
+            items.forEach(row => { (groups[row.colorKey] = groups[row.colorKey] || []).push(row); });
+            const layouts = [];
+            for (const group of Object.values(groups)) {
+                // Resolução do arquivo = maior DPI do grupo; as menores são ampliadas repetindo pixels
+                const dpi = Math.max(...group.map(r => r.dpi));
+                for (const row of group) {
+                    row.shape = null;
+                    if (row.dpi === dpi) continue;
+                    const cached = printImageCache[row.item.image];
+                    cached.scaled = cached.scaled || {};
+                    if (!cached.scaled[dpi]) {
+                        statusEl.textContent = `Ajustando "${row.item.name}" de ${row.dpi} para ${dpi} DPI...`;
+                        await new Promise(r => setTimeout(r, 0));
+                        cached.scaled[dpi] = scalePixelsNearest(row.pixels, dpi / row.dpi);
+                    }
+                    row.pixels = cached.scaled[dpi];
+                    row.widthPx = row.pixels.width;
+                    row.heightPx = row.pixels.height;
+                    row.dpi = dpi;
+                }
+                // Perfil de cor do arquivo: o da primeira arte que tiver um
+                const withColor = group.find(r => r.colorChunks.length > 0);
+                group.forEach(r => { r.outputColorChunks = withColor ? withColor.colorChunks : []; });
+                statusEl.textContent = 'Organizando estampas...';
+                await new Promise(r => setTimeout(r, 0));
+                layouts.push(layoutPrints(group, settings, dpi));
+            }
 
             // Faixas com tinta (colagem sem apagar a vizinha) também para o encaixe retangular
-            items.forEach(r => { if (!r.shape) r.shape = { ...analyzePrintShape(r.pixels, 1e9), cellPx: 1e9 }; });
+            items.forEach(r => { if (!r.shape) r.shape = getPrintShape(r.pixels, 1e9); });
             renderPrintFilePreview(layouts);
             const copies = items.reduce((sum, r) => sum + r.copies, 0);
             const files = layouts.reduce((n, l) => n + l.sheets.length, 0);
             const heights = layouts.map(l => `${formatCm(pxToCm(l.totalHeightPx, l.dpi))} cm a ${l.dpi} DPI`).join(' + ');
-            statusEl.textContent = `${copies} estampas · largura ${formatCm(settings.widthCm)} cm · altura ${heights}${files > 1 ? ` · ${files} arquivos` : ''}.`;
+            if (layouts.length > 1) statusEl.dataset.note = ' Artes com perfil de cor diferente de sRGB ficaram em arquivo separado para não alterar as cores.';
+            else statusEl.dataset.note = '';
+            statusEl.textContent = `${copies} estampas · largura ${formatCm(settings.widthCm)} cm · altura ${heights}${files > 1 ? ` · ${files} arquivos` : ''}.${statusEl.dataset.note}`;
             return layouts;
         }
 
@@ -4438,7 +4536,7 @@
             const parts = [
                 new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
                 pngChunk('IHDR', ihdr),
-                ...layout.items[0].colorChunks, // perfil de cor original
+                ...layout.items[0].outputColorChunks, // perfil de cor original
                 pngChunk('pHYs', phys)
             ];
 
