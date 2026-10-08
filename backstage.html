@@ -1254,7 +1254,13 @@
             </div>
 
             <div class="space-y-2">
-                <h3 class="font-semibold text-gray-700 text-sm">Estampas em falta</h3>
+                <div class="flex flex-wrap justify-between items-center gap-2">
+                    <h3 class="font-semibold text-gray-700 text-sm">Estampas</h3>
+                    <select id="printFileSource" onchange="changePrintFileSource()" class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="missing">Em falta no estoque</option>
+                        <option value="all">Todas dos pedidos selecionados</option>
+                    </select>
+                </div>
                 <div class="border rounded-md overflow-hidden">
                     <table class="w-full text-sm text-left">
                         <thead class="bg-gray-100 text-muted-foreground font-medium">
@@ -1263,10 +1269,10 @@
                         <tbody id="printFileItemsBody" class="divide-y bg-white"></tbody>
                     </table>
                 </div>
-                <p class="text-xs text-muted-foreground">As cópias vêm preenchidas com a quantidade em falta. Cada estampa é colada exatamente como o arquivo enviado (mesmos pixels e resolução), apenas duplicada e posicionada.</p>
+                <p class="text-xs text-muted-foreground">As cópias vêm preenchidas com a quantidade em falta (ou a quantidade total dos pedidos selecionados). Cada estampa é colada exatamente como o arquivo enviado (mesmos pixels e resolução), apenas duplicada e posicionada.</p>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-4 items-end">
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-gray-700">Unidade</label>
                     <select id="printFileUnit" onchange="convertPrintFileUnit()" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
@@ -1283,6 +1289,10 @@
                     <input id="printFileGap" type="number" step="0.1" min="0" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ex: 1">
                 </div>
                 <div class="space-y-1">
+                    <label class="text-xs font-medium text-gray-700">Resolução do arquivo (DPI)</label>
+                    <input id="printFileDpi" type="number" step="1" min="72" value="350" placeholder="Original" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div class="space-y-1">
                     <label class="text-xs font-medium text-gray-700">Altura máxima por arquivo (m)</label>
                     <input id="printFileMaxHeight" type="number" step="0.1" min="0.1" value="10" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
@@ -1295,7 +1305,7 @@
                     </label>
                 </div>
             </div>
-            <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). O arquivo usa o maior DPI entre as artes; as de DPI menor são ampliadas repetindo pixels (sem criar cores novas e mantendo o tamanho em cm). Só uma arte com perfil de cor diferente de sRGB (ex.: Adobe RGB) sai em arquivo separado, para não alterar as cores.</p>
+            <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). O arquivo sai na resolução informada (padrão 350 DPI): artes com outro DPI são reamostradas por média de área, mantendo o tamanho em cm (deixe o campo vazio para usar o DPI original das artes). Estampas diferentes são intercaladas para aproveitar os espaços. Só uma arte com perfil de cor diferente de sRGB (ex.: Adobe RGB) sai em arquivo separado, para não alterar as cores.</p>
 
             <div id="printFileStatus" class="text-sm text-gray-600"></div>
             <div id="printFilePreview" class="space-y-4"></div>
@@ -3679,7 +3689,8 @@
 
                 // Estampas em falta alimentam o botão "Gerar Arquivo"
                 window.lastMissingPrints = missingByType['Estampa'] || [];
-                document.getElementById('generatePrintFileBtn').classList.toggle('hidden', window.lastMissingPrints.length === 0);
+                window.lastNeededPrints = needsByType['Estampa'] || [];
+                document.getElementById('generatePrintFileBtn').classList.toggle('hidden', window.lastNeededPrints.length === 0);
 
                 window.openModalById('materialReportModal');
                 lucide.createIcons();
@@ -3701,19 +3712,35 @@
         const formatCm = (value) => (Math.round(value * 10) / 10).toLocaleString('pt-BR');
         const pxToCm = (px, dpi) => px / dpi * 2.54;
 
-        window.openPrintFileModal = () => {
-            const missing = window.lastMissingPrints || [];
-            if (missing.length === 0) { alert('Nenhuma estampa em falta.'); return; }
-
-            printFileRows = missing.map(m => ({
-                item: m.item,
-                selected: !!m.item.image,
-                copies: Math.ceil(m.missing)
+        // Lista de estampas do modal: em falta no estoque ou tudo o que os pedidos selecionados usam
+        function loadPrintFileRows(source) {
+            const list = source === 'all'
+                ? (window.lastNeededPrints || []).map(n => ({ item: n.item, qty: n.qtyNeeded }))
+                : (window.lastMissingPrints || []).map(m => ({ item: m.item, qty: m.missing }));
+            printFileRows = list.map(entry => ({
+                item: entry.item,
+                selected: !!entry.item.image,
+                copies: Math.ceil(entry.qty)
             }));
+        }
+
+        window.changePrintFileSource = () => {
+            loadPrintFileRows(document.getElementById('printFileSource').value);
+            document.getElementById('printFilePreview').innerHTML = '';
+            document.getElementById('printFileStatus').textContent = '';
+            renderPrintFileRows();
+        }
+
+        window.openPrintFileModal = () => {
+            if ((window.lastNeededPrints || []).length === 0) { alert('Os pedidos selecionados não usam estampas.'); return; }
 
             // Preferências da última geração (apenas conveniência local)
             let saved = {};
             try { saved = JSON.parse(localStorage.getItem(PRINT_FILE_SETTINGS_KEY) || '{}'); } catch (e) { saved = {}; }
+            let source = saved.source === 'all' ? 'all' : 'missing';
+            if (source === 'missing' && (window.lastMissingPrints || []).length === 0) source = 'all';
+            document.getElementById('printFileSource').value = source;
+            loadPrintFileRows(source);
             const unit = saved.unit || 'cm';
             document.getElementById('printFileUnit').value = unit;
             document.getElementById('printFileUnit').dataset.current = unit;
@@ -3723,6 +3750,7 @@
             document.getElementById('printFileRotate').checked = saved.rotate !== false;
             document.getElementById('printFileNest').checked = saved.nest !== false;
             document.getElementById('printFileMaxHeight').value = saved.maxHeight || 10;
+            document.getElementById('printFileDpi').value = saved.dpi === '' ? '' : (saved.dpi || 350);
 
             document.getElementById('printFileStatus').textContent = '';
             document.getElementById('printFilePreview').innerHTML = '';
@@ -3960,28 +3988,88 @@
             return createImageBitmap(image);
         }
 
-        // Amplia repetindo pixels (vizinho mais próximo): nenhuma cor nova, só o DPI muda
-        function scalePixelsNearest(pixels, factor) {
-            const W = Math.max(1, Math.round(pixels.width * factor));
-            const H = Math.max(1, Math.round(pixels.height * factor));
-            const bytes = pixels.depth / 8 * 4;
-            const outStride = W * bytes;
-            const out = new Uint8Array(outStride * H);
-            const xMap = new Int32Array(W);
-            for (let x = 0; x < W; x++) xMap[x] = Math.min(pixels.width - 1, Math.floor((x + 0.5) / factor)) * bytes;
-            let prevSy = -1;
-            for (let y = 0; y < H; y++) {
-                const sy = Math.min(pixels.height - 1, Math.floor((y + 0.5) / factor));
-                const d = y * outStride;
-                if (sy === prevSy) { out.copyWithin(d, d - outStride, d); continue; } // mesma linha da origem
-                const s = pixels.offset + sy * pixels.stride;
-                for (let x = 0; x < W; x++) {
-                    const si = s + xMap[x], di = d + x * bytes;
-                    for (let c = 0; c < bytes; c++) out[di + c] = pixels.data[si + c];
+        // Reamostra para outro DPI por média de área (mantém o tamanho em cm). Cada pixel novo é a
+        // média ponderada dos pixels que ele cobre; a cor é ponderada pela transparência para não
+        // escurecer as bordas. Processa linha a linha para usar pouca memória.
+        function resamplePixelsArea(pixels, factor) {
+            const { width: W, height: H, data, stride, offset, depth } = pixels;
+            const W2 = Math.max(1, Math.round(W * factor));
+            const H2 = Math.max(1, Math.round(H * factor));
+            const bytes = depth / 8;
+            const pxBytes = 4 * bytes;
+            const maxV = depth === 16 ? 65535 : 255;
+
+            // Pesos de cada pixel de origem por pixel de destino (normalizados)
+            const buildWeights = (srcLen, dstLen) => {
+                const scale = srcLen / dstLen;
+                const start = new Int32Array(dstLen), count = new Int32Array(dstLen);
+                const idx = [], w = [];
+                for (let d = 0; d < dstLen; d++) {
+                    const s0 = d * scale, s1 = Math.min(srcLen, s0 + scale);
+                    start[d] = idx.length;
+                    for (let i = Math.floor(s0); i < Math.ceil(s1); i++) {
+                        const cover = Math.min(i + 1, s1) - Math.max(i, s0);
+                        if (cover > 1e-9) { idx.push(i); w.push(cover / (s1 - s0)); }
+                    }
+                    count[d] = idx.length - start[d];
                 }
-                prevSy = sy;
+                return { start, count, idx: Int32Array.from(idx), w: Float64Array.from(w) };
+            };
+            const hw = buildWeights(W, W2);
+            const vw = buildWeights(H, H2);
+            const read = depth === 16 ? (o) => (data[o] << 8) | data[o + 1] : (o) => data[o];
+
+            // Linha de origem reamostrada na horizontal: [alfa, R·alfa, G·alfa, B·alfa] por pixel
+            const rowCache = new Map();
+            const horizontalRow = (sy) => {
+                let row = rowCache.get(sy);
+                if (row) return row;
+                row = new Float64Array(W2 * 4);
+                const base = offset + sy * stride;
+                for (let x = 0; x < W2; x++) {
+                    let a = 0, r = 0, g = 0, b = 0;
+                    for (let k = hw.start[x], end = k + hw.count[x]; k < end; k++) {
+                        const o = base + hw.idx[k] * pxBytes;
+                        const alpha = read(o + 3 * bytes) / maxV;
+                        if (alpha === 0) continue;
+                        const wa = hw.w[k] * alpha;
+                        a += wa; r += wa * read(o); g += wa * read(o + bytes); b += wa * read(o + 2 * bytes);
+                    }
+                    const i = x * 4;
+                    row[i] = a; row[i + 1] = r; row[i + 2] = g; row[i + 3] = b;
+                }
+                rowCache.set(sy, row);
+                return row;
+            };
+
+            const outStride = W2 * pxBytes;
+            const out = new Uint8Array(outStride * H2);
+            const acc = new Float64Array(W2 * 4);
+            for (let y = 0; y < H2; y++) {
+                acc.fill(0);
+                const k0 = vw.start[y], k1 = k0 + vw.count[y];
+                for (let k = k0; k < k1; k++) {
+                    const row = horizontalRow(vw.idx[k]);
+                    const w = vw.w[k];
+                    for (let i = 0; i < acc.length; i++) acc[i] += w * row[i];
+                }
+                // Linhas que não serão mais usadas saem do cache
+                for (const key of rowCache.keys()) if (key < vw.idx[k0]) rowCache.delete(key);
+
+                const d0 = y * outStride;
+                for (let x = 0; x < W2; x++) {
+                    const i = x * 4;
+                    const alpha = Math.round(acc[i] * maxV);
+                    if (alpha <= 0) continue; // totalmente transparente
+                    const values = [acc[i + 1] / acc[i], acc[i + 2] / acc[i], acc[i + 3] / acc[i], alpha];
+                    const d = d0 + x * pxBytes;
+                    for (let c = 0; c < 4; c++) {
+                        const v = Math.min(maxV, Math.max(0, Math.round(values[c])));
+                        if (bytes === 2) { out[d + c * 2] = v >> 8; out[d + c * 2 + 1] = v & 0xFF; } else out[d + c] = v;
+                    }
+                }
             }
-            return { width: W, height: H, depth: pixels.depth, data: out, stride: outStride, offset: 0 };
+            return { width: W2, height: H2, depth, data: out, stride: outStride, offset: 0 };
         }
 
         async function loadPrintImage(row, onProgress) {
@@ -4023,11 +4111,15 @@
             const rotate = document.getElementById('printFileRotate').checked;
             const nest = document.getElementById('printFileNest').checked;
             const maxHeight = parseFloat(document.getElementById('printFileMaxHeight').value);
+            const dpiText = document.getElementById('printFileDpi').value.trim();
+            const dpi = dpiText === '' ? null : parseFloat(dpiText);
+            const source = document.getElementById('printFileSource').value;
+            if (dpi !== null && !(dpi >= 72 && dpi <= 1200)) throw new Error('Use uma resolução entre 72 e 1200 DPI (ou deixe vazio para o DPI original).');
             if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
             if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
             if (!(maxHeight > 0)) throw new Error('Informe a altura máxima por arquivo (em metros).');
-            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, maxHeight })); } catch (e) { /* sem armazenamento local */ }
-            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, maxHeightCm: maxHeight * 100 };
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, maxHeight, dpi: dpiText === '' ? '' : dpi, source })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, maxHeightCm: maxHeight * 100, dpi };
         }
 
         // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
@@ -4251,14 +4343,33 @@
 
             const copies = [];
             shapes.forEach(shape => { for (let c = 0; c < shape.row.copies; c++) copies.push(shape); });
-            const strategies = [
-                (a, b) => b.ink - a.ink,
-                (a, b) => Math.max(b.row.widthPx, b.row.heightPx) - Math.max(a.row.widthPx, a.row.heightPx) || b.ink - a.ink
-            ];
+
+            // Ordens de encaixe testadas: maiores primeiro e variações que intercalam estampas
+            // diferentes (as pequenas preenchem os vãos das grandes)
+            const bySize = [...copies].sort((a, b) => b.ink - a.ink);
+            const byLongSide = [...copies].sort((a, b) =>
+                Math.max(b.row.widthPx, b.row.heightPx) - Math.max(a.row.widthPx, a.row.heightPx) || b.ink - a.ink);
+            const roundRobin = (() => { // uma de cada estampa por vez, das maiores para as menores
+                const queues = [...shapes].sort((a, b) => b.ink - a.ink).map(sh => Array(sh.row.copies).fill(sh));
+                const order = [];
+                while (order.length < copies.length) queues.forEach(q => { if (q.length) order.push(q.pop()); });
+                return order;
+            })();
+            let seed = 12345;
+            const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+            const jittered = () => copies.map(c => ({ c, k: c.ink * (0.6 + 0.8 * random()) }))
+                .sort((a, b) => b.k - a.k).map(e => e.c);
+            const orders = [bySize, byLongSide, roundRobin];
 
             let best = null;
-            strategies.forEach(sortFn => {
-                let remaining = [...copies].sort(sortFn);
+            const started = Date.now();
+            for (let attempt = 0; ; attempt++) {
+                // Depois das ordens fixas, tenta misturas aleatórias por até ~3 s
+                if (attempt >= orders.length) {
+                    if (attempt >= orders.length + 12 || Date.now() - started > 3000 || shapes.length < 2) break;
+                    orders.push(jittered());
+                }
+                let remaining = orders[attempt];
                 const sheets = [];
                 while (remaining.length > 0) {
                     const sky = new Int32Array(Wc); // por coluna: primeira linha livre abaixo do que já foi colocado
@@ -4298,7 +4409,7 @@
                 }
                 const candidate = { sheets, totalHeightPx: sheets.reduce((sum, sh) => sum + sh.heightPx, 0) };
                 if (isBetterLayout(candidate, best)) best = candidate;
-            });
+            }
             return { ...best, dpi, sheetWidthPx, items };
         }
 
@@ -4381,8 +4492,8 @@
             items.forEach(row => { (groups[row.colorKey] = groups[row.colorKey] || []).push(row); });
             const layouts = [];
             for (const group of Object.values(groups)) {
-                // Resolução do arquivo = maior DPI do grupo; as menores são ampliadas repetindo pixels
-                const dpi = Math.max(...group.map(r => r.dpi));
+                // Resolução do arquivo: a informada (ex.: 350) ou, se vazia, o maior DPI das artes
+                const dpi = settings.dpi || Math.max(...group.map(r => r.dpi));
                 for (const row of group) {
                     row.shape = null;
                     if (row.dpi === dpi) continue;
@@ -4391,7 +4502,7 @@
                     if (!cached.scaled[dpi]) {
                         statusEl.textContent = `Ajustando "${row.item.name}" de ${row.dpi} para ${dpi} DPI...`;
                         await new Promise(r => setTimeout(r, 0));
-                        cached.scaled[dpi] = scalePixelsNearest(row.pixels, dpi / row.dpi);
+                        cached.scaled[dpi] = resamplePixelsArea(row.pixels, dpi / row.dpi);
                     }
                     row.pixels = cached.scaled[dpi];
                     row.widthPx = row.pixels.width;
