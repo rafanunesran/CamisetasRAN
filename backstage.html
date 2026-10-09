@@ -1294,7 +1294,7 @@
                 </div>
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-gray-700">Altura máxima por arquivo (m)</label>
-                    <input id="printFileMaxHeight" type="number" step="0.1" min="0.1" value="4.5" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <input id="printFileMaxHeight" type="number" step="0.1" min="0.1" value="10" class="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
                 <div class="space-y-1">
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700">
@@ -1302,6 +1302,9 @@
                     </label>
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Áreas 100% transparentes de uma estampa podem ficar sobre outra; o espaçamento vale entre as partes com tinta">
                         <input id="printFileNest" type="checkbox" checked class="h-4 w-4"> Encaixar nas áreas transparentes
+                    </label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Divide em arquivos de no máximo 65.000 px de altura (≈ 4,7 m a 350 DPI). Use só se o RIP recusar arquivos maiores.">
+                        <input id="printFileRipLimit" type="checkbox" class="h-4 w-4"> Limitar a 65.000 px (RIP)
                     </label>
                     <label class="flex items-center gap-2 text-xs font-medium text-gray-700" title="Depois de organizar, encaixa nos espaços que sobram estampas de outros pedidos ativos (sem aumentar a altura do arquivo)">
                         <input id="printFileFillOrders" type="checkbox" checked class="h-4 w-4"> Sobras: outros pedidos
@@ -1314,7 +1317,7 @@
                     </label>
                 </div>
             </div>
-            <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). Para ser aceito pelos RIPs, cada arquivo tem no máximo 65.000 px de altura (≈ 4,7 m a 350 DPI). O arquivo sai na resolução informada (padrão 350 DPI): artes com outro DPI são reamostradas por média de área, mantendo o tamanho em cm (deixe o campo vazio para usar o DPI original das artes). Estampas diferentes são intercaladas para aproveitar os espaços. Só uma arte com perfil de cor diferente de sRGB (ex.: Adobe RGB) sai em arquivo separado, para não alterar as cores.</p>
+            <p class="text-xs text-muted-foreground">Todas as artes vão na mesma imagem, organizadas para o menor desperdício; a altura é automática até o máximo informado (passando disso, continua em um novo arquivo). Se o RIP recusar arquivos muito longos, marque "Limitar a 65.000 px" (≈ 4,7 m a 350 DPI por arquivo). O arquivo sai na resolução informada (padrão 350 DPI): artes com outro DPI são reamostradas por média de área, mantendo o tamanho em cm (deixe o campo vazio para usar o DPI original das artes). Estampas diferentes são intercaladas para aproveitar os espaços. Artes com perfis de cor diferentes (ex.: sRGB e Adobe RGB) são convertidas para o perfil de maior gama entre elas, mantendo a aparência, e vão para a mesma imagem.</p>
 
             <div id="printFileStatus" class="text-sm text-gray-600"></div>
             <div id="printFilePreview" class="space-y-4"></div>
@@ -3768,7 +3771,8 @@
             document.getElementById('printFile16').checked = saved.keep16 === true;
             document.getElementById('printFileFillOrders').checked = saved.fillOrders !== false;
             document.getElementById('printFileFillStock').checked = saved.fillStock !== false;
-            document.getElementById('printFileMaxHeight').value = saved.maxHeight || 4.5;
+            document.getElementById('printFileMaxHeight').value = saved.maxHeight || 10;
+            document.getElementById('printFileRipLimit').checked = saved.ripLimit === true;
             document.getElementById('printFileDpi').value = saved.dpi === '' ? '' : (saved.dpi || 350);
 
             document.getElementById('printFileStatus').textContent = '';
@@ -4159,6 +4163,7 @@
             const keep16 = document.getElementById('printFile16').checked;
             const fillOrders = document.getElementById('printFileFillOrders').checked;
             const fillStock = document.getElementById('printFileFillStock').checked;
+            const ripLimit = document.getElementById('printFileRipLimit').checked;
             const maxHeight = parseFloat(document.getElementById('printFileMaxHeight').value);
             const dpiText = document.getElementById('printFileDpi').value.trim();
             const dpi = dpiText === '' ? null : parseFloat(dpiText);
@@ -4167,8 +4172,8 @@
             if (!(width > 0)) throw new Error('Informe a largura do arquivo.');
             if (gap < 0) throw new Error('O espaçamento não pode ser negativo.');
             if (!(maxHeight > 0)) throw new Error('Informe a altura máxima por arquivo (em metros).');
-            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, keep16, fillOrders, fillStock, maxHeight, dpi: dpiText === '' ? '' : dpi, source })); } catch (e) { /* sem armazenamento local */ }
-            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, keep16, fillOrders, fillStock, maxHeightCm: maxHeight * 100, dpi };
+            try { localStorage.setItem(PRINT_FILE_SETTINGS_KEY, JSON.stringify({ unit, width, gap, rotate, nest, keep16, fillOrders, fillStock, ripLimit, maxHeight, dpi: dpiText === '' ? '' : dpi, source })); } catch (e) { /* sem armazenamento local */ }
+            return { widthCm: toCm(width), gapCm: toCm(gap), rotate, nest, keep16, fillOrders, fillStock, ripLimit, maxHeightCm: maxHeight * 100, dpi };
         }
 
         // Baixa as estampas selecionadas e lê pixels/DPI de cada arquivo
@@ -4189,6 +4194,7 @@
                 row.dpi = image.dpi || parseFloat(row.item.imageDpi) || null;
                 row.colorChunks = image.colorChunks;
                 row.colorKey = image.colorKey;
+                row.colorConverted = false;
                 if (!row.dpi) throw new Error(`A estampa "${row.item.name}" não tem DPI. Edite-a no Estoque e informe a resolução do arquivo.`);
             }
             renderPrintFileRows();
@@ -4472,7 +4478,36 @@
                 if (row.shape.empty) throw new Error(`A estampa "${row.item.name}" é totalmente transparente.`);
             });
             const nested = nestPrints(group, settings, dpi);
-            return isBetterLayout(nested, rect) ? nested : rect;
+            const best = isBetterLayout(nested, rect) ? nested : rect;
+            return best.sheets.length > 1 ? balanceSheets(best, group, settings, dpi) : best;
+        }
+
+        // Quando precisa de mais de um arquivo, distribui as cópias de cada estampa entre os arquivos
+        // (em vez de grandes no 1º e pequenas no último), para cada arquivo sair misturado e equilibrado
+        function balanceSheets(sequential, group, settings, dpi) {
+            const n = sequential.sheets.length;
+            const buckets = Array.from({ length: n }, () => new Map());
+            let next = 0;
+            [...group].sort((a, b) => b.widthPx * b.heightPx - a.widthPx * a.heightPx).forEach(row => {
+                for (let c = 0; c < row.copies; c++) {
+                    const bucket = buckets[next++ % n];
+                    bucket.set(row, (bucket.get(row) || 0) + 1);
+                }
+            });
+            const sheets = [];
+            for (const bucket of buckets) {
+                const subset = [...bucket].map(([row, copies]) => ({ ...row, copies }));
+                if (!subset.length) continue;
+                const rect = packPrints(subset, settings, dpi);
+                const nested = settings.nest ? nestPrints(subset, settings, dpi) : null;
+                const part = nested && isBetterLayout(nested, rect) ? nested : rect;
+                if (part.sheets.length !== 1) return sequential; // não coube equilibrado: mantém o sequencial
+                sheets.push(part.sheets[0]);
+            }
+            const balanced = { ...sequential, sheets, totalHeightPx: sheets.reduce((s, sh) => s + sh.heightPx, 0) };
+            // Os subconjuntos usam cópias de row: preserva a mesma estampa para a gravação
+            balanced.sheets.forEach(sh => sh.placed.forEach(p => { p.row = group.find(r => r.item === p.row.item) || p.row; }));
+            return balanced;
         }
 
         const orientedSize = (row, orient) => orient % 2 ? [row.heightPx, row.widthPx] : [row.widthPx, row.heightPx];
@@ -4536,7 +4571,7 @@
             if (row.dpi === dpi && !to8) return;
             const cached = printImageCache[row.item.image];
             cached.scaled = cached.scaled || {};
-            const key = `${dpi}|${to8 ? 8 : row.pixels.depth}`;
+            const key = `${dpi}|${to8 ? 8 : row.pixels.depth}|${row.colorConverted ? row.colorKey : 'original'}`;
             if (!cached.scaled[key]) {
                 statusEl.textContent = row.dpi === dpi
                     ? `Convertendo "${row.item.name}" para 8 bits...`
@@ -4696,6 +4731,151 @@
             return summary;
         }
 
+        // ---- Perfis de cor: unificar artes com perfis diferentes em um só arquivo ----
+        // Perfis RGB "matriz + curvas" (sRGB, Adobe RGB, Display P3...) são convertidos com precisão:
+        // cor -> linear (curva) -> XYZ (matriz) -> linear do destino -> curva inversa.
+        function parseIccMatrixProfile(profile) {
+            try {
+                const view = new DataView(profile.buffer, profile.byteOffset, profile.byteLength);
+                if (profile.length < 132 || String.fromCharCode(...profile.subarray(16, 20)) !== 'RGB ') return null;
+                const count = view.getUint32(128);
+                const tags = {};
+                for (let i = 0; i < count; i++) {
+                    const e = 132 + i * 12;
+                    tags[String.fromCharCode(...profile.subarray(e, e + 4))] = { offset: view.getUint32(e + 4), size: view.getUint32(e + 8) };
+                }
+                const s15 = (o) => view.getInt32(o) / 65536;
+                const xyz = (sig) => { const t = tags[sig]; return t ? [s15(t.offset + 8), s15(t.offset + 12), s15(t.offset + 16)] : null; };
+                const curve = (sig) => {
+                    const t = tags[sig];
+                    if (!t) return null;
+                    const type = String.fromCharCode(...profile.subarray(t.offset, t.offset + 4));
+                    if (type === 'curv') {
+                        const n = view.getUint32(t.offset + 8);
+                        if (n === 0) return (x) => x;
+                        if (n === 1) { const g = view.getUint16(t.offset + 12) / 256; return (x) => Math.pow(x, g); }
+                        const table = []; for (let i = 0; i < n; i++) table.push(view.getUint16(t.offset + 12 + i * 2) / 65535);
+                        return (x) => { const p = x * (n - 1), i = Math.min(n - 2, Math.floor(p)); return table[i] + (table[i + 1] - table[i]) * (p - i); };
+                    }
+                    if (type === 'para') {
+                        const fn = view.getUint16(t.offset + 8);
+                        const k = [0, 1, 2, 3, 4, 5, 6].map(i => t.offset + 12 + i * 4 < t.offset + t.size ? s15(t.offset + 12 + i * 4) : 0);
+                        const [g, a, b, c, d, e, f] = k;
+                        if (fn === 0) return (x) => Math.pow(x, g);
+                        if (fn === 1) return (x) => x >= -b / a ? Math.pow(a * x + b, g) : 0;
+                        if (fn === 2) return (x) => x >= -b / a ? Math.pow(a * x + b, g) + c : c;
+                        if (fn === 3) return (x) => x >= d ? Math.pow(a * x + b, g) : c * x;
+                        if (fn === 4) return (x) => x >= d ? Math.pow(a * x + b, g) + e : c * x + f;
+                    }
+                    return null;
+                };
+                const r = xyz('rXYZ'), g = xyz('gXYZ'), b = xyz('bXYZ');
+                const trc = [curve('rTRC'), curve('gTRC'), curve('bTRC')];
+                if (!r || !g || !b || trc.some(c => !c)) return null;
+                const M = [[r[0], g[0], b[0]], [r[1], g[1], b[1]], [r[2], g[2], b[2]]]; // RGB linear -> XYZ (D50)
+                const xy = (v) => [v[0] / (v[0] + v[1] + v[2]), v[1] / (v[0] + v[1] + v[2])];
+                const [p1, p2, p3] = [xy(r), xy(g), xy(b)];
+                const area = Math.abs((p2[0] - p1[0]) * (p3[1] - p1[1]) - (p3[0] - p1[0]) * (p2[1] - p1[1])) / 2;
+                return { M, trc, area };
+            } catch (e) { return null; }
+        }
+
+        function invert3(m) {
+            const [a, b, c] = m[0], [d, e, f] = m[1], [g, h, i] = m[2];
+            const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+            const det = a * A + b * B + c * C;
+            return [[A / det, -(b * i - c * h) / det, (b * f - c * e) / det],
+                    [B / det, (a * i - c * g) / det, -(a * f - c * d) / det],
+                    [C / det, -(a * h - b * g) / det, (a * e - b * d) / det]];
+        }
+
+        // Converte os pixels de um perfil para outro (intenção colorimétrica relativa)
+        function convertPixelsProfile(pixels, src, dst) {
+            const { width: W, height: H, data, stride, offset, depth } = pixels;
+            const bytes = depth / 8, px = 4 * bytes, maxV = depth === 16 ? 65535 : 255;
+            const levels = maxV + 1;
+            // Curva de entrada (valor -> linear) em tabela
+            const lin = src.trc.map(f => { const t = new Float64Array(levels); for (let v = 0; v < levels; v++) t[v] = Math.max(0, f(v / maxV)); return t; });
+            // Curva inversa do destino (linear -> valor) por tabela + busca binária
+            const N = 4096;
+            const inv = dst.trc.map(f => {
+                const fwd = new Float64Array(levels); for (let v = 0; v < levels; v++) fwd[v] = f(v / maxV);
+                const t = new Float64Array(N + 1);
+                for (let i = 0; i <= N; i++) {
+                    const target = i / N; let lo = 0, hi = maxV;
+                    while (lo < hi) { const mid = (lo + hi) >> 1; if (fwd[mid] < target) lo = mid + 1; else hi = mid; }
+                    // interpola entre lo-1 e lo para precisão sub-nível
+                    const v0 = Math.max(0, lo - 1), f0 = fwd[v0], f1 = fwd[lo];
+                    t[i] = f1 > f0 ? v0 + (target - f0) / (f1 - f0) * (lo - v0) : lo;
+                }
+                return (y) => { const p = Math.min(1, Math.max(0, y)) * N, i = Math.min(N - 1, Math.floor(p)); return t[i] + (t[i + 1] - t[i]) * (p - i); };
+            });
+            const Minv = invert3(dst.M);
+            const T = [0, 1, 2].map(r => [0, 1, 2].map(c => Minv[r][0] * src.M[0][c] + Minv[r][1] * src.M[1][c] + Minv[r][2] * src.M[2][c]));
+            const read = depth === 16 ? (o) => (data[o] << 8) | data[o + 1] : (o) => data[o];
+            const outStride = W * px;
+            const out = new Uint8Array(outStride * H);
+            for (let y = 0; y < H; y++) {
+                const s0 = offset + y * stride, d0 = y * outStride;
+                for (let x = 0; x < W; x++) {
+                    const s = s0 + x * px, d = d0 + x * px;
+                    const a = read(s + 3 * bytes);
+                    let rgb = [0, 0, 0];
+                    if (a !== 0) {
+                        const l0 = lin[0][read(s)], l1 = lin[1][read(s + bytes)], l2 = lin[2][read(s + 2 * bytes)];
+                        rgb = [0, 1, 2].map(k => Math.min(maxV, Math.max(0, Math.round(inv[k](T[k][0] * l0 + T[k][1] * l1 + T[k][2] * l2)))));
+                    }
+                    const vals = [rgb[0], rgb[1], rgb[2], a];
+                    for (let c = 0; c < 4; c++) {
+                        if (bytes === 2) { out[d + c * 2] = vals[c] >> 8; out[d + c * 2 + 1] = vals[c] & 0xFF; } else out[d + c] = vals[c];
+                    }
+                }
+            }
+            return { width: W, height: H, depth, data: out, stride: outStride, offset: 0 };
+        }
+
+        async function iccProfileOfRow(row) {
+            for (const chunk of row.colorChunks) {
+                const type = String.fromCharCode(chunk[4], chunk[5], chunk[6], chunk[7]);
+                if (type !== 'iCCP') continue;
+                const body = chunk.subarray(8, chunk.length - 4);
+                try { return await inflateZlib([body.subarray(body.indexOf(0) + 2)]); } catch (e) { return null; }
+            }
+            return base64ToBytes(SRGB_ICC_BASE64); // sem perfil ou marcado como sRGB
+        }
+
+        // Junta todas as artes num único perfil de cor (o de maior gama), convertendo as demais.
+        // Retorna false se algum perfil não puder ser convertido (aí os grupos ficam separados).
+        async function unifyColorProfiles(items, statusEl) {
+            const keys = [...new Set(items.map(r => r.colorKey))];
+            if (keys.length < 2) return true;
+            const profiles = {};
+            for (const row of items) {
+                if (profiles[row.colorKey]) continue;
+                const bytes = await iccProfileOfRow(row);
+                const parsed = bytes && parseIccMatrixProfile(bytes);
+                if (!parsed) return false;
+                profiles[row.colorKey] = { ...parsed, row };
+            }
+            const targetKey = keys.reduce((best, k) => profiles[k].area > profiles[best].area ? k : best, keys[0]);
+            const target = profiles[targetKey];
+            for (const row of items) {
+                if (row.colorKey === targetKey) continue;
+                const cached = printImageCache[row.item.image];
+                cached.converted = cached.converted || {};
+                if (!cached.converted[targetKey]) {
+                    statusEl.textContent = `Convertendo cores de "${row.item.name}" para o perfil do arquivo...`;
+                    await new Promise(r => setTimeout(r, 0));
+                    cached.converted[targetKey] = convertPixelsProfile(row.pixels, profiles[row.colorKey], target);
+                }
+                row.pixels = cached.converted[targetKey];
+                row.colorKey = targetKey;
+                row.colorChunks = target.row.colorChunks.length ? target.row.colorChunks : row.colorChunks;
+                row.colorConverted = true;
+            }
+            return true;
+        }
+
         const MAX_RIP_PIXELS = 65000;  // por lado
         const MAX_PDF_PAGE_CM = 508;   // 200 polegadas, sem precisar de UserUnit
 
@@ -4707,6 +4887,8 @@
             await new Promise(r => setTimeout(r, 20)); // deixa a tela atualizar
 
             // Todas as artes na mesma imagem; só um perfil de cor diferente de sRGB fica em arquivo à parte
+            // Perfis de cor diferentes: converte para o de maior gama e mantém tudo na mesma imagem
+            const unified = await unifyColorProfiles(items, statusEl);
             const groups = {};
             items.forEach(row => { (groups[row.colorKey] = groups[row.colorKey] || []).push(row); });
             const layouts = [];
@@ -4724,8 +4906,10 @@
                 await new Promise(r => setTimeout(r, 0));
                 // Limite de compatibilidade com RIPs: no máximo 65.000 px por lado (vários RIPs e
                 // bibliotecas de imagem não aceitam mais que 65.535) e página PDF até 200" (5,08 m)
-                const groupSettings = { ...settings, maxHeightCm: Math.min(settings.maxHeightCm, MAX_RIP_PIXELS / dpi * 2.54, MAX_PDF_PAGE_CM) };
-                if (Math.round(settings.widthCm / 2.54 * dpi) > MAX_RIP_PIXELS) {
+                const groupSettings = settings.ripLimit
+                    ? { ...settings, maxHeightCm: Math.min(settings.maxHeightCm, MAX_RIP_PIXELS / dpi * 2.54, MAX_PDF_PAGE_CM) }
+                    : settings;
+                if (settings.ripLimit && Math.round(settings.widthCm / 2.54 * dpi) > MAX_RIP_PIXELS) {
                     throw new Error(`Largura de ${formatCm(settings.widthCm)} cm a ${dpi} DPI passa de ${MAX_RIP_PIXELS.toLocaleString('pt-BR')} px. Reduza a largura ou o DPI.`);
                 }
                 if (groupSettings.maxHeightCm < settings.maxHeightCm) ripLimited = groupSettings.maxHeightCm;
@@ -4750,7 +4934,9 @@
             const files = layouts.reduce((n, l) => n + l.sheets.length, 0);
             const heights = layouts.map(l => `${formatCm(pxToCm(l.totalHeightPx, l.dpi))} cm a ${l.dpi} DPI`).join(' + ');
             statusEl.dataset.note = '';
-            if (layouts.length > 1) statusEl.dataset.note += ' Artes com perfil de cor diferente de sRGB ficaram em arquivo separado para não alterar as cores.';
+            if (layouts.length > 1) statusEl.dataset.note += ' Uma arte tem um perfil de cor que não pode ser convertido com segurança e ficou em arquivo separado.';
+            const converted = items.filter(r => r.colorConverted).map(r => r.item.name);
+            if (unified && converted.length) statusEl.dataset.note += ` Cores convertidas para o perfil do arquivo (mesma aparência): ${converted.join(', ')}.`;
             if (ripLimited) statusEl.dataset.note += ` Cada arquivo foi limitado a ${formatCm(ripLimited / 100)} m de altura para ser aceito pelo RIP (até ${MAX_RIP_PIXELS.toLocaleString('pt-BR')} px).`;
             statusEl.dataset.note += extrasText;
             statusEl.textContent = `${copies} estampas · largura ${formatCm(settings.widthCm)} cm · altura ${heights}${files > 1 ? ` · ${files} arquivos` : ''}.${statusEl.dataset.note}`;
