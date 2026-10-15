@@ -5558,6 +5558,27 @@
             renderOrderItems();
         }
 
+        window.updateOrderItemQty = (index, value) => {
+            const item = orderList[index];
+            if (!item) return;
+            const qty = parseFloat(value);
+            if (isNaN(qty) || qty <= 0) return;
+            const unitPrice = !isNaN(parseFloat(item.price)) ? parseFloat(item.price) : (item.qty ? item.total / item.qty : 0);
+            item.price = unitPrice;
+            item.qty = qty;
+            item.total = qty * unitPrice;
+            const cell = document.querySelector(`#orderItemsList [data-item-total="${index}"]`);
+            if (cell) cell.textContent = `R$ ${item.total.toFixed(2)}`;
+            updateOrderTotals();
+        }
+
+        function updateOrderTotals() {
+            const subtotal = orderList.reduce((acc, item) => acc + item.total, 0);
+            const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
+            document.getElementById('orderSubtotalDisplay').textContent = `R$ ${subtotal.toFixed(2)}`;
+            document.getElementById('orderTotalDisplay').textContent = `R$ ${(subtotal - discount).toFixed(2)}`;
+        }
+
         function renderOrderItems() {
             const tbody = document.getElementById('orderItemsList');
             tbody.innerHTML = '';
@@ -5569,8 +5590,8 @@
                 tr.innerHTML = `
                     <td class="px-4 py-2">${item.name}</td>
                     <td class="px-4 py-2 text-xs text-gray-600">${item.category || '-'} / ${item.size || '-'}</td>
-                    <td class="px-4 py-2">${item.qty}</td>
-                    <td class="px-4 py-2">R$ ${item.total.toFixed(2)}</td>
+                    <td class="px-4 py-2"><input type="number" min="1" step="1" value="${item.qty}" oninput="updateOrderItemQty(${index}, this.value)" class="h-8 w-16 rounded-md border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"></td>
+                    <td class="px-4 py-2" data-item-total="${index}">R$ ${item.total.toFixed(2)}</td>
                     <td class="px-4 py-2 text-right">
                         <button onclick="removeOrderProduct(${index})" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
                     </td>
