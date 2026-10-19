@@ -1,6 +1,6 @@
 // Service worker do UniformeGestor: permite instalar como app e abrir as páginas offline.
 // Estratégia "rede primeiro": sempre busca a versão mais nova e usa o cache só se estiver sem internet.
-const CACHE = 'ran-gestor-v2';
+const CACHE = 'ran-gestor-v3';
 const PRECACHE = ['./', './index.html', './login.html', './backstage.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
