@@ -1,0 +1,18 @@
+{
+  "name": "UniformeGestor - Camisetas RAN",
+  "short_name": "RAN Gestor",
+  "description": "Gestão de pedidos, produção e estoque da Camisetas RAN",
+  "id": "./backstage.html",
+  "start_url": "./backstage.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#2E3A87",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
